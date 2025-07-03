@@ -34,7 +34,7 @@ export const JournalEntryScreen: React.FC<JournalEntryScreenProps> = ({
   onCancel,
   onBack,
 }) => {
-  const { addEntry, updateEntry } = useJournalStore();
+  const { addEntry, updateEntry, entries, loadEntries } = useJournalStore();
   const { activeEntry, startTracking, stopTracking } = useTimeTrackingStore();
   const [loading, setLoading] = useState(false);
   
@@ -79,6 +79,11 @@ export const JournalEntryScreen: React.FC<JournalEntryScreenProps> = ({
   const [selectedAETCategories, setSelectedAETCategories] = useState<string[]>([]);
   
   const scrollViewRef = useRef<ScrollView>(null);
+
+  // Load entries on mount
+  useEffect(() => {
+    loadEntries();
+  }, [loadEntries]);
 
   const categories = [
     { label: 'Feeding & Nutrition', value: 'Feeding & Nutrition' },
@@ -656,6 +661,23 @@ export const JournalEntryScreen: React.FC<JournalEntryScreenProps> = ({
   const dismissAutofillPrompt = () => {
     setShowAutofillPrompt(false);
     setAutofillSuggestions(null);
+  };
+
+  const handleUseLastLocation = () => {
+    // Get the most recent entry that has a location
+    const sortedEntries = [...entries].sort((a, b) => 
+      new Date(b.date).getTime() - new Date(a.date).getTime()
+    );
+    
+    const lastEntryWithLocation = sortedEntries.find(entry => 
+      entry.location?.address && entry.location.address.trim() !== ''
+    );
+    
+    if (lastEntryWithLocation && lastEntryWithLocation.location?.address) {
+      setFormData(prev => ({ ...prev, location: lastEntryWithLocation.location.address }));
+    } else {
+      Alert.alert('No Previous Location', 'No previous location found in your journal entries.');
+    }
   };
 
   // Trigger autofill when enough context is available
@@ -1390,7 +1412,17 @@ export const JournalEntryScreen: React.FC<JournalEntryScreenProps> = ({
               </View>
               
               <View style={styles.contextInputWrapper}>
-                <Text style={styles.contextInputLabel}>Location</Text>
+                <View style={styles.locationLabelRow}>
+                  <Text style={styles.contextInputLabel}>Location</Text>
+                  {!useLocationWeather && !locationLoading && (
+                    <TouchableOpacity
+                      style={styles.useLastButton}
+                      onPress={handleUseLastLocation}
+                    >
+                      <Text style={styles.useLastButtonText}>Use Last</Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
                 <TextInput
                   style={[
                     styles.contextInput,
@@ -1724,6 +1756,23 @@ const styles = StyleSheet.create({
     backgroundColor: '#F5F5F5',
     color: '#999',
     opacity: 0.8,
+  },
+  locationLabelRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  useLastButton: {
+    backgroundColor: '#007AFF',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 6,
+  },
+  useLastButtonText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '600',
   },
   dateDisplay: {
     backgroundColor: '#FFFFFF',

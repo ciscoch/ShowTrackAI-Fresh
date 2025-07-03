@@ -8,7 +8,9 @@ import {
   ScrollView,
   Alert,
   Switch,
+  ActivityIndicator,
 } from 'react-native';
+import * as Location from 'expo-location';
 import { Journal, FeedTrackingData, FeedItem } from '../../../core/models/Journal';
 import { useJournalStore } from '../../../core/stores/JournalStore';
 import { useTimeTrackingStore } from '../../../core/stores/TimeTrackingStore';
@@ -60,6 +62,9 @@ export const JournalEntryScreen: React.FC<JournalEntryScreenProps> = ({
   });
   const [aiSuggestions, setAiSuggestions] = useState<AIActivitySuggestion | null>(null);
   const [useLocationWeather, setUseLocationWeather] = useState(false);
+  const [locationLoading, setLocationLoading] = useState(false);
+  const [weatherLoading, setWeatherLoading] = useState(false);
+  const [locationPermission, setLocationPermission] = useState<Location.LocationPermissionResponse | null>(null);
 
   const [isTracking, setIsTracking] = useState(false);
   const [suggestedSkills, setSuggestedSkills] = useState<string[]>([]);
@@ -216,15 +221,117 @@ export const JournalEntryScreen: React.FC<JournalEntryScreenProps> = ({
     setFeedData(prev => ({ ...prev, notes }));
   };
 
+  const requestLocationPermission = async (): Promise<boolean> => {
+    try {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      const permissionResponse = await Location.getForegroundPermissionsAsync();
+      setLocationPermission(permissionResponse);
+      
+      if (status !== 'granted') {
+        Alert.alert(
+          'Location Permission Required',
+          'Please enable location permissions in your device settings to use automatic weather and location features.',
+          [{ text: 'OK' }]
+        );
+        return false;
+      }
+      return true;
+    } catch (error) {
+      console.error('Permission request error:', error);
+      return false;
+    }
+  };
+
+  const getCurrentLocation = async (): Promise<Location.LocationObject | null> => {
+    try {
+      setLocationLoading(true);
+      const location = await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.Balanced,
+        timeInterval: 5000,
+      });
+      return location;
+    } catch (error) {
+      console.error('Location error:', error);
+      Alert.alert('Location Error', 'Unable to get current location. Please enter manually.');
+      return null;
+    } finally {
+      setLocationLoading(false);
+    }
+  };
+
+  const reverseGeocode = async (latitude: number, longitude: number): Promise<string> => {
+    try {
+      const result = await Location.reverseGeocodeAsync({ latitude, longitude });
+      if (result && result.length > 0) {
+        const addr = result[0];
+        const parts = [];
+        if (addr.name) parts.push(addr.name);
+        if (addr.city) parts.push(addr.city);
+        if (addr.region) parts.push(addr.region);
+        return parts.join(', ') || 'Unknown Location';
+      }
+      return 'Unknown Location';
+    } catch (error) {
+      console.error('Reverse geocoding error:', error);
+      return 'Unknown Location';
+    }
+  };
+
+  const getWeatherData = async (latitude: number, longitude: number): Promise<string> => {
+    try {
+      setWeatherLoading(true);
+      // Using a simple weather simulation since we don't have a weather API key
+      // In production, you would integrate with OpenWeatherMap, WeatherAPI, etc.
+      const temperature = Math.round(Math.random() * 40 + 50); // 50-90°F
+      const conditions = ['Clear', 'Partly Cloudy', 'Cloudy', 'Sunny'][Math.floor(Math.random() * 4)];
+      const humidity = Math.round(Math.random() * 40 + 30); // 30-70%
+      
+      return `${conditions}, ${temperature}°F, ${humidity}% humidity`;
+    } catch (error) {
+      console.error('Weather error:', error);
+      return 'Weather data unavailable';
+    } finally {
+      setWeatherLoading(false);
+    }
+  };
+
   const getLocationWeather = async () => {
     if (!useLocationWeather) return;
     
+    // Request permission first
+    const hasPermission = await requestLocationPermission();
+    if (!hasPermission) {
+      setUseLocationWeather(false);
+      return;
+    }
+    
     try {
-      // Simulate geolocation and weather API call
-      const weather = `Clear, 72°F at ${formData.location || 'Current Location'}`;
-      setFormData(prev => ({ ...prev, weather }));
+      // Get current location
+      const location = await getCurrentLocation();
+      if (!location) {
+        setUseLocationWeather(false);
+        return;
+      }
+      
+      const { latitude, longitude } = location.coords;
+      
+      // Get location name and weather data in parallel
+      const [locationName, weatherData] = await Promise.all([
+        reverseGeocode(latitude, longitude),
+        getWeatherData(latitude, longitude)
+      ]);
+      
+      // Update form data
+      setFormData(prev => ({
+        ...prev,
+        location: locationName,
+        weather: weatherData
+      }));
+      
     } catch (error) {
       console.error('Failed to get location weather:', error);
+      Alert.alert('Error', 'Failed to get location and weather data. Please try again or enter manually.');
+      setUseLocationWeather(false);
     }
   };
 
@@ -648,61 +755,117 @@ export const JournalEntryScreen: React.FC<JournalEntryScreenProps> = ({
             />
           </View>
 
-          <View style={styles.contextRow}>
-            <View style={styles.contextField}>
-              <Text style={styles.contextLabel}>📅 Date</Text>
-              <TouchableOpacity style={styles.contextButton}>
-                <DatePicker
-                  value={formData.date}
-                  onDateChange={(date) => setFormData(prev => ({ ...prev, date: date || new Date() }))}
-                  placeholder="Select date"
-                  renderButton={({ onPress }) => (
-                    <TouchableOpacity style={styles.dateButton} onPress={onPress}>
-                      <Text style={styles.dateText}>
-                        {formData.date.toLocaleDateString('en-US', { 
-                          month: 'short', 
-                          day: 'numeric', 
-                          year: 'numeric' 
-                        })}
-                      </Text>
-                    </TouchableOpacity>
-                  )}
-                />
-              </TouchableOpacity>
-            </View>
-            
-            <View style={styles.contextField}>
-              <View style={styles.contextLabelRow}>
-                <Text style={styles.contextLabel}>🌤️ Weather</Text>
-                <Switch
-                  value={useLocationWeather}
-                  onValueChange={(value) => {
-                    setUseLocationWeather(value);
-                    if (value) getLocationWeather();
-                  }}
-                  trackColor={{ false: '#E5E5EA', true: '#34C759' }}
-                  thumbColor="#FFFFFF"
-                  style={styles.miniSwitch}
-                />
+          <View style={styles.contextCardsRow}>
+            {/* Date Card */}
+            <View style={styles.contextCard}>
+              <View style={styles.contextCardHeaderSimple}>
+                <View style={styles.dateIconContainer}>
+                  <Text style={styles.calendarIcon}>📅</Text>
+                  <Text style={styles.calendarNumber}>17</Text>
+                </View>
+                <Text style={styles.contextCardTitleFixed} numberOfLines={1}>Date</Text>
               </View>
+              <DatePicker
+                value={formData.date}
+                onDateChange={(date) => setFormData(prev => ({ ...prev, date: date || new Date() }))}
+                placeholder="Select date"
+                renderButton={({ onPress }) => (
+                  <TouchableOpacity style={styles.dateDisplay} onPress={onPress}>
+                    <Text style={styles.dateDisplayText}>
+                      {formData.date.toLocaleDateString('en-US', { 
+                        month: 'numeric', 
+                        day: 'numeric', 
+                        year: '2-digit' 
+                      })}
+                    </Text>
+                    <View style={styles.miniCalendar}>
+                      <Text style={styles.miniCalendarText}>📅</Text>
+                      <Text style={styles.miniCalendarDate}>17</Text>
+                    </View>
+                  </TouchableOpacity>
+                )}
+              />
+            </View>
+
+            {/* Weather Card */}
+            <View style={styles.contextCard}>
+              <View style={styles.contextCardHeader}>
+                <View style={styles.weatherIconContainer}>
+                  <Text style={styles.weatherIcon}>🌤️</Text>
+                </View>
+                <Text style={styles.contextCardTitleFixed} numberOfLines={1}>Weather</Text>
+                <TouchableOpacity
+                  style={[
+                    styles.geoButton,
+                    useLocationWeather && styles.geoButtonActive
+                  ]}
+                  onPress={() => {
+                    const newValue = !useLocationWeather;
+                    setUseLocationWeather(newValue);
+                    if (newValue) getLocationWeather();
+                  }}
+                  disabled={weatherLoading || locationLoading}
+                >
+                  {(weatherLoading || locationLoading) ? (
+                    <ActivityIndicator size="small" color="#666" />
+                  ) : (
+                    <Text style={[
+                      styles.geoIcon,
+                      useLocationWeather && styles.geoIconActive
+                    ]}>📍</Text>
+                  )}
+                </TouchableOpacity>
+              </View>
+              
+              {useLocationWeather && (
+                <View style={styles.statusIndicator}>
+                  <View style={[styles.statusDot, styles.statusDotActive]} />
+                  <Text style={styles.statusText}>Auto-detecting location & weather</Text>
+                </View>
+              )}
+              
               <TextInput
-                style={styles.contextInput}
+                style={[
+                  styles.weatherInput,
+                  (weatherLoading || locationLoading) && styles.inputLoading
+                ]}
                 value={formData.weather}
                 onChangeText={(text) => setFormData(prev => ({ ...prev, weather: text }))}
-                placeholder={useLocationWeather ? "Auto..." : "75°F Sunny"}
-                editable={!useLocationWeather}
+                placeholder="Clear, 72°F, 45% humidity"
+                editable={!useLocationWeather && !weatherLoading && !locationLoading}
                 placeholderTextColor="#999"
               />
             </View>
-            
-            <View style={styles.contextField}>
-              <Text style={styles.contextLabel}>📍 Location</Text>
+
+            {/* Location Card */}
+            <View style={styles.contextCard}>
+              <View style={styles.contextCardHeaderSimple}>
+                <View style={styles.locationIconContainer}>
+                  <Text style={styles.locationIcon}>📍</Text>
+                </View>
+                <Text style={styles.contextCardTitleFixed} numberOfLines={1}>Location</Text>
+              </View>
+              
+              {useLocationWeather && locationLoading && (
+                <View style={styles.statusIndicator}>
+                  <ActivityIndicator size="small" color="#FF6B6B" />
+                  <Text style={styles.statusText}>Getting location...</Text>
+                </View>
+              )}
+              
               <TextInput
-                style={styles.contextInput}
+                style={[
+                  styles.locationInput,
+                  (locationLoading) && styles.inputLoading
+                ]}
                 value={formData.location}
                 onChangeText={(text) => setFormData(prev => ({ ...prev, location: text }))}
-                placeholder="Barn A"
+                placeholder="Barn A, Farm Name, City"
                 placeholderTextColor="#999"
+                multiline={true}
+                numberOfLines={2}
+                textAlignVertical="top"
+                editable={!locationLoading}
               />
             </View>
           </View>
@@ -913,59 +1076,212 @@ const styles = StyleSheet.create({
     flex: 1,
     marginHorizontal: 2,
   },
-  contextRow: {
+  contextCardsRow: {
     flexDirection: 'row',
-    gap: 10,
-    marginTop: 16,
+    gap: 8,
+    marginTop: 20,
   },
-  contextField: {
+  contextCard: {
     flex: 1,
     backgroundColor: '#F8F9FA',
-    borderRadius: 10,
+    borderRadius: 16,
     padding: 12,
     borderWidth: 1,
-    borderColor: '#E5E5EA',
+    borderColor: '#E8E8E8',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
+    minHeight: 120,
+    minWidth: 100,
   },
-  contextLabel: {
-    fontSize: 12,
+  contextCardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+    justifyContent: 'space-between',
+  },
+  contextCardHeaderSimple: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  contextCardTitle: {
+    fontSize: 14,
     fontWeight: '600',
-    color: '#666',
-    marginBottom: 6,
+    color: '#333',
+    flex: 1,
+    marginLeft: 8,
+    lineHeight: 18,
+    flexShrink: 1,
   },
-  contextLabelRow: {
+  contextCardTitleFixed: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#333',
+    marginLeft: 6,
+    textAlign: 'left',
+    flexShrink: 0,
+    width: 'auto',
+  },
+  dateIconContainer: {
+    backgroundColor: '#FFF',
+    borderRadius: 8,
+    padding: 6,
+    borderWidth: 1,
+    borderColor: '#E8E8E8',
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: 32,
+    height: 32,
+  },
+  calendarIcon: {
+    fontSize: 16,
+    position: 'absolute',
+    top: 2,
+  },
+  calendarNumber: {
+    fontSize: 10,
+    fontWeight: 'bold',
+    color: '#333',
+    marginTop: 12,
+  },
+  weatherIconContainer: {
+    backgroundColor: '#FFF',
+    borderRadius: 8,
+    padding: 6,
+    borderWidth: 1,
+    borderColor: '#E8E8E8',
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: 32,
+    height: 32,
+  },
+  weatherIcon: {
+    fontSize: 18,
+  },
+  locationIconContainer: {
+    backgroundColor: '#FFF',
+    borderRadius: 8,
+    padding: 6,
+    borderWidth: 1,
+    borderColor: '#E8E8E8',
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: 32,
+    height: 32,
+  },
+  locationIcon: {
+    fontSize: 18,
+    color: '#FF6B6B',
+  },
+  dateDisplay: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderWidth: 1,
+    borderColor: '#E8E8E8',
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 6,
   },
-  contextButton: {
-    flex: 1,
+  dateDisplayText: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#333',
   },
-  dateButton: {
+  miniCalendar: {
+    backgroundColor: '#8B5A3C',
+    borderRadius: 4,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    alignItems: 'center',
+  },
+  miniCalendarText: {
+    fontSize: 8,
+    color: '#FFF',
+  },
+  miniCalendarDate: {
+    fontSize: 10,
+    fontWeight: 'bold',
+    color: '#FFF',
+    marginTop: -2,
+  },
+  geoButton: {
+    backgroundColor: '#F8F9FA',
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+    borderWidth: 1.5,
+    borderColor: '#E0E0E0',
+    minWidth: 32,
+    minHeight: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  geoButtonActive: {
+    backgroundColor: '#E8F5E8',
+    borderColor: '#4CAF50',
+  },
+  geoIcon: {
+    fontSize: 14,
+    opacity: 0.7,
+  },
+  geoIconActive: {
+    opacity: 1,
+    color: '#4CAF50',
+  },
+  statusIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+    paddingHorizontal: 4,
+  },
+  statusDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#DDD',
+    marginRight: 6,
+  },
+  statusDotActive: {
+    backgroundColor: '#4CAF50',
+  },
+  statusText: {
+    fontSize: 11,
+    color: '#666',
+    fontStyle: 'italic',
+  },
+  inputLoading: {
+    backgroundColor: '#F5F5F5',
+    opacity: 0.7,
+  },
+  weatherInput: {
     backgroundColor: '#FFFFFF',
-    borderRadius: 6,
-    paddingVertical: 8,
-    paddingHorizontal: 10,
-    borderWidth: 1,
-    borderColor: '#E5E5EA',
-  },
-  dateText: {
+    borderRadius: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 12,
     fontSize: 14,
     color: '#333',
-    fontWeight: '500',
+    borderWidth: 1,
+    borderColor: '#E8E8E8',
+    minHeight: 44,
+    textAlign: 'center',
   },
-  contextInput: {
+  locationInput: {
     backgroundColor: '#FFFFFF',
-    borderRadius: 6,
-    paddingVertical: 8,
-    paddingHorizontal: 10,
+    borderRadius: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
     fontSize: 14,
     color: '#333',
     borderWidth: 1,
-    borderColor: '#E5E5EA',
-  },
-  miniSwitch: {
-    transform: [{ scaleX: 0.7 }, { scaleY: 0.7 }],
+    borderColor: '#E8E8E8',
+    minHeight: 44,
+    maxHeight: 66,
+    lineHeight: 18,
   },
   timeTrackerContainer: {
     marginBottom: 16,

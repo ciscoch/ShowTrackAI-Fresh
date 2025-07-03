@@ -1326,13 +1326,12 @@ export const JournalEntryScreen: React.FC<JournalEntryScreenProps> = ({
           <View style={styles.contextSection}>
             <Text style={styles.contextSectionTitle}>📍 Context & Environment</Text>
             
-            <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Date *</Text>
-              <DatePicker
-                value={formData.date}
-                onChange={(date) => setFormData(prev => ({ ...prev, date }))}
-              />
-            </View>
+            <DatePicker
+              label="Date"
+              value={formData.date}
+              onDateChange={(date) => setFormData(prev => ({ ...prev, date: date || new Date() }))}
+              required
+            />
             
             <View style={styles.autoDetectContainer}>
               <Text style={styles.autoDetectLabel}>Weather & Location</Text>

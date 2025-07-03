@@ -6,3 +6,5 @@ export * from './Weight';
 export * from './Subscription';
 export * from './TimeTracking';
 export * from './AETMapping';
+export * from './FFAProfiles';
+export * from './Profile';

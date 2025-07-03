@@ -65,6 +65,9 @@ export const JournalEntryScreen: React.FC<JournalEntryScreenProps> = ({
   const [locationLoading, setLocationLoading] = useState(false);
   const [weatherLoading, setWeatherLoading] = useState(false);
   const [locationPermission, setLocationPermission] = useState<Location.LocationPermissionResponse | null>(null);
+  const [autofillSuggestions, setAutofillSuggestions] = useState<{title: string, description: string} | null>(null);
+  const [showAutofillPrompt, setShowAutofillPrompt] = useState(false);
+  const [isGeneratingAutofill, setIsGeneratingAutofill] = useState(false);
 
   const [isTracking, setIsTracking] = useState(false);
   const [suggestedSkills, setSuggestedSkills] = useState<string[]>([]);
@@ -384,6 +387,293 @@ export const JournalEntryScreen: React.FC<JournalEntryScreenProps> = ({
       setUseLocationWeather(false);
     }
   };
+
+  // Advanced AI Autofill System
+  const generateAutofillSuggestions = async () => {
+    setIsGeneratingAutofill(true);
+    
+    try {
+      // Analyze all available context for intelligent suggestions
+      const context = {
+        feeds: feedData.feeds,
+        location: formData.location,
+        weather: formData.weather,
+        date: formData.date,
+        aetCategories: selectedAETCategories,
+        objectives: selectedObjectives,
+        duration: formData.duration,
+        timeOfDay: new Date().getHours(),
+        season: getCurrentSeason(),
+        dayOfWeek: formData.date.getDay()
+      };
+      
+      const suggestions = await generateIntelligentSuggestions(context);
+      setAutofillSuggestions(suggestions);
+      setShowAutofillPrompt(true);
+      
+    } catch (error) {
+      console.error('Autofill generation error:', error);
+      Alert.alert('Autofill Error', 'Unable to generate suggestions. Please enter manually.');
+    } finally {
+      setIsGeneratingAutofill(false);
+    }
+  };
+
+  const getCurrentSeason = (): string => {
+    const month = new Date().getMonth();
+    if (month >= 2 && month <= 4) return 'spring';
+    if (month >= 5 && month <= 7) return 'summer';  
+    if (month >= 8 && month <= 10) return 'fall';
+    return 'winter';
+  };
+
+  const generateIntelligentSuggestions = async (context: any): Promise<{title: string, description: string}> => {
+    // Simulate AI processing delay for realistic UX
+    await new Promise(resolve => setTimeout(resolve, 2000));
+    
+    // Analyze feeds for activity type
+    const feedTypes = context.feeds.map((f: any) => f.product?.toLowerCase() || '');
+    const feedBrands = context.feeds.map((f: any) => f.brand || '');
+    const totalCost = feedData.totalCost;
+    
+    // Analyze AET categories for skill focus
+    const categoryNames = context.aetCategories.map((id: string) => 
+      detailedAETCategories.find(cat => cat.id === id)?.name || ''
+    );
+    
+    // Time-based context
+    const timeContext = getTimeOfDayContext(context.timeOfDay);
+    const dateContext = formatDateContext(context.date);
+    
+    // Weather influence
+    const weatherCondition = context.weather.toLowerCase();
+    const isGoodWeather = weatherCondition.includes('clear') || weatherCondition.includes('sunny');
+    
+    // Generate title based on primary activity
+    let suggestedTitle = '';
+    let suggestedDescription = '';
+    
+    if (feedTypes.length > 0) {
+      // Feed-based activity
+      const mainActivity = determineFeedActivity(feedTypes, feedBrands);
+      suggestedTitle = `${timeContext.period} ${mainActivity}`;
+      
+      suggestedDescription = generateFeedDescription({
+        feeds: context.feeds,
+        location: context.location,
+        weather: context.weather,
+        timeContext,
+        categories: categoryNames,
+        cost: totalCost,
+        isGoodWeather
+      });
+    } else if (categoryNames.length > 0) {
+      // AET-based activity
+      const primaryCategory = categoryNames[0];
+      suggestedTitle = `${timeContext.period} ${getPrimaryCategoryActivity(primaryCategory)}`;
+      
+      suggestedDescription = generateCategoryDescription({
+        categories: categoryNames,
+        location: context.location,
+        weather: context.weather,
+        timeContext,
+        objectives: context.objectives
+      });
+    } else {
+      // Generic activity based on time and weather
+      suggestedTitle = `${timeContext.period} Livestock Management`;
+      
+      suggestedDescription = generateGenericDescription({
+        location: context.location,
+        weather: context.weather,
+        timeContext,
+        isGoodWeather
+      });
+    }
+    
+    return {
+      title: suggestedTitle,
+      description: suggestedDescription
+    };
+  };
+
+  const getTimeOfDayContext = (hour: number) => {
+    if (hour >= 5 && hour < 9) return { period: 'Morning', activity: 'feeding and health checks' };
+    if (hour >= 9 && hour < 12) return { period: 'Mid-Morning', activity: 'maintenance and training' };
+    if (hour >= 12 && hour < 15) return { period: 'Afternoon', activity: 'monitoring and care' };
+    if (hour >= 15 && hour < 18) return { period: 'Late Afternoon', activity: 'feeding and facility checks' };
+    if (hour >= 18 && hour < 21) return { period: 'Evening', activity: 'final feeding and securing' };
+    return { period: 'Night', activity: 'emergency check and monitoring' };
+  };
+
+  const formatDateContext = (date: Date): string => {
+    const options = { weekday: 'long', month: 'long', day: 'numeric' } as const;
+    return date.toLocaleDateString('en-US', options);
+  };
+
+  const determineFeedActivity = (feedTypes: string[], feedBrands: string[]): string => {
+    const hasMultipleFeeds = feedTypes.length > 1;
+    const hasShowFeed = feedTypes.some(type => type.includes('show') || type.includes('developer'));
+    const hasHay = feedTypes.some(type => type.includes('hay') || type.includes('forage'));
+    const hasSpecialty = feedTypes.some(type => type.includes('medicated') || type.includes('supplement'));
+    
+    if (hasShowFeed) return 'Show Animal Feeding & Nutrition Management';
+    if (hasSpecialty) return 'Specialized Feed Administration & Health Support';
+    if (hasMultipleFeeds) return 'Multi-Feed Nutrition Program Implementation';
+    if (hasHay) return 'Forage & Hay Distribution';
+    return 'Daily Feeding & Nutrition Management';
+  };
+
+  const getPrimaryCategoryActivity = (category: string): string => {
+    const categoryMap: Record<string, string> = {
+      'Feeding & Nutrition': 'Nutritional Management & Feed Distribution',
+      'Animal Care & Management': 'Animal Care & Health Monitoring',
+      'Health & Veterinary Care': 'Health Assessment & Medical Care',
+      'Breeding & Genetics': 'Breeding Program Management',
+      'Facilities & Equipment': 'Facility Maintenance & Equipment Check',
+      'Record Keeping & Documentation': 'Data Collection & Record Management',
+      'Business & Financial Management': 'Financial Planning & Cost Analysis',
+      'Safety & Compliance': 'Safety Inspection & Protocol Review'
+    };
+    return categoryMap[category] || 'Agricultural Education Activity';
+  };
+
+  const generateFeedDescription = (params: any): string => {
+    const { feeds, location, weather, timeContext, categories, cost, isGoodWeather } = params;
+    
+    let description = `Conducted ${timeContext.period.toLowerCase()} feeding operations `;
+    
+    if (location) {
+      description += `at ${location}. `;
+    } else {
+      description += `at the farm facility. `;
+    }
+    
+    // Feed details
+    if (feeds.length === 1) {
+      const feed = feeds[0];
+      description += `Administered ${feed.amount} ${feed.unit} of ${feed.brand} ${feed.product}. `;
+    } else if (feeds.length > 1) {
+      description += `Implemented multi-feed nutrition program including: `;
+      feeds.forEach((feed: any, index: number) => {
+        description += `${feed.amount} ${feed.unit} of ${feed.brand} ${feed.product}`;
+        if (index < feeds.length - 1) description += ', ';
+      });
+      description += '. ';
+    }
+    
+    // Cost tracking
+    if (cost > 0) {
+      description += `Total feed cost: $${cost.toFixed(2)}. `;
+    }
+    
+    // Weather consideration
+    if (weather) {
+      const weatherLower = weather.toLowerCase();
+      if (isGoodWeather) {
+        description += `Favorable weather conditions (${weather}) supported normal feeding routines. `;
+      } else if (weatherLower.includes('cold') || weatherLower.includes('windy')) {
+        description += `Weather conditions (${weather}) required additional attention to animal comfort and feed accessibility. `;
+      } else {
+        description += `Weather conditions: ${weather}. `;
+      }
+    }
+    
+    // Educational focus
+    if (categories.length > 0) {
+      description += `This activity focused on developing skills in ${categories.join(' and ').toLowerCase()}. `;
+    }
+    
+    description += `Monitored animal behavior and intake levels to ensure optimal nutritional outcomes and animal welfare standards.`;
+    
+    return description;
+  };
+
+  const generateCategoryDescription = (params: any): string => {
+    const { categories, location, weather, timeContext, objectives } = params;
+    
+    let description = `Completed ${timeContext.period.toLowerCase()} agricultural education activities `;
+    
+    if (location) {
+      description += `at ${location} `;
+    }
+    
+    description += `focusing on ${categories.join(', ').toLowerCase()}. `;
+    
+    if (objectives.length > 0) {
+      description += `Learning objectives included: ${objectives.slice(0, 3).join(', ')}. `;
+    }
+    
+    if (weather) {
+      description += `Weather conditions (${weather}) were documented as part of environmental factor assessment. `;
+    }
+    
+    description += `Applied agricultural education and training (AET) standards to develop practical skills and knowledge relevant to livestock management and agricultural career pathways.`;
+    
+    return description;
+  };
+
+  const generateGenericDescription = (params: any): string => {
+    const { location, weather, timeContext, isGoodWeather } = params;
+    
+    let description = `Conducted ${timeContext.period.toLowerCase()} livestock management activities `;
+    
+    if (location) {
+      description += `at ${location}. `;
+    } else {
+      description += `at farm facilities. `;
+    }
+    
+    description += `Performed routine ${timeContext.activity} as part of daily animal husbandry protocols. `;
+    
+    if (weather) {
+      if (isGoodWeather) {
+        description += `Excellent weather conditions (${weather}) allowed for comprehensive outdoor activities and thorough facility inspections. `;
+      } else {
+        description += `Weather conditions (${weather}) were monitored and appropriate adjustments made to ensure animal welfare. `;
+      }
+    }
+    
+    description += `Documented observations and maintained detailed records for continuous improvement of farm operations and educational outcomes.`;
+    
+    return description;
+  };
+
+  const applyAutofillSuggestions = () => {
+    if (autofillSuggestions) {
+      setFormData(prev => ({
+        ...prev,
+        title: autofillSuggestions.title,
+        description: autofillSuggestions.description
+      }));
+      setShowAutofillPrompt(false);
+      setAutofillSuggestions(null);
+    }
+  };
+
+  const dismissAutofillPrompt = () => {
+    setShowAutofillPrompt(false);
+    setAutofillSuggestions(null);
+  };
+
+  // Trigger autofill when enough context is available
+  const checkForAutofillTrigger = () => {
+    const hasFeeds = feedData.feeds.length > 0;
+    const hasCategories = selectedAETCategories.length > 0;
+    const hasContext = formData.location || formData.weather;
+    const fieldsEmpty = !formData.title.trim() && !formData.description.trim();
+    
+    if (fieldsEmpty && (hasFeeds || hasCategories || hasContext)) {
+      if (!autofillSuggestions && !isGeneratingAutofill && !showAutofillPrompt) {
+        setShowAutofillPrompt(true);
+      }
+    }
+  };
+
+  // Monitor for autofill triggers
+  useEffect(() => {
+    checkForAutofillTrigger();
+  }, [feedData.feeds, selectedAETCategories, formData.location, formData.weather]);
 
   const validateForm = (): boolean => {
     if (!formData.title.trim()) {
@@ -783,7 +1073,25 @@ export const JournalEntryScreen: React.FC<JournalEntryScreenProps> = ({
           <Text style={styles.sectionTitle}>📝 Basic Information</Text>
           
           <View style={styles.inputGroup}>
-            <Text style={styles.inputLabel}>Title *</Text>
+            <View style={styles.inputLabelRow}>
+              <Text style={styles.inputLabel}>Title *</Text>
+              {!formData.title.trim() && !isGeneratingAutofill && (
+                <TouchableOpacity 
+                  style={styles.autofillButton}
+                  onPress={generateAutofillSuggestions}
+                  disabled={feedData.feeds.length === 0 && selectedAETCategories.length === 0}
+                >
+                  <Text style={styles.autofillIcon}>✨</Text>
+                  <Text style={styles.autofillButtonText}>AI Autofill</Text>
+                </TouchableOpacity>
+              )}
+              {isGeneratingAutofill && (
+                <View style={styles.generatingIndicator}>
+                  <ActivityIndicator size="small" color="#007AFF" />
+                  <Text style={styles.generatingText}>Generating...</Text>
+                </View>
+              )}
+            </View>
             <TextInput
               style={styles.textInput}
               value={formData.title}
@@ -804,6 +1112,48 @@ export const JournalEntryScreen: React.FC<JournalEntryScreenProps> = ({
               numberOfLines={4}
             />
           </View>
+
+          {/* Autofill Suggestions Prompt */}
+          {showAutofillPrompt && autofillSuggestions && (
+            <View style={styles.autofillPrompt}>
+              <View style={styles.autofillHeader}>
+                <Text style={styles.autofillTitle}>🤖 AI-Generated Suggestions</Text>
+                <Text style={styles.autofillSubtitle}>
+                  Based on your feeds, activities, and context
+                </Text>
+              </View>
+              
+              <View style={styles.autofillPreview}>
+                <View style={styles.previewItem}>
+                  <Text style={styles.previewLabel}>Suggested Title:</Text>
+                  <Text style={styles.previewText}>{autofillSuggestions.title}</Text>
+                </View>
+                
+                <View style={styles.previewItem}>
+                  <Text style={styles.previewLabel}>Suggested Description:</Text>
+                  <Text style={styles.previewText} numberOfLines={4}>
+                    {autofillSuggestions.description}
+                  </Text>
+                </View>
+              </View>
+              
+              <View style={styles.autofillActions}>
+                <TouchableOpacity 
+                  style={styles.autofillActionButton}
+                  onPress={dismissAutofillPrompt}
+                >
+                  <Text style={styles.autofillActionTextSecondary}>Keep Manual</Text>
+                </TouchableOpacity>
+                
+                <TouchableOpacity 
+                  style={[styles.autofillActionButton, styles.autofillActionButtonPrimary]}
+                  onPress={applyAutofillSuggestions}
+                >
+                  <Text style={styles.autofillActionTextPrimary}>✨ Use AI Suggestions</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          )}
 
           {/* Context Information Cards */}
           <View style={styles.contextSection}>
@@ -1089,11 +1439,49 @@ const styles = StyleSheet.create({
   inputGroup: {
     marginBottom: 16,
   },
+  inputLabelRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
   inputLabel: {
     fontSize: 14,
     fontWeight: '500',
     color: '#333',
-    marginBottom: 6,
+  },
+  autofillButton: {
+    backgroundColor: '#F0F8FF',
+    borderRadius: 16,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#007AFF',
+  },
+  autofillIcon: {
+    fontSize: 12,
+    marginRight: 4,
+  },
+  autofillButtonText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#007AFF',
+  },
+  generatingIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F0F8FF',
+    borderRadius: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+  },
+  generatingText: {
+    fontSize: 12,
+    color: '#007AFF',
+    marginLeft: 6,
+    fontStyle: 'italic',
   },
   textInput: {
     borderWidth: 1,
@@ -1620,5 +2008,83 @@ const styles = StyleSheet.create({
   },
   customInputContainer: {
     marginTop: 8,
+  },
+  // Autofill Prompt Styles
+  autofillPrompt: {
+    backgroundColor: '#F8FDFF',
+    borderRadius: 12,
+    padding: 16,
+    marginTop: 16,
+    borderWidth: 2,
+    borderColor: '#B3E5FC',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  autofillHeader: {
+    marginBottom: 16,
+  },
+  autofillTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#007AFF',
+    marginBottom: 4,
+  },
+  autofillSubtitle: {
+    fontSize: 12,
+    color: '#666',
+    fontStyle: 'italic',
+  },
+  autofillPreview: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+  },
+  previewItem: {
+    marginBottom: 12,
+  },
+  previewLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#007AFF',
+    marginBottom: 4,
+  },
+  previewText: {
+    fontSize: 14,
+    color: '#333',
+    lineHeight: 18,
+  },
+  autofillActions: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  autofillActionButton: {
+    flex: 1,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    alignItems: 'center',
+    backgroundColor: '#F5F5F5',
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+  },
+  autofillActionButtonPrimary: {
+    backgroundColor: '#007AFF',
+    borderColor: '#007AFF',
+  },
+  autofillActionTextSecondary: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#666',
+  },
+  autofillActionTextPrimary: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#FFFFFF',
   },
 });

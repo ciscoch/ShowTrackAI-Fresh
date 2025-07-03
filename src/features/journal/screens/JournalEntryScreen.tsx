@@ -71,6 +71,8 @@ export const JournalEntryScreen: React.FC<JournalEntryScreenProps> = ({
   const [lastFeedOperation, setLastFeedOperation] = useState<number>(0);
 
   const [isTracking, setIsTracking] = useState(false);
+  const [trackingStartTime, setTrackingStartTime] = useState<Date | null>(null);
+  const [currentTrackingDuration, setCurrentTrackingDuration] = useState<number>(0);
   const [suggestedSkills, setSuggestedSkills] = useState<string[]>([]);
   const [selectedObjectives, setSelectedObjectives] = useState<string[]>(formData.objectives);
   const [detailedAETCategories, setDetailedAETCategories] = useState(aetSkillMatcher.getDetailedAETCategories());
@@ -174,23 +176,26 @@ export const JournalEntryScreen: React.FC<JournalEntryScreenProps> = ({
   };
 
   const handleStartTimeTracking = () => {
+    const startTime = new Date();
     const trackingEntry = {
       id: entry?.id || `temp_${Date.now()}`,
       activity: formData.title || 'Journal Activity',
       category: formData.category,
-      startTime: new Date(),
+      startTime,
     };
     
     startTracking(trackingEntry);
     setIsTracking(true);
+    setTrackingStartTime(startTime);
   };
 
   const handleStopTimeTracking = () => {
-    if (activeEntry) {
-      const duration = Math.floor((Date.now() - activeEntry.startTime.getTime()) / 60000);
+    if (activeEntry && trackingStartTime) {
+      const duration = Math.floor((Date.now() - trackingStartTime.getTime()) / 60000);
       setFormData(prev => ({ ...prev, duration: prev.duration + duration }));
       stopTracking(activeEntry.id);
       setIsTracking(false);
+      setTrackingStartTime(null);
     }
   };
 
@@ -684,6 +689,28 @@ export const JournalEntryScreen: React.FC<JournalEntryScreenProps> = ({
     }
   }, [feedData.feeds, selectedAETCategories, formData.location, formData.weather, lastFeedOperation]);
 
+  // Update tracking duration every minute when tracking is active
+  useEffect(() => {
+    let intervalId: NodeJS.Timeout | null = null;
+    
+    if (isTracking && trackingStartTime) {
+      intervalId = setInterval(() => {
+        const duration = Math.floor((Date.now() - trackingStartTime.getTime()) / 60000);
+        setCurrentTrackingDuration(duration);
+      }, 60000); // Update every minute
+      
+      // Update immediately
+      const duration = Math.floor((Date.now() - trackingStartTime.getTime()) / 60000);
+      setCurrentTrackingDuration(duration);
+    }
+    
+    return () => {
+      if (intervalId) {
+        clearInterval(intervalId);
+      }
+    };
+  }, [isTracking, trackingStartTime]);
+
   const validateForm = (): boolean => {
     if (!formData.title.trim()) {
       Alert.alert('Validation Error', 'Please enter a title for your journal entry.');
@@ -774,28 +801,59 @@ export const JournalEntryScreen: React.FC<JournalEntryScreenProps> = ({
     <View style={styles.section}>
       <Text style={styles.sectionTitle}>⏱️ Time Tracking</Text>
       
-      <View style={styles.timeTrackerContainer}>
-        <TimeTracker
-          isActive={isTracking}
-          currentDuration={formData.duration}
-          onStart={handleStartTimeTracking}
-          onStop={handleStopTimeTracking}
-          activity={formData.title || 'Current Activity'}
-        />
+      {/* Check In/Out Button */}
+      <View style={styles.checkInOutContainer}>
+        <TouchableOpacity
+          style={[
+            styles.checkInOutButton,
+            isTracking ? styles.checkOutButton : styles.checkInButton
+          ]}
+          onPress={isTracking ? handleStopTimeTracking : handleStartTimeTracking}
+        >
+          <Text style={styles.checkInOutIcon}>
+            {isTracking ? '⏹️' : '▶️'}
+          </Text>
+          <View style={styles.checkInOutTextContainer}>
+            <Text style={styles.checkInOutText}>
+              {isTracking ? 'Check Out' : 'Check In'}
+            </Text>
+            {isTracking && (
+              <Text style={styles.checkInOutSubtext}>
+                Activity in progress...
+              </Text>
+            )}
+          </View>
+        </TouchableOpacity>
+        
+        {isTracking && trackingStartTime && (
+          <View style={styles.trackingIndicator}>
+            <Text style={styles.trackingDuration}>
+              Duration: {currentTrackingDuration}m
+            </Text>
+          </View>
+        )}
       </View>
 
-      <View style={styles.durationInput}>
+      {/* Manual Duration Input */}
+      <View style={styles.manualDurationContainer}>
         <Text style={styles.inputLabel}>Manual Duration (minutes)</Text>
         <TextInput
-          style={styles.smallInput}
+          style={styles.durationInput}
           value={formData.duration.toString()}
           onChangeText={(text) => setFormData(prev => ({ 
             ...prev, 
             duration: parseInt(text) || 0 
           }))}
           keyboardType="numeric"
-          placeholder="0"
+          placeholder="Enter duration in minutes"
+          editable={!isTracking}
         />
+        <Text style={styles.durationHint}>
+          {isTracking 
+            ? 'Duration will be automatically calculated when you check out'
+            : 'Enter the time spent on this activity'
+          }
+        </Text>
       </View>
     </View>
   );
@@ -1701,13 +1759,71 @@ const styles = StyleSheet.create({
     color: '#FFF',
     marginTop: -2,
   },
-  timeTrackerContainer: {
+  checkInOutContainer: {
     marginBottom: 16,
   },
-  durationInput: {
+  checkInOutButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    justifyContent: 'center',
+    paddingVertical: 16,
+    paddingHorizontal: 20,
+    borderRadius: 12,
+    marginBottom: 12,
+  },
+  checkInButton: {
+    backgroundColor: '#4CAF50',
+  },
+  checkOutButton: {
+    backgroundColor: '#f44336',
+  },
+  checkInOutIcon: {
+    fontSize: 24,
+    marginRight: 12,
+  },
+  checkInOutTextContainer: {
+    alignItems: 'center',
+  },
+  checkInOutText: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#fff',
+  },
+  checkInOutSubtext: {
+    fontSize: 14,
+    color: '#fff',
+    opacity: 0.9,
+    marginTop: 2,
+  },
+  trackingIndicator: {
+    backgroundColor: '#fff3cd',
+    borderColor: '#ffc107',
+    borderWidth: 1,
+    borderRadius: 8,
+    padding: 12,
+    alignItems: 'center',
+  },
+  trackingDuration: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#856404',
+  },
+  manualDurationContainer: {
+    marginTop: 16,
+  },
+  durationInput: {
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 8,
+    padding: 12,
+    fontSize: 16,
+    backgroundColor: '#f9f9f9',
+    marginBottom: 8,
+  },
+  durationHint: {
+    fontSize: 12,
+    color: '#666',
+    fontStyle: 'italic',
   },
   suggestedSkills: {
     marginBottom: 16,

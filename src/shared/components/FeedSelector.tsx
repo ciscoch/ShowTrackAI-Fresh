@@ -59,7 +59,6 @@ export const FeedSelector: React.FC<FeedSelectorProps> = ({
         product: 'Red Tag Sheep and Goat Developer',
         amount: 1,
         unit: 'lbs',
-        cost: 21.75,
         isHay: false,
         category: 'pellets'
       },
@@ -158,7 +157,8 @@ export const FeedSelector: React.FC<FeedSelectorProps> = ({
 
     const newFeed: FeedItem = {
       ...lastFeed,
-      id: `feed_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+      id: `feed_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      cost: undefined // Remove cost from last used feeds to prevent default values
     };
 
     onFeedsChange([...feeds, newFeed]);

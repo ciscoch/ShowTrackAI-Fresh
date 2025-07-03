@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -68,12 +68,15 @@ export const JournalEntryScreen: React.FC<JournalEntryScreenProps> = ({
   const [autofillSuggestions, setAutofillSuggestions] = useState<{title: string, description: string} | null>(null);
   const [showAutofillPrompt, setShowAutofillPrompt] = useState(false);
   const [isGeneratingAutofill, setIsGeneratingAutofill] = useState(false);
+  const [lastFeedOperation, setLastFeedOperation] = useState<number>(0);
 
   const [isTracking, setIsTracking] = useState(false);
   const [suggestedSkills, setSuggestedSkills] = useState<string[]>([]);
   const [selectedObjectives, setSelectedObjectives] = useState<string[]>(formData.objectives);
   const [detailedAETCategories, setDetailedAETCategories] = useState(aetSkillMatcher.getDetailedAETCategories());
   const [selectedAETCategories, setSelectedAETCategories] = useState<string[]>([]);
+  
+  const scrollViewRef = useRef<ScrollView>(null);
 
   const categories = [
     { label: 'Feeding & Nutrition', value: 'Feeding & Nutrition' },
@@ -218,6 +221,8 @@ export const JournalEntryScreen: React.FC<JournalEntryScreenProps> = ({
 
   const handleFeedsChange = (feeds: FeedItem[]) => {
     setFeedData(prev => ({ ...prev, feeds }));
+    // Track when feed operations happen to prevent unwanted autofill triggers
+    setLastFeedOperation(Date.now());
   };
   
   const handleFeedNotesChange = (notes: string) => {
@@ -662,10 +667,18 @@ export const JournalEntryScreen: React.FC<JournalEntryScreenProps> = ({
     }
   };
 
-  // Monitor for autofill triggers
+  // Monitor for autofill triggers with delay to prevent unwanted scrolling after feed operations
   useEffect(() => {
-    checkForAutofillTrigger();
-  }, [feedData.feeds, selectedAETCategories, formData.location, formData.weather]);
+    const now = Date.now();
+    // Don't trigger autofill immediately after feed operations (within 1 second)
+    if (now - lastFeedOperation > 1000) {
+      const timeoutId = setTimeout(() => {
+        checkForAutofillTrigger();
+      }, 300); // Small delay to prevent layout conflicts
+      
+      return () => clearTimeout(timeoutId);
+    }
+  }, [feedData.feeds, selectedAETCategories, formData.location, formData.weather, lastFeedOperation]);
 
   const validateForm = (): boolean => {
     if (!formData.title.trim()) {
@@ -1056,9 +1069,14 @@ export const JournalEntryScreen: React.FC<JournalEntryScreenProps> = ({
       </View>
 
       <ScrollView 
+        ref={scrollViewRef}
         style={styles.content}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
+        maintainVisibleContentPosition={{
+          minIndexForVisible: 0,
+          autoscrollToTopThreshold: 1000
+        }}
       >
         {/* Basic Information */}
         <View style={styles.section}>

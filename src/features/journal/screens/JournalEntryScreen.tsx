@@ -419,14 +419,6 @@ export const JournalEntryScreen: React.FC<JournalEntryScreenProps> = ({
     }
   };
 
-  const getCurrentSeason = (): string => {
-    const month = new Date().getMonth();
-    if (month >= 2 && month <= 4) return 'spring';
-    if (month >= 5 && month <= 7) return 'summer';  
-    if (month >= 8 && month <= 10) return 'fall';
-    return 'winter';
-  };
-
   const generateIntelligentSuggestions = async (context: any): Promise<{title: string, description: string}> => {
     // Simulate AI processing delay for realistic UX
     await new Promise(resolve => setTimeout(resolve, 2000));

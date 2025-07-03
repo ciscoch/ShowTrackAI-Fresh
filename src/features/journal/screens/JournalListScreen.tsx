@@ -210,15 +210,21 @@ export const JournalListScreen: React.FC<JournalListScreenProps> = ({
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        {onBack && (
-          <TouchableOpacity style={styles.backButton} onPress={onBack}>
-            <Text style={styles.backButtonText}>← Back</Text>
+        <View style={styles.headerLeft}>
+          {onBack && (
+            <TouchableOpacity style={styles.backButton} onPress={onBack}>
+              <Text style={styles.backButtonText}>← Back</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+        <View style={styles.headerCenter}>
+          <Text style={styles.title}>📝 Activity Journal</Text>
+        </View>
+        <View style={styles.headerRight}>
+          <TouchableOpacity style={styles.addButton} onPress={onAddEntry}>
+            <Text style={styles.addButtonText}>+ New Entry</Text>
           </TouchableOpacity>
-        )}
-        <Text style={styles.title}>📝 Activity Journal</Text>
-        <TouchableOpacity style={styles.addButton} onPress={onAddEntry}>
-          <Text style={styles.addButtonText}>+ New Entry</Text>
-        </TouchableOpacity>
+        </View>
       </View>
 
       {error && (
@@ -252,29 +258,40 @@ const styles = StyleSheet.create({
   },
   header: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 16,
     paddingVertical: 16,
     backgroundColor: '#fff',
     borderBottomWidth: 1,
     borderBottomColor: '#eee',
+    minHeight: 60,
+  },
+  headerLeft: {
+    flex: 1,
+    alignItems: 'flex-start',
+  },
+  headerCenter: {
+    flex: 2,
+    alignItems: 'center',
+  },
+  headerRight: {
+    flex: 1,
+    alignItems: 'flex-end',
   },
   backButton: {
     paddingVertical: 8,
     paddingHorizontal: 12,
-    position: 'absolute',
-    left: 16,
-    zIndex: 1,
   },
   backButtonText: {
     color: '#007AFF',
     fontSize: 16,
+    fontWeight: '500',
   },
   title: {
-    fontSize: 24,
+    fontSize: 20,
     fontWeight: 'bold',
     color: '#333',
+    textAlign: 'center',
   },
   addButton: {
     backgroundColor: '#007AFF',

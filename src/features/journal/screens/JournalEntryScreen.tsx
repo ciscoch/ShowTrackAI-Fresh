@@ -1079,211 +1079,6 @@ export const JournalEntryScreen: React.FC<JournalEntryScreenProps> = ({
           autoscrollToTopThreshold: 1000
         }}
       >
-        {/* AET Skills Development first for better UX flow */}
-        {renderAETSkills()}
-            <View style={styles.inputLabelRow}>
-              <Text style={styles.inputLabel}>Title *</Text>
-              {!formData.title.trim() && !isGeneratingAutofill && (
-                <TouchableOpacity 
-                  style={styles.autofillButton}
-                  onPress={generateAutofillSuggestions}
-                  disabled={feedData.feeds.length === 0 && selectedAETCategories.length === 0}
-                >
-                  <Text style={styles.autofillIcon}>✨</Text>
-                  <Text style={styles.autofillButtonText}>AI Autofill</Text>
-                </TouchableOpacity>
-              )}
-              {isGeneratingAutofill && (
-                <View style={styles.generatingIndicator}>
-                  <ActivityIndicator size="small" color="#007AFF" />
-                  <Text style={styles.generatingText}>Generating...</Text>
-                </View>
-              )}
-            </View>
-            <TextInput
-              style={styles.textInput}
-              value={formData.title}
-              onChangeText={(text) => setFormData(prev => ({ ...prev, title: text }))}
-              placeholder="What activity did you do?"
-              autoCapitalize="words"
-            />
-          </View>
-
-          <View style={styles.inputGroup}>
-            <Text style={styles.inputLabel}>Description *</Text>
-            <TextInput
-              style={[styles.textInput, styles.textArea]}
-              value={formData.description}
-              onChangeText={(text) => setFormData(prev => ({ ...prev, description: text }))}
-              placeholder="Describe what you did in detail..."
-              multiline
-              numberOfLines={4}
-            />
-          </View>
-
-          {/* Autofill Suggestions Prompt */}
-          {showAutofillPrompt && autofillSuggestions && (
-            <View style={styles.autofillPrompt}>
-              <View style={styles.autofillHeader}>
-                <Text style={styles.autofillTitle}>🤖 AI-Generated Suggestions</Text>
-                <Text style={styles.autofillSubtitle}>
-                  Based on your feeds, activities, and context
-                </Text>
-              </View>
-              
-              <View style={styles.autofillPreview}>
-                <View style={styles.previewItem}>
-                  <Text style={styles.previewLabel}>Suggested Title:</Text>
-                  <Text style={styles.previewText}>{autofillSuggestions.title}</Text>
-                </View>
-                
-                <View style={styles.previewItem}>
-                  <Text style={styles.previewLabel}>Suggested Description:</Text>
-                  <Text style={styles.previewText} numberOfLines={4}>
-                    {autofillSuggestions.description}
-                  </Text>
-                </View>
-              </View>
-              
-              <View style={styles.autofillActions}>
-                <TouchableOpacity 
-                  style={styles.autofillActionButton}
-                  onPress={dismissAutofillPrompt}
-                >
-                  <Text style={styles.autofillActionTextSecondary}>Keep Manual</Text>
-                </TouchableOpacity>
-                
-                <TouchableOpacity 
-                  style={[styles.autofillActionButton, styles.autofillActionButtonPrimary]}
-                  onPress={applyAutofillSuggestions}
-                >
-                  <Text style={styles.autofillActionTextPrimary}>✨ Use AI Suggestions</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          )}
-
-          {/* Context Information Cards */}
-          <View style={styles.contextSection}>
-            <Text style={styles.contextSectionTitle}>📍 Context & Environment</Text>
-            
-            {/* Date Selection */}
-            <View style={styles.contextItemCard}>
-              <View style={styles.contextItemHeader}>
-                <View style={styles.contextIconWrapper}>
-                  <Text style={styles.contextIcon}>📅</Text>
-                </View>
-                <View style={styles.contextItemContent}>
-                  <Text style={styles.contextItemLabel}>Date</Text>
-                  <DatePicker
-                    value={formData.date}
-                    onDateChange={(date) => setFormData(prev => ({ ...prev, date: date || new Date() }))}
-                    placeholder="Select date"
-                    renderButton={({ onPress }) => (
-                      <TouchableOpacity style={styles.contextValueButton} onPress={onPress}>
-                        <Text style={styles.contextValueText}>
-                          {formData.date.toLocaleDateString('en-US', { 
-                            weekday: 'short',
-                            month: 'short', 
-                            day: 'numeric', 
-                            year: 'numeric' 
-                          })}
-                        </Text>
-                        <Text style={styles.contextEditIcon}>✏️</Text>
-                      </TouchableOpacity>
-                    )}
-                  />
-                </View>
-              </View>
-            </View>
-
-            {/* Weather & Location Combined */}
-            <View style={styles.contextItemCard}>
-              <View style={styles.contextItemHeader}>
-                <View style={styles.contextIconWrapper}>
-                  <Text style={styles.contextIcon}>🌤️</Text>
-                </View>
-                <View style={styles.contextItemContent}>
-                  <View style={styles.contextLabelRow}>
-                    <Text style={styles.contextItemLabel}>Weather & Location</Text>
-                    <TouchableOpacity
-                      style={[
-                        styles.autoDetectButton,
-                        useLocationWeather && styles.autoDetectButtonActive
-                      ]}
-                      onPress={() => {
-                        const newValue = !useLocationWeather;
-                        setUseLocationWeather(newValue);
-                        if (newValue) getLocationWeather();
-                      }}
-                      disabled={weatherLoading || locationLoading}
-                    >
-                      {(weatherLoading || locationLoading) ? (
-                        <ActivityIndicator size="small" color="#FFF" />
-                      ) : (
-                        <>
-                          <Text style={styles.autoDetectIcon}>📍</Text>
-                          <Text style={[
-                            styles.autoDetectText,
-                            useLocationWeather && styles.autoDetectTextActive
-                          ]}>
-                            {useLocationWeather ? 'Auto' : 'Manual'}
-                          </Text>
-                        </>
-                      )}
-                    </TouchableOpacity>
-                  </View>
-                  
-                  {(weatherLoading || locationLoading) && (
-                    <View style={styles.loadingIndicator}>
-                      <ActivityIndicator size="small" color="#007AFF" />
-                      <Text style={styles.loadingText}>
-                        {locationLoading ? 'Getting location...' : 'Fetching weather...'}
-                      </Text>
-                    </View>
-                  )}
-                  
-                  <View style={styles.contextInputsContainer}>
-                    <View style={styles.contextInputWrapper}>
-                      <Text style={styles.contextInputLabel}>Weather</Text>
-                      <TextInput
-                        style={[
-                          styles.contextInput,
-                          (weatherLoading || locationLoading) && styles.contextInputDisabled
-                        ]}
-                        value={formData.weather}
-                        onChangeText={(text) => setFormData(prev => ({ ...prev, weather: text }))}
-                        placeholder="Clear, 72°F"
-                        editable={!useLocationWeather && !weatherLoading && !locationLoading}
-                        placeholderTextColor="#999"
-                      />
-                    </View>
-                    
-                    <View style={styles.contextInputWrapper}>
-                      <Text style={styles.contextInputLabel}>Location</Text>
-                      <TextInput
-                        style={[
-                          styles.contextInput,
-                          styles.contextInputLocation,
-                          locationLoading && styles.contextInputDisabled
-                        ]}
-                        value={formData.location}
-                        onChangeText={(text) => setFormData(prev => ({ ...prev, location: text }))}
-                        placeholder="Barn A, Farm Name"
-                        placeholderTextColor="#999"
-                        multiline={true}
-                        numberOfLines={2}
-                        textAlignVertical="top"
-                        editable={!locationLoading}
-                      />
-                    </View>
-                  </View>
-                </View>
-              </View>
-            </View>
-          </View>
-        </View>
-
         {/* AI Suggestions */}
         {aiSuggestions && (
           <View style={styles.section}>
@@ -1357,6 +1152,175 @@ export const JournalEntryScreen: React.FC<JournalEntryScreenProps> = ({
             multiline
             numberOfLines={3}
           />
+        </View>
+
+        {/* Basic Information - moved to bottom for better AI autofill UX */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>📝 Basic Information</Text>
+          
+          <View style={styles.inputGroup}>
+            <View style={styles.inputLabelRow}>
+              <Text style={styles.inputLabel}>Title *</Text>
+              {!formData.title.trim() && !isGeneratingAutofill && (
+                <TouchableOpacity 
+                  style={styles.autofillButton}
+                  onPress={generateAutofillSuggestions}
+                  disabled={feedData.feeds.length === 0 && selectedAETCategories.length === 0}
+                >
+                  <Text style={styles.autofillIcon}>✨</Text>
+                  <Text style={styles.autofillButtonText}>AI Autofill</Text>
+                </TouchableOpacity>
+              )}
+              {isGeneratingAutofill && (
+                <View style={styles.generatingIndicator}>
+                  <ActivityIndicator size="small" color="#007AFF" />
+                  <Text style={styles.generatingText}>Generating...</Text>
+                </View>
+              )}
+            </View>
+            <TextInput
+              style={styles.textInput}
+              value={formData.title}
+              onChangeText={(text) => setFormData(prev => ({ ...prev, title: text }))}
+              placeholder="What activity did you do?"
+              autoCapitalize="words"
+            />
+          </View>
+
+          <View style={styles.inputGroup}>
+            <Text style={styles.inputLabel}>Description *</Text>
+            <TextInput
+              style={[styles.textInput, styles.textArea]}
+              value={formData.description}
+              onChangeText={(text) => setFormData(prev => ({ ...prev, description: text }))}
+              placeholder="Describe what you did, how you did it, and what you learned..."
+              multiline
+              numberOfLines={4}
+            />
+          </View>
+
+          {/* Autofill suggestions */}
+          {showAutofillPrompt && autofillSuggestions && (
+            <View style={styles.autofillPrompt}>
+              <View style={styles.autofillHeader}>
+                <Text style={styles.autofillTitle}>✨ AI Suggestions Ready</Text>
+                <TouchableOpacity 
+                  style={styles.autofillDismissButton}
+                  onPress={() => setShowAutofillPrompt(false)}
+                >
+                  <Text style={styles.autofillDismissText}>✕</Text>
+                </TouchableOpacity>
+              </View>
+              
+              <Text style={styles.autofillPreviewLabel}>Suggested Title:</Text>
+              <Text style={styles.autofillPreviewText}>{autofillSuggestions.title}</Text>
+              
+              <Text style={styles.autofillPreviewLabel}>Suggested Description:</Text>
+              <Text style={styles.autofillPreviewText} numberOfLines={3}>
+                {autofillSuggestions.description}
+              </Text>
+              
+              <View style={styles.autofillPromptActions}>
+                <TouchableOpacity 
+                  style={styles.autofillKeepManualButton}
+                  onPress={() => setShowAutofillPrompt(false)}
+                >
+                  <Text style={styles.autofillKeepManualText}>Keep Manual</Text>
+                </TouchableOpacity>
+                <TouchableOpacity 
+                  style={styles.autofillUseButton}
+                  onPress={applyAutofillSuggestions}
+                >
+                  <Text style={styles.autofillUseText}>✨ Use AI Suggestions</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          )}
+
+          {/* Context & Environment */}
+          <View style={styles.contextSection}>
+            <Text style={styles.contextSectionTitle}>📍 Context & Environment</Text>
+            
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>Date *</Text>
+              <DatePicker
+                value={formData.date}
+                onChange={(date) => setFormData(prev => ({ ...prev, date }))}
+              />
+            </View>
+            
+            <View style={styles.autoDetectContainer}>
+              <Text style={styles.autoDetectLabel}>Weather & Location</Text>
+              <TouchableOpacity
+                style={[
+                  styles.autoDetectButton,
+                  useLocationWeather && styles.autoDetectButtonActive,
+                  (weatherLoading || locationLoading) && styles.autoDetectButtonLoading
+                ]}
+                onPress={() => {
+                  const newValue = !useLocationWeather;
+                  setUseLocationWeather(newValue);
+                  if (newValue) getLocationWeather();
+                }}
+                disabled={weatherLoading || locationLoading}
+              >
+                {(weatherLoading || locationLoading) ? (
+                  <ActivityIndicator size="small" color="#FFF" />
+                ) : (
+                  <>
+                    <Text style={styles.autoDetectIcon}>📍</Text>
+                    <Text style={[
+                      styles.autoDetectText,
+                      useLocationWeather && styles.autoDetectTextActive
+                    ]}>
+                      {useLocationWeather ? 'Auto' : 'Manual'}
+                    </Text>
+                  </>
+                )}
+              </TouchableOpacity>
+            </View>
+            
+            {(weatherLoading || locationLoading) && (
+              <View style={styles.loadingIndicator}>
+                <ActivityIndicator size="small" color="#007AFF" />
+                <Text style={styles.loadingText}>
+                  {locationLoading ? 'Getting location...' : 'Fetching weather...'}
+                </Text>
+              </View>
+            )}
+            
+            <View style={styles.contextInputsContainer}>
+              <View style={styles.contextInputWrapper}>
+                <Text style={styles.contextInputLabel}>Weather</Text>
+                <TextInput
+                  style={[
+                    styles.contextInput,
+                    (weatherLoading || locationLoading) && styles.contextInputDisabled
+                  ]}
+                  value={formData.weather}
+                  onChangeText={(text) => setFormData(prev => ({ ...prev, weather: text }))}
+                  placeholder="Clear, 72°F"
+                  editable={!useLocationWeather && !weatherLoading && !locationLoading}
+                  placeholderTextColor="#999"
+                />
+              </View>
+              
+              <View style={styles.contextInputWrapper}>
+                <Text style={styles.contextInputLabel}>Location</Text>
+                <TextInput
+                  style={[
+                    styles.contextInput,
+                    (weatherLoading || locationLoading) && styles.contextInputDisabled
+                  ]}
+                  value={formData.location}
+                  onChangeText={(text) => setFormData(prev => ({ ...prev, location: text }))}
+                  placeholder="Farm, barn, pasture..."
+                  editable={!useLocationWeather && !weatherLoading && !locationLoading}
+                  placeholderTextColor="#999"
+                />
+              </View>
+            </View>
+          </View>
         </View>
       </ScrollView>
 

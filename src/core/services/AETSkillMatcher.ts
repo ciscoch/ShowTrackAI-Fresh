@@ -17,7 +17,7 @@ interface ActivityAnalysis {
   saeCompetencies: string[];
 }
 
-interface AIActivitySuggestion {
+export interface AIActivitySuggestion {
   suggestedTitle: string;
   suggestedDescription: string;
   suggestedAETSkills: string[];

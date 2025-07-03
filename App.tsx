@@ -9,11 +9,12 @@ import { AnimalListScreen } from './src/features/animals/screens/AnimalListScree
 import { AnimalFormScreen } from './src/features/animals/screens/AnimalFormScreen';
 import { JournalListScreen } from './src/features/journal/screens/JournalListScreen';
 import { JournalEntryScreen } from './src/features/journal/screens/JournalEntryScreen';
+import { JournalAnalyticsScreen } from './src/features/journal/screens/JournalAnalyticsScreen';
 import { UpgradeScreen } from './src/features/subscription/screens/UpgradeScreen';
 import { useProfileStore } from './src/core/stores/ProfileStore';
 import { UserProfile, Animal, Journal } from './src/core/models';
 
-type AppScreen = 'demoChooser' | 'profileChooser' | 'profileSettings' | 'freemiumDashboard' | 'eliteDashboard' | 'animalList' | 'animalForm' | 'journalList' | 'journalEntry' | 'upgrade';
+type AppScreen = 'demoChooser' | 'profileChooser' | 'profileSettings' | 'freemiumDashboard' | 'eliteDashboard' | 'animalList' | 'animalForm' | 'journalList' | 'journalEntry' | 'journalAnalytics' | 'upgrade';
 
 export default function App() {
   const { currentProfile, isFirstLaunch, checkLimitations } = useProfileStore();
@@ -130,6 +131,10 @@ export default function App() {
     setSelectedJournalEntry(undefined);
   };
 
+  const handleViewJournalAnalytics = () => {
+    setCurrentScreen('journalAnalytics');
+  };
+
   // Navigation with safety - always provide a way back
   const handleSafeNavigation = (targetScreen: AppScreen) => {
     setCurrentScreen(targetScreen);
@@ -216,7 +221,7 @@ export default function App() {
           <JournalListScreen
             onAddEntry={handleAddJournalEntry}
             onEditEntry={handleEditJournalEntry}
-            onViewAnalytics={() => console.log('Navigate to Journal Analytics')}
+            onViewAnalytics={handleViewJournalAnalytics}
             onBack={() => {
               // Go back to appropriate dashboard
               if (currentProfile) {
@@ -237,6 +242,15 @@ export default function App() {
             onBack={() => {
               setCurrentScreen('journalList');
               setSelectedJournalEntry(undefined);
+            }}
+          />
+        );
+
+      case 'journalAnalytics':
+        return (
+          <JournalAnalyticsScreen
+            onBack={() => {
+              setCurrentScreen('journalList');
             }}
           />
         );

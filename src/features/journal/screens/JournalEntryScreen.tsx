@@ -1079,11 +1079,8 @@ export const JournalEntryScreen: React.FC<JournalEntryScreenProps> = ({
           autoscrollToTopThreshold: 1000
         }}
       >
-        {/* Basic Information */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>📝 Basic Information</Text>
-          
-          <View style={styles.inputGroup}>
+        {/* AET Skills Development first for better UX flow */}
+        {renderAETSkills()}
             <View style={styles.inputLabelRow}>
               <Text style={styles.inputLabel}>Title *</Text>
               {!formData.title.trim() && !isGeneratingAutofill && (

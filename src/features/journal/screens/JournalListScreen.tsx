@@ -16,12 +16,14 @@ interface JournalListScreenProps {
   onAddEntry: () => void;
   onEditEntry: (entry: Journal) => void;
   onViewAnalytics: () => void;
+  onBack?: () => void;
 }
 
 export const JournalListScreen: React.FC<JournalListScreenProps> = ({
   onAddEntry,
   onEditEntry,
   onViewAnalytics,
+  onBack,
 }) => {
   const { entries, loadEntries, deleteEntry, error } = useJournalStore();
   const { activeEntry, stopTracking } = useTimeTrackingStore();
@@ -208,6 +210,11 @@ export const JournalListScreen: React.FC<JournalListScreenProps> = ({
   return (
     <View style={styles.container}>
       <View style={styles.header}>
+        {onBack && (
+          <TouchableOpacity style={styles.backButton} onPress={onBack}>
+            <Text style={styles.backButtonText}>← Back</Text>
+          </TouchableOpacity>
+        )}
         <Text style={styles.title}>📝 Activity Journal</Text>
         <TouchableOpacity style={styles.addButton} onPress={onAddEntry}>
           <Text style={styles.addButtonText}>+ New Entry</Text>
@@ -252,6 +259,17 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     borderBottomWidth: 1,
     borderBottomColor: '#eee',
+  },
+  backButton: {
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    position: 'absolute',
+    left: 16,
+    zIndex: 1,
+  },
+  backButtonText: {
+    color: '#007AFF',
+    fontSize: 16,
   },
   title: {
     fontSize: 24,

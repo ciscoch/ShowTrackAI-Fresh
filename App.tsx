@@ -7,16 +7,19 @@ import { FreemiumDashboard } from './src/features/dashboard/screens/FreemiumDash
 import { EliteDashboard } from './src/features/dashboard/screens/EliteDashboard';
 import { AnimalListScreen } from './src/features/animals/screens/AnimalListScreen';
 import { AnimalFormScreen } from './src/features/animals/screens/AnimalFormScreen';
+import { JournalListScreen } from './src/features/journal/screens/JournalListScreen';
+import { JournalEntryScreen } from './src/features/journal/screens/JournalEntryScreen';
 import { UpgradeScreen } from './src/features/subscription/screens/UpgradeScreen';
 import { useProfileStore } from './src/core/stores/ProfileStore';
-import { UserProfile, Animal } from './src/core/models';
+import { UserProfile, Animal, Journal } from './src/core/models';
 
-type AppScreen = 'demoChooser' | 'profileChooser' | 'profileSettings' | 'freemiumDashboard' | 'eliteDashboard' | 'animalList' | 'animalForm' | 'upgrade';
+type AppScreen = 'demoChooser' | 'profileChooser' | 'profileSettings' | 'freemiumDashboard' | 'eliteDashboard' | 'animalList' | 'animalForm' | 'journalList' | 'journalEntry' | 'upgrade';
 
 export default function App() {
   const { currentProfile, isFirstLaunch, checkLimitations } = useProfileStore();
   const [currentScreen, setCurrentScreen] = useState<AppScreen>('demoChooser');
   const [selectedAnimal, setSelectedAnimal] = useState<Animal | undefined>();
+  const [selectedJournalEntry, setSelectedJournalEntry] = useState<Journal | undefined>();
 
   useEffect(() => {
     // Always start with demo chooser on first launch
@@ -102,6 +105,31 @@ export default function App() {
     setSelectedAnimal(undefined);
   };
 
+  // Journal management handlers
+  const handleNavigateToJournal = () => {
+    setCurrentScreen('journalList');
+  };
+
+  const handleAddJournalEntry = () => {
+    setSelectedJournalEntry(undefined);
+    setCurrentScreen('journalEntry');
+  };
+
+  const handleEditJournalEntry = (entry: Journal) => {
+    setSelectedJournalEntry(entry);
+    setCurrentScreen('journalEntry');
+  };
+
+  const handleSaveJournalEntry = () => {
+    setCurrentScreen('journalList');
+    setSelectedJournalEntry(undefined);
+  };
+
+  const handleCancelJournalEntry = () => {
+    setCurrentScreen('journalList');
+    setSelectedJournalEntry(undefined);
+  };
+
   // Navigation with safety - always provide a way back
   const handleSafeNavigation = (targetScreen: AppScreen) => {
     setCurrentScreen(targetScreen);
@@ -153,6 +181,7 @@ export default function App() {
             onNavigateToAnalytics={() => console.log('Navigate to Analytics')}
             onNavigateToAI={() => console.log('Navigate to AI')}
             onNavigateToExport={() => console.log('Navigate to Export')}
+            onNavigateToJournal={handleNavigateToJournal}
           />
         );
 
@@ -179,6 +208,36 @@ export default function App() {
             animal={selectedAnimal}
             onSave={handleSaveAnimal}
             onCancel={handleCancelAnimal}
+          />
+        );
+
+      case 'journalList':
+        return (
+          <JournalListScreen
+            onAddEntry={handleAddJournalEntry}
+            onEditEntry={handleEditJournalEntry}
+            onViewAnalytics={() => console.log('Navigate to Journal Analytics')}
+            onBack={() => {
+              // Go back to appropriate dashboard
+              if (currentProfile) {
+                routeToDashboard(currentProfile);
+              } else {
+                setCurrentScreen('demoChooser');
+              }
+            }}
+          />
+        );
+
+      case 'journalEntry':
+        return (
+          <JournalEntryScreen
+            entry={selectedJournalEntry}
+            onSave={handleSaveJournalEntry}
+            onCancel={handleCancelJournalEntry}
+            onBack={() => {
+              setCurrentScreen('journalList');
+              setSelectedJournalEntry(undefined);
+            }}
           />
         );
 

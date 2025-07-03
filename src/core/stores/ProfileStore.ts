@@ -1,6 +1,8 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { UserProfile, ProfileCreationData, DEFAULT_SETTINGS, DEFAULT_STATS } from '../models/Profile';
+import { useJournalStore } from './JournalStore';
+import { useAnimalStore } from './AnimalStore';
 
 interface ProfileState {
   profiles: UserProfile[];

@@ -15,6 +15,7 @@ interface EliteDashboardProps {
   onNavigateToAnalytics: () => void;
   onNavigateToAI: () => void;
   onNavigateToExport: () => void;
+  onNavigateToJournal: () => void;
 }
 
 export const EliteDashboard: React.FC<EliteDashboardProps> = ({
@@ -24,6 +25,7 @@ export const EliteDashboard: React.FC<EliteDashboardProps> = ({
   onNavigateToAnalytics,
   onNavigateToAI,
   onNavigateToExport,
+  onNavigateToJournal,
 }) => {
   const { currentProfile } = useProfileStore();
 
@@ -164,7 +166,10 @@ export const EliteDashboard: React.FC<EliteDashboardProps> = ({
           <Text style={styles.sectionTitle}>🛠️ Core Features</Text>
           
           <View style={styles.featuresGrid}>
-            <TouchableOpacity style={styles.featureCard}>
+            <TouchableOpacity 
+              style={styles.featureCard}
+              onPress={onNavigateToJournal}
+            >
               <Text style={styles.featureIcon}>📝</Text>
               <Text style={styles.featureTitle}>Advanced Journal</Text>
               <Text style={styles.featureSubtitle}>AET skill tracking</Text>
@@ -227,7 +232,10 @@ export const EliteDashboard: React.FC<EliteDashboardProps> = ({
               <Text style={styles.quickActionText}>Add Animal</Text>
             </TouchableOpacity>
             
-            <TouchableOpacity style={styles.quickAction}>
+            <TouchableOpacity 
+              style={styles.quickAction}
+              onPress={onNavigateToJournal}
+            >
               <Text style={styles.quickActionIcon}>📝</Text>
               <Text style={styles.quickActionText}>Log Activity</Text>
             </TouchableOpacity>

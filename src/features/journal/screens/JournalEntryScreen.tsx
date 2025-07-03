@@ -34,7 +34,7 @@ export const JournalEntryScreen: React.FC<JournalEntryScreenProps> = ({
   onCancel,
   onBack,
 }) => {
-  const { createEntry, updateEntry } = useJournalStore();
+  const { addEntry, updateEntry } = useJournalStore();
   const { activeEntry, startTracking, stopTracking } = useTimeTrackingStore();
   const [loading, setLoading] = useState(false);
   
@@ -739,7 +739,7 @@ export const JournalEntryScreen: React.FC<JournalEntryScreenProps> = ({
       if (entry) {
         await updateEntry(entry.id, journalData);
       } else {
-        await createEntry(journalData);
+        await addEntry(journalData);
       }
 
       const feedSummary = finalFeedData.feeds.length === 1 
@@ -752,6 +752,7 @@ export const JournalEntryScreen: React.FC<JournalEntryScreenProps> = ({
         [{ text: 'OK', onPress: onSave }]
       );
     } catch (error) {
+      console.error('Save error:', error);
       Alert.alert('Error', 'Failed to save journal entry. Please try again.');
     } finally {
       setLoading(false);

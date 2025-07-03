@@ -43,7 +43,9 @@ export const useJournalStore = create<JournalStore>((set, get) => ({
     try {
       await get().saveEntries();
     } catch (error) {
+      console.error('Error saving journal entry:', error);
       set({ error: 'Failed to save journal entry' });
+      throw error; // Re-throw to let the UI handle it
     }
   },
 
@@ -58,7 +60,9 @@ export const useJournalStore = create<JournalStore>((set, get) => ({
     try {
       await get().saveEntries();
     } catch (error) {
+      console.error('Error updating journal entry:', error);
       set({ error: 'Failed to update journal entry' });
+      throw error; // Re-throw to let the UI handle it
     }
   },
 
@@ -72,7 +76,9 @@ export const useJournalStore = create<JournalStore>((set, get) => ({
     try {
       await get().saveEntries();
     } catch (error) {
+      console.error('Error deleting journal entry:', error);
       set({ error: 'Failed to delete journal entry' });
+      throw error; // Re-throw to let the UI handle it
     }
   },
 

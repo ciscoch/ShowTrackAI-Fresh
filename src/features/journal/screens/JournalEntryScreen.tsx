@@ -660,7 +660,11 @@ export const JournalEntryScreen: React.FC<JournalEntryScreenProps> = ({
     const hasContext = formData.location || formData.weather;
     const fieldsEmpty = !formData.title.trim() && !formData.description.trim();
     
-    if (fieldsEmpty && (hasFeeds || hasCategories || hasContext)) {
+    // For Feeding & Nutrition, prefer to have feeds for better autofill context
+    const feedingNutritionSelected = selectedAETCategories.includes('feeding_nutrition');
+    const hasEnoughContext = feedingNutritionSelected ? (hasFeeds || hasContext) : (hasCategories || hasContext);
+    
+    if (fieldsEmpty && hasEnoughContext) {
       if (!autofillSuggestions && !isGeneratingAutofill && !showAutofillPrompt) {
         setShowAutofillPrompt(true);
       }
@@ -696,17 +700,19 @@ export const JournalEntryScreen: React.FC<JournalEntryScreenProps> = ({
       return false;
     }
 
-    // Validate mandatory feed tracking
-    if (!feedData.feeds || feedData.feeds.length === 0) {
-      Alert.alert('Feed Tracking Required', 'Please add at least one feed. Feed tracking is required for all journal entries.');
-      return false;
-    }
-    
-    // Validate each feed item has required fields
-    for (const feed of feedData.feeds) {
-      if (!feed.brand || !feed.product || feed.amount <= 0) {
-        Alert.alert('Feed Tracking Error', 'All feeds must have a brand, product, and valid amount.');
+    // Validate feed tracking only when Feeding & Nutrition is selected
+    if (selectedAETCategories.includes('feeding_nutrition')) {
+      if (!feedData.feeds || feedData.feeds.length === 0) {
+        Alert.alert('Feed Tracking Required', 'Please add at least one feed. Feed tracking is required for Feeding & Nutrition activities.');
         return false;
+      }
+      
+      // Validate each feed item has required fields
+      for (const feed of feedData.feeds) {
+        if (!feed.brand || !feed.product || feed.amount <= 0) {
+          Alert.alert('Feed Tracking Error', 'All feeds must have a brand, product, and valid amount.');
+          return false;
+        }
       }
     }
 
@@ -723,16 +729,20 @@ export const JournalEntryScreen: React.FC<JournalEntryScreenProps> = ({
 
     setLoading(true);
     try {
-      // Calculate total cost
-      const totalCost = feedData.feeds.reduce((sum, feed) => sum + (feed.cost || 0), 0);
-      const finalFeedData = {
-        ...feedData,
-        totalCost
-      };
+      // Calculate total cost and prepare feed data (include if feeds are present)
+      let finalFeedData = null;
+      
+      if (feedData.feeds.length > 0) {
+        const totalCost = feedData.feeds.reduce((sum, feed) => sum + (feed.cost || 0), 0);
+        finalFeedData = {
+          ...feedData,
+          totalCost
+        };
+      }
       
       const journalData: Omit<Journal, 'id' | 'createdAt' | 'updatedAt'> = {
         ...formData,
-        feedData: finalFeedData, // Include mandatory feed tracking data
+        feedData: finalFeedData, // Include feed data only when present
         userId: 'current-user', // Would get from auth context
       };
 
@@ -742,15 +752,16 @@ export const JournalEntryScreen: React.FC<JournalEntryScreenProps> = ({
         await addEntry(journalData);
       }
 
-      const feedSummary = finalFeedData.feeds.length === 1 
-        ? `${finalFeedData.feeds[0].amount} ${finalFeedData.feeds[0].unit} of ${finalFeedData.feeds[0].product}`
-        : `${finalFeedData.feeds.length} different feeds`;
+      const successMessage = finalFeedData
+        ? (() => {
+            const feedSummary = finalFeedData.feeds.length === 1 
+              ? `${finalFeedData.feeds[0].amount} ${finalFeedData.feeds[0].unit} of ${finalFeedData.feeds[0].product}`
+              : `${finalFeedData.feeds.length} different feeds`;
+            return `Journal entry ${entry ? 'updated' : 'created'} successfully!\n\nFeed tracked: ${feedSummary}${finalFeedData.totalCost > 0 ? ` ($${finalFeedData.totalCost.toFixed(2)})` : ''}`;
+          })()
+        : `Journal entry ${entry ? 'updated' : 'created'} successfully!`;
       
-      Alert.alert(
-        'Success',
-        `Journal entry ${entry ? 'updated' : 'created'} successfully!\n\nFeed tracked: ${feedSummary}${finalFeedData.totalCost > 0 ? ` ($${finalFeedData.totalCost.toFixed(2)})` : ''}`,
-        [{ text: 'OK', onPress: onSave }]
-      );
+      Alert.alert('Success', successMessage, [{ text: 'OK', onPress: onSave }]);
     } catch (error) {
       console.error('Save error:', error);
       Alert.alert('Error', 'Failed to save journal entry. Please try again.');
@@ -855,6 +866,15 @@ export const JournalEntryScreen: React.FC<JournalEntryScreenProps> = ({
       if (category) {
         category.skills.forEach(skillId => {
           handleRemoveSkill(skillId);
+        });
+      }
+      
+      // Clear feed data if Feeding & Nutrition is being deselected
+      if (categoryId === 'feeding_nutrition') {
+        setFeedData({
+          feeds: [],
+          totalCost: 0,
+          notes: ''
         });
       }
       
@@ -1105,16 +1125,23 @@ export const JournalEntryScreen: React.FC<JournalEntryScreenProps> = ({
 
         {renderAETSkills()}
 
-        {/* Feed Tracking - Mandatory */}
+        {/* Feed Tracking - Required for Feeding & Nutrition, Optional for others */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>🌾 Feed Data *</Text>
-            <View style={styles.mandatoryBadge}>
-              <Text style={styles.mandatoryText}>Required</Text>
-            </View>
+            <Text style={styles.sectionTitle}>
+              🌾 Feed Data {selectedAETCategories.includes('feeding_nutrition') ? '*' : ''}
+            </Text>
+            {selectedAETCategories.includes('feeding_nutrition') && (
+              <View style={styles.mandatoryBadge}>
+                <Text style={styles.mandatoryText}>Required</Text>
+              </View>
+            )}
           </View>
           <Text style={styles.sectionSubtitle}>
-            Track all feeds used in this activity for comprehensive record keeping
+            {selectedAETCategories.includes('feeding_nutrition') 
+              ? 'Track all feeds used in this Feeding & Nutrition activity'
+              : 'Track feeds used in this activity (optional for this category)'
+            }
           </Text>
           
           <FeedSelector
@@ -1165,7 +1192,7 @@ export const JournalEntryScreen: React.FC<JournalEntryScreenProps> = ({
                 <TouchableOpacity 
                   style={styles.autofillButton}
                   onPress={generateAutofillSuggestions}
-                  disabled={feedData.feeds.length === 0 && selectedAETCategories.length === 0}
+                  disabled={selectedAETCategories.length === 0 || (selectedAETCategories.includes('feeding_nutrition') && feedData.feeds.length === 0)}
                 >
                   <Text style={styles.autofillIcon}>✨</Text>
                   <Text style={styles.autofillButtonText}>AI Autofill</Text>

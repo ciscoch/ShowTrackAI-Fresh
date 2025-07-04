@@ -12,6 +12,7 @@ import {
 import { useProfileStore } from '../../../core/stores/ProfileStore';
 import { UserProfile, PROFILE_TYPES } from '../../../core/models/Profile';
 import { FormPicker } from '../../../shared/components/FormPicker';
+import { DataManager } from '../../../shared/components/DataManager';
 
 interface ProfileSettingsScreenProps {
   onClose: () => void;
@@ -38,6 +39,7 @@ export const ProfileSettingsScreen: React.FC<ProfileSettingsScreenProps> = ({
   });
   
   const [loading, setLoading] = useState(false);
+  const [showDataManager, setShowDataManager] = useState(false);
 
   const speciesOptions = [
     { label: 'Cattle', value: 'Cattle' },
@@ -297,6 +299,28 @@ export const ProfileSettingsScreen: React.FC<ProfileSettingsScreenProps> = ({
     </View>
   );
 
+  const renderDataManagement = () => (
+    <View style={styles.section}>
+      <Text style={styles.sectionTitle}>🗄️ Data Management</Text>
+      
+      <TouchableOpacity 
+        style={styles.dataButton}
+        onPress={() => setShowDataManager(true)}
+      >
+        <View style={styles.dataButtonContent}>
+          <Text style={styles.dataButtonIcon}>💾</Text>
+          <View style={styles.dataButtonInfo}>
+            <Text style={styles.dataButtonTitle}>Backup & Restore</Text>
+            <Text style={styles.dataButtonSubtext}>
+              Manage your data, create backups, and restore from files
+            </Text>
+          </View>
+          <Text style={styles.dataButtonArrow}>→</Text>
+        </View>
+      </TouchableOpacity>
+    </View>
+  );
+
   const renderDangerZone = () => (
     <View style={styles.section}>
       <Text style={styles.dangerTitle}>⚠️ Danger Zone</Text>
@@ -337,9 +361,15 @@ export const ProfileSettingsScreen: React.FC<ProfileSettingsScreenProps> = ({
       >
         {renderProfileInfo()}
         {renderAppSettings()}
+        {renderDataManagement()}
         {renderProfileStats()}
         {renderDangerZone()}
       </ScrollView>
+
+      <DataManager
+        visible={showDataManager}
+        onClose={() => setShowDataManager(false)}
+      />
     </View>
   );
 };
@@ -510,6 +540,45 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#666',
     textAlign: 'center',
+  },
+  dataButton: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#e9ecef',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  dataButtonContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  dataButtonIcon: {
+    fontSize: 24,
+    marginRight: 12,
+  },
+  dataButtonInfo: {
+    flex: 1,
+  },
+  dataButtonTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: 2,
+  },
+  dataButtonSubtext: {
+    fontSize: 12,
+    color: '#666',
+    lineHeight: 16,
+  },
+  dataButtonArrow: {
+    fontSize: 18,
+    color: '#007AFF',
+    fontWeight: '600',
   },
   dangerTitle: {
     fontSize: 18,

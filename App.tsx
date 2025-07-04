@@ -15,6 +15,7 @@ import { MedicalRecordsScreen } from './src/features/medical/screens/MedicalReco
 import { UpgradeScreen } from './src/features/subscription/screens/UpgradeScreen';
 import { useProfileStore } from './src/core/stores/ProfileStore';
 import { UserProfile, Animal, Journal } from './src/core/models';
+import { autoSyncService } from './src/core/services/AutoSyncService';
 
 type AppScreen = 'demoChooser' | 'profileChooser' | 'profileSettings' | 'freemiumDashboard' | 'eliteDashboard' | 'animalList' | 'animalForm' | 'journalList' | 'journalEntry' | 'journalAnalytics' | 'financial' | 'medical' | 'upgrade';
 
@@ -25,6 +26,11 @@ export default function App() {
   const [selectedJournalEntry, setSelectedJournalEntry] = useState<Journal | undefined>();
 
   useEffect(() => {
+    // Initialize auto-sync service
+    autoSyncService.initialize().catch(error => {
+      console.error('Failed to initialize AutoSync service:', error);
+    });
+
     // Always start with demo chooser on first launch
     if (isFirstLaunch || !currentProfile) {
       setCurrentScreen('demoChooser');

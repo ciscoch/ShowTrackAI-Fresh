@@ -11,11 +11,12 @@ import { JournalListScreen } from './src/features/journal/screens/JournalListScr
 import { JournalEntryScreen } from './src/features/journal/screens/JournalEntryScreen';
 import { JournalAnalyticsScreen } from './src/features/journal/screens/JournalAnalyticsScreen';
 import { FinancialTrackingScreen } from './src/features/financial/screens/FinancialTrackingScreen';
+import { MedicalRecordsScreen } from './src/features/medical/screens/MedicalRecordsScreen';
 import { UpgradeScreen } from './src/features/subscription/screens/UpgradeScreen';
 import { useProfileStore } from './src/core/stores/ProfileStore';
 import { UserProfile, Animal, Journal } from './src/core/models';
 
-type AppScreen = 'demoChooser' | 'profileChooser' | 'profileSettings' | 'freemiumDashboard' | 'eliteDashboard' | 'animalList' | 'animalForm' | 'journalList' | 'journalEntry' | 'journalAnalytics' | 'financial' | 'upgrade';
+type AppScreen = 'demoChooser' | 'profileChooser' | 'profileSettings' | 'freemiumDashboard' | 'eliteDashboard' | 'animalList' | 'animalForm' | 'journalList' | 'journalEntry' | 'journalAnalytics' | 'financial' | 'medical' | 'upgrade';
 
 export default function App() {
   const { currentProfile, isFirstLaunch, checkLimitations } = useProfileStore();
@@ -140,6 +141,10 @@ export default function App() {
     setCurrentScreen('financial');
   };
 
+  const handleNavigateToMedical = () => {
+    setCurrentScreen('medical');
+  };
+
   // Navigation with safety - always provide a way back
   const handleSafeNavigation = (targetScreen: AppScreen) => {
     setCurrentScreen(targetScreen);
@@ -193,6 +198,7 @@ export default function App() {
             onNavigateToExport={() => console.log('Navigate to Export')}
             onNavigateToJournal={handleNavigateToJournal}
             onNavigateToFinancial={handleNavigateToFinancial}
+            onNavigateToMedical={handleNavigateToMedical}
           />
         );
 
@@ -272,6 +278,21 @@ export default function App() {
                 setCurrentScreen('demoChooser');
               }
             }}
+          />
+        );
+
+      case 'medical':
+        return (
+          <MedicalRecordsScreen
+            onBack={() => {
+              // Go back to appropriate dashboard
+              if (currentProfile) {
+                routeToDashboard(currentProfile);
+              } else {
+                setCurrentScreen('demoChooser');
+              }
+            }}
+            onNavigateToAddAnimal={() => setCurrentScreen('animalForm')}
           />
         );
 

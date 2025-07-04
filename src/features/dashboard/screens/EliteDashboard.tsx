@@ -17,6 +17,7 @@ interface EliteDashboardProps {
   onNavigateToExport: () => void;
   onNavigateToJournal: () => void;
   onNavigateToFinancial: () => void;
+  onNavigateToMedical: () => void;
 }
 
 export const EliteDashboard: React.FC<EliteDashboardProps> = ({
@@ -28,6 +29,7 @@ export const EliteDashboard: React.FC<EliteDashboardProps> = ({
   onNavigateToExport,
   onNavigateToJournal,
   onNavigateToFinancial,
+  onNavigateToMedical,
 }) => {
   const { currentProfile } = useProfileStore();
 
@@ -196,6 +198,15 @@ export const EliteDashboard: React.FC<EliteDashboardProps> = ({
               <Text style={styles.featureIcon}>💰</Text>
               <Text style={styles.featureTitle}>Financial Tracking</Text>
               <Text style={styles.featureSubtitle}>Expenses & income</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity 
+              style={styles.featureCard}
+              onPress={onNavigateToMedical}
+            >
+              <Text style={styles.featureIcon}>🏥</Text>
+              <Text style={styles.featureTitle}>Medical Records</Text>
+              <Text style={styles.featureSubtitle}>Health tracking & vet records</Text>
             </TouchableOpacity>
           </View>
         </View>

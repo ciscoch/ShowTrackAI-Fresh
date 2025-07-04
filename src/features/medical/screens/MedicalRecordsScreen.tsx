@@ -13,6 +13,7 @@ import { useHealthRecordStore } from '../../../core/stores/HealthRecordStore';
 import { useAnimalStore } from '../../../core/stores/AnimalStore';
 import { HealthRecord, HealthAlert, OBSERVATION_TYPES } from '../../../core/models/HealthRecord';
 import { AddHealthRecordModal } from '../components/AddHealthRecordModal';
+import { HealthRecordDetailModal } from '../components/HealthRecordDetailModal';
 
 interface MedicalRecordsScreenProps {
   onBack: () => void;
@@ -36,6 +37,9 @@ export const MedicalRecordsScreen: React.FC<MedicalRecordsScreenProps> = ({ onBa
   const [activeTab, setActiveTab] = useState<'overview' | 'records' | 'alerts' | 'trends'>('overview');
   const [selectedAnimal, setSelectedAnimal] = useState<string>('');
   const [showAddModal, setShowAddModal] = useState(false);
+  const [showDetailModal, setShowDetailModal] = useState(false);
+  const [selectedRecord, setSelectedRecord] = useState<HealthRecord | null>(null);
+  const [editingRecord, setEditingRecord] = useState<HealthRecord | null>(null);
 
   useEffect(() => {
     loadHealthRecords();
@@ -48,6 +52,23 @@ export const MedicalRecordsScreen: React.FC<MedicalRecordsScreenProps> = ({ onBa
   const animalHealthRecords = selectedAnimal ? getHealthRecordsByAnimal(selectedAnimal) : [];
   const animalAlerts = selectedAnimal ? getAlertsByAnimal(selectedAnimal) : [];
   const healthSummary = selectedAnimal ? getHealthSummary(selectedAnimal) : null;
+
+  const handleViewRecord = (record: HealthRecord) => {
+    setSelectedRecord(record);
+    setShowDetailModal(true);
+  };
+
+  const handleEditRecord = (record: HealthRecord) => {
+    setEditingRecord(record);
+    setShowAddModal(true);
+  };
+
+  const handleCloseModals = () => {
+    setShowAddModal(false);
+    setShowDetailModal(false);
+    setSelectedRecord(null);
+    setEditingRecord(null);
+  };
 
   const renderHeader = () => (
     <View style={styles.header}>
@@ -255,7 +276,11 @@ export const MedicalRecordsScreen: React.FC<MedicalRecordsScreenProps> = ({ onBa
         animalHealthRecords.map((record) => {
           const observationType = OBSERVATION_TYPES.find(type => type.id === record.observationType);
           return (
-            <View key={record.id} style={styles.recordCard}>
+            <TouchableOpacity 
+              key={record.id} 
+              style={styles.recordCard}
+              onPress={() => handleViewRecord(record)}
+            >
               <View style={styles.recordHeader}>
                 <View style={styles.recordTypeIndicator}>
                   <Text style={styles.recordTypeIcon}>{observationType?.icon || '📋'}</Text>
@@ -313,7 +338,29 @@ export const MedicalRecordsScreen: React.FC<MedicalRecordsScreenProps> = ({ onBa
                   </Text>
                 </View>
               )}
-            </View>
+
+              {/* Action Buttons */}
+              <View style={styles.recordActions}>
+                <TouchableOpacity 
+                  style={styles.recordActionButton}
+                  onPress={(e) => {
+                    e.stopPropagation();
+                    handleEditRecord(record);
+                  }}
+                >
+                  <Text style={styles.recordActionButtonText}>✏️ Edit</Text>
+                </TouchableOpacity>
+                <TouchableOpacity 
+                  style={[styles.recordActionButton, styles.viewButton]}
+                  onPress={(e) => {
+                    e.stopPropagation();
+                    handleViewRecord(record);
+                  }}
+                >
+                  <Text style={[styles.recordActionButtonText, styles.viewButtonText]}>👁️ View Details</Text>
+                </TouchableOpacity>
+              </View>
+            </TouchableOpacity>
           );
         })
       )}
@@ -424,9 +471,17 @@ export const MedicalRecordsScreen: React.FC<MedicalRecordsScreenProps> = ({ onBa
 
       <AddHealthRecordModal
         visible={showAddModal}
-        onClose={() => setShowAddModal(false)}
+        onClose={handleCloseModals}
         selectedAnimalId={selectedAnimal}
         onNavigateToAddAnimal={onNavigateToAddAnimal}
+        editingRecord={editingRecord}
+      />
+
+      <HealthRecordDetailModal
+        visible={showDetailModal}
+        onClose={handleCloseModals}
+        record={selectedRecord}
+        onEdit={handleEditRecord}
       />
     </SafeAreaView>
   );
@@ -941,6 +996,34 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#856404',
     fontWeight: '500',
+  },
+  recordActions: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 12,
+    gap: 8,
+  },
+  recordActionButton: {
+    flex: 1,
+    backgroundColor: '#f8f9fa',
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 6,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#e9ecef',
+  },
+  viewButton: {
+    backgroundColor: '#007AFF',
+    borderColor: '#007AFF',
+  },
+  recordActionButtonText: {
+    fontSize: 12,
+    color: '#6c757d',
+    fontWeight: '500',
+  },
+  viewButtonText: {
+    color: '#fff',
   },
   alertCard: {
     backgroundColor: '#fff',

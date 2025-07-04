@@ -85,6 +85,11 @@ export const AnimalListScreen: React.FC<AnimalListScreenProps> = ({
     <View style={styles.container}>
       <View style={styles.header}>
         <View style={styles.headerLeft}>
+          {onBack && (
+            <TouchableOpacity style={styles.backButton} onPress={onBack}>
+              <Text style={styles.backButtonText}>← Back</Text>
+            </TouchableOpacity>
+          )}
           <Text style={styles.title}>My Animals ({animals.length})</Text>
         </View>
         <TouchableOpacity style={styles.addButton} onPress={onAddAnimal}>
@@ -129,6 +134,18 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     flex: 1,
+  },
+  backButton: {
+    marginRight: 12,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 6,
+    backgroundColor: '#f0f0f0',
+  },
+  backButtonText: {
+    fontSize: 16,
+    color: '#007AFF',
+    fontWeight: '500',
   },
   title: {
     fontSize: 24,

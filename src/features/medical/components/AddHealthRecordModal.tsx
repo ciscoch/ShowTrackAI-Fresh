@@ -17,14 +17,17 @@ import { FormPicker } from '../../../shared/components/FormPicker';
 import { 
   OBSERVATION_TYPES, 
   COMMON_SYMPTOMS, 
-  HealthRecord 
+  HealthRecord,
+  HealthPhoto
 } from '../../../core/models/HealthRecord';
+import { HealthPhotoCapture } from './HealthPhotoCapture';
 
 interface AddHealthRecordModalProps {
   visible: boolean;
   onClose: () => void;
   selectedAnimalId?: string;
   onNavigateToAddAnimal?: () => void;
+  editingRecord?: HealthRecord | null;
 }
 
 export const AddHealthRecordModal: React.FC<AddHealthRecordModalProps> = ({
@@ -32,8 +35,9 @@ export const AddHealthRecordModal: React.FC<AddHealthRecordModalProps> = ({
   onClose,
   selectedAnimalId,
   onNavigateToAddAnimal,
+  editingRecord,
 }) => {
-  const { addHealthRecord } = useHealthRecordStore();
+  const { addHealthRecord, updateHealthRecord } = useHealthRecordStore();
   const { animals } = useAnimalStore();
 
   const [formData, setFormData] = useState({
@@ -59,15 +63,43 @@ export const AddHealthRecordModal: React.FC<AddHealthRecordModalProps> = ({
     followUpRequired: false,
     followUpDate: new Date(),
     recordedDate: new Date(),
+    photos: [] as HealthPhoto[],
   });
 
   const [newCustomSymptom, setNewCustomSymptom] = useState('');
 
   useEffect(() => {
-    if (selectedAnimalId && selectedAnimalId !== formData.animalId) {
+    if (editingRecord) {
+      // Initialize form with editing record data
+      setFormData({
+        animalId: editingRecord.animalId,
+        observationType: editingRecord.observationType,
+        temperature: editingRecord.temperature?.toString() || '',
+        heartRate: editingRecord.heartRate?.toString() || '',
+        respiratoryRate: editingRecord.respiratoryRate?.toString() || '',
+        bodyConditionScore: editingRecord.bodyConditionScore || 3,
+        mobilityScore: editingRecord.mobilityScore || 3,
+        appetiteScore: editingRecord.appetiteScore || 3,
+        alertnessScore: editingRecord.alertnessScore || 3,
+        eyeCondition: editingRecord.eyeCondition,
+        nasalDischarge: editingRecord.nasalDischarge,
+        manureConsistency: editingRecord.manureConsistency,
+        gaitMobility: editingRecord.gaitMobility,
+        appetite: editingRecord.appetite,
+        symptoms: editingRecord.symptoms || [],
+        customSymptoms: editingRecord.customSymptoms || [],
+        notes: editingRecord.notes,
+        isUnknownCondition: editingRecord.isUnknownCondition || false,
+        unknownConditionPriority: editingRecord.unknownConditionPriority || 'monitor',
+        followUpRequired: editingRecord.followUpRequired || false,
+        followUpDate: editingRecord.followUpDate || new Date(),
+        recordedDate: editingRecord.recordedDate,
+        photos: editingRecord.photos || [],
+      });
+    } else if (selectedAnimalId && selectedAnimalId !== formData.animalId) {
       setFormData(prev => ({ ...prev, animalId: selectedAnimalId }));
     }
-  }, [selectedAnimalId]);
+  }, [selectedAnimalId, editingRecord]);
 
 
 
@@ -95,6 +127,7 @@ export const AddHealthRecordModal: React.FC<AddHealthRecordModalProps> = ({
       followUpRequired: false,
       followUpDate: new Date(),
       recordedDate: new Date(),
+      photos: [],
     });
     setNewCustomSymptom('');
   };
@@ -142,7 +175,47 @@ export const AddHealthRecordModal: React.FC<AddHealthRecordModalProps> = ({
     }
 
     try {
-      const healthRecord: Omit<HealthRecord, 'id' | 'createdAt' | 'updatedAt'> = {
+      if (editingRecord) {
+        // Update existing record
+        const updates = {
+          animalId: formData.animalId,
+          observationType: formData.observationType,
+          temperature: formData.temperature ? parseFloat(formData.temperature) : undefined,
+          heartRate: formData.heartRate ? parseInt(formData.heartRate) : undefined,
+          respiratoryRate: formData.respiratoryRate ? parseInt(formData.respiratoryRate) : undefined,
+          bodyConditionScore: formData.bodyConditionScore,
+          mobilityScore: formData.mobilityScore,
+          appetiteScore: formData.appetiteScore,
+          alertnessScore: formData.alertnessScore,
+          eyeCondition: formData.eyeCondition,
+          nasalDischarge: formData.nasalDischarge,
+          manureConsistency: formData.manureConsistency,
+          gaitMobility: formData.gaitMobility,
+          appetite: formData.appetite,
+          symptoms: formData.symptoms,
+          customSymptoms: formData.customSymptoms,
+          notes: formData.notes,
+          photos: formData.photos,
+          isUnknownCondition: formData.isUnknownCondition,
+          unknownConditionPriority: formData.isUnknownCondition ? formData.unknownConditionPriority : undefined,
+          expertReviewRequested: formData.isUnknownCondition && 
+            (formData.unknownConditionPriority === 'urgent' || formData.unknownConditionPriority === 'emergency'),
+          followUpRequired: formData.followUpRequired,
+          followUpDate: formData.followUpRequired ? formData.followUpDate : undefined,
+          recordedDate: formData.recordedDate,
+        };
+
+        await updateHealthRecord(editingRecord.id, updates);
+        
+        const photoCount = formData.photos.length;
+        Alert.alert(
+          'Success', 
+          `Health record updated successfully${photoCount > 0 ? ` with ${photoCount} medical photo${photoCount > 1 ? 's' : ''}` : ''}`
+        );
+        handleClose();
+      } else {
+        // Create new record
+        const healthRecord: Omit<HealthRecord, 'id' | 'createdAt' | 'updatedAt'> = {
         animalId: formData.animalId,
         recordedBy: 'current-user',
         recordedDate: formData.recordedDate,
@@ -162,7 +235,7 @@ export const AddHealthRecordModal: React.FC<AddHealthRecordModalProps> = ({
         symptoms: formData.symptoms,
         customSymptoms: formData.customSymptoms,
         notes: formData.notes,
-        photos: [],
+        photos: formData.photos,
         isUnknownCondition: formData.isUnknownCondition,
         unknownConditionPriority: formData.isUnknownCondition ? formData.unknownConditionPriority : undefined,
         expertReviewRequested: formData.isUnknownCondition && 
@@ -172,9 +245,25 @@ export const AddHealthRecordModal: React.FC<AddHealthRecordModalProps> = ({
         userId: 'current-user',
       };
 
-      await addHealthRecord(healthRecord);
-      Alert.alert('Success', 'Health record added successfully');
-      handleClose();
+        const savedRecord = await addHealthRecord(healthRecord);
+        
+        // Update photos with the health record ID
+        if (formData.photos.length > 0 && savedRecord?.id) {
+          const updatedPhotos = formData.photos.map(photo => ({
+            ...photo,
+            healthRecordId: savedRecord.id
+          }));
+          // In a real app, you'd save these to a photo store or update the health record
+          console.log('Photos linked to health record:', updatedPhotos);
+        }
+
+        const photoCount = formData.photos.length;
+        Alert.alert(
+          'Success', 
+          `Health record added successfully${photoCount > 0 ? ` with ${photoCount} medical photo${photoCount > 1 ? 's' : ''}` : ''}`
+        );
+        handleClose();
+      }
     } catch (error) {
       Alert.alert('Error', 'Failed to save health record');
     }
@@ -209,7 +298,9 @@ export const AddHealthRecordModal: React.FC<AddHealthRecordModalProps> = ({
       <View style={styles.modalOverlay}>
         <View style={styles.modalContent}>
           <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>🏥 Add Health Record</Text>
+            <Text style={styles.modalTitle}>
+              🏥 {editingRecord ? 'Edit Health Record' : 'Add Health Record'}
+            </Text>
             <TouchableOpacity onPress={handleClose}>
               <Text style={styles.closeButton}>✕</Text>
             </TouchableOpacity>
@@ -461,6 +552,13 @@ export const AddHealthRecordModal: React.FC<AddHealthRecordModalProps> = ({
               />
             </View>
 
+            {/* Medical Photos */}
+            <HealthPhotoCapture
+              photos={formData.photos}
+              onPhotosChange={(photos) => setFormData(prev => ({ ...prev, photos }))}
+              maxPhotos={5}
+            />
+
             {/* Unknown Condition */}
             <View style={styles.section}>
               <View style={styles.unknownConditionToggle}>
@@ -512,7 +610,9 @@ export const AddHealthRecordModal: React.FC<AddHealthRecordModalProps> = ({
               <Text style={styles.cancelButtonText}>Cancel</Text>
             </TouchableOpacity>
             <TouchableOpacity style={[styles.modalButton, styles.saveButton]} onPress={handleSubmit}>
-              <Text style={styles.saveButtonText}>Save Record</Text>
+              <Text style={styles.saveButtonText}>
+                {editingRecord ? 'Update Record' : 'Save Record'}
+              </Text>
             </TouchableOpacity>
           </View>
         </View>

@@ -27,7 +27,7 @@ export const FormPicker: React.FC<FormPickerProps> = ({
 }) => {
   const [modalVisible, setModalVisible] = React.useState(false);
 
-  const selectedOption = options.find(opt => opt.value === value);
+  const selectedOption = options?.find(opt => opt.value === value);
 
   const handleSelect = (selectedValue: string) => {
     onValueChange(selectedValue);
@@ -64,7 +64,7 @@ export const FormPicker: React.FC<FormPickerProps> = ({
           <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>{label}</Text>
             <FlatList
-              data={options}
+              data={options || []}
               keyExtractor={(item) => item.value}
               renderItem={({ item }) => (
                 <TouchableOpacity

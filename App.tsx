@@ -10,11 +10,12 @@ import { AnimalFormScreen } from './src/features/animals/screens/AnimalFormScree
 import { JournalListScreen } from './src/features/journal/screens/JournalListScreen';
 import { JournalEntryScreen } from './src/features/journal/screens/JournalEntryScreen';
 import { JournalAnalyticsScreen } from './src/features/journal/screens/JournalAnalyticsScreen';
+import { FinancialTrackingScreen } from './src/features/financial/screens/FinancialTrackingScreen';
 import { UpgradeScreen } from './src/features/subscription/screens/UpgradeScreen';
 import { useProfileStore } from './src/core/stores/ProfileStore';
 import { UserProfile, Animal, Journal } from './src/core/models';
 
-type AppScreen = 'demoChooser' | 'profileChooser' | 'profileSettings' | 'freemiumDashboard' | 'eliteDashboard' | 'animalList' | 'animalForm' | 'journalList' | 'journalEntry' | 'journalAnalytics' | 'upgrade';
+type AppScreen = 'demoChooser' | 'profileChooser' | 'profileSettings' | 'freemiumDashboard' | 'eliteDashboard' | 'animalList' | 'animalForm' | 'journalList' | 'journalEntry' | 'journalAnalytics' | 'financial' | 'upgrade';
 
 export default function App() {
   const { currentProfile, isFirstLaunch, checkLimitations } = useProfileStore();
@@ -135,6 +136,10 @@ export default function App() {
     setCurrentScreen('journalAnalytics');
   };
 
+  const handleNavigateToFinancial = () => {
+    setCurrentScreen('financial');
+  };
+
   // Navigation with safety - always provide a way back
   const handleSafeNavigation = (targetScreen: AppScreen) => {
     setCurrentScreen(targetScreen);
@@ -187,6 +192,7 @@ export default function App() {
             onNavigateToAI={() => console.log('Navigate to AI')}
             onNavigateToExport={() => console.log('Navigate to Export')}
             onNavigateToJournal={handleNavigateToJournal}
+            onNavigateToFinancial={handleNavigateToFinancial}
           />
         );
 
@@ -251,6 +257,20 @@ export default function App() {
           <JournalAnalyticsScreen
             onBack={() => {
               setCurrentScreen('journalList');
+            }}
+          />
+        );
+
+      case 'financial':
+        return (
+          <FinancialTrackingScreen
+            onBack={() => {
+              // Go back to appropriate dashboard
+              if (currentProfile) {
+                routeToDashboard(currentProfile);
+              } else {
+                setCurrentScreen('demoChooser');
+              }
             }}
           />
         );

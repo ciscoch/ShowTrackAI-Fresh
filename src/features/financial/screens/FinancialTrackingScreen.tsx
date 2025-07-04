@@ -10,7 +10,9 @@ import {
   TextInput,
   Alert,
   ActivityIndicator,
+  Image,
 } from 'react-native';
+import * as ImagePicker from 'expo-image-picker';
 import { useFinancialStore } from '../../../core/stores/FinancialStore';
 import { useJournalStore } from '../../../core/stores/JournalStore';
 import { EXPENSE_CATEGORIES, INCOME_CATEGORIES, FinancialEntry } from '../../../core/models/Financial';
@@ -28,6 +30,7 @@ export const FinancialTrackingScreen: React.FC<FinancialTrackingScreenProps> = (
     entries, 
     loadEntries, 
     addEntry, 
+    updateEntry,
     deleteEntry,
     getFinancialSummary,
     isLoading 
@@ -39,6 +42,7 @@ export const FinancialTrackingScreen: React.FC<FinancialTrackingScreenProps> = (
   const [activeTab, setActiveTab] = useState<'overview' | 'entries' | 'feed' | 'aet'>('overview');
   const [entryType, setEntryType] = useState<'income' | 'expense'>('expense');
   const [selectedTimeRange, setSelectedTimeRange] = useState<'month' | 'quarter' | 'year'>('month');
+  const [editingEntry, setEditingEntry] = useState<FinancialEntry | null>(null);
   
   // Analytics services
   const feedCalculator = new FeedCostCalculator();
@@ -53,13 +57,110 @@ export const FinancialTrackingScreen: React.FC<FinancialTrackingScreenProps> = (
     date: new Date(),
     description: '',
     tags: [] as string[],
+    receiptPhoto: null as string | null,
   });
+
+  const resetForm = () => {
+    setFormData({
+      type: 'expense',
+      category: '',
+      subcategory: '',
+      amount: '',
+      date: new Date(),
+      description: '',
+      tags: [],
+      receiptPhoto: null,
+    });
+    setEditingEntry(null);
+  };
+
+  const openEditModal = (entry: FinancialEntry) => {
+    setEditingEntry(entry);
+    setFormData({
+      type: entry.type,
+      category: entry.category,
+      subcategory: entry.subcategory || '',
+      amount: entry.amount.toString(),
+      date: entry.date,
+      description: entry.description,
+      tags: entry.tags || [],
+      receiptPhoto: entry.attachments?.[0] || null,
+    });
+    setShowAddModal(true);
+  };
 
   useEffect(() => {
     loadEntries();
   }, [loadEntries]);
 
   const summary = getFinancialSummary();
+
+  const pickImage = async () => {
+    try {
+      // Request permissions
+      const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      
+      if (permissionResult.granted === false) {
+        Alert.alert('Permission Required', 'Please enable photo library access to upload receipts.');
+        return;
+      }
+
+      // Launch image picker
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [4, 3],
+        quality: 0.8,
+      });
+
+      if (!result.canceled && result.assets[0]) {
+        setFormData(prev => ({ ...prev, receiptPhoto: result.assets[0].uri }));
+      }
+    } catch (error) {
+      Alert.alert('Error', 'Failed to pick image. Please try again.');
+    }
+  };
+
+  const takePhoto = async () => {
+    try {
+      // Request permissions
+      const permissionResult = await ImagePicker.requestCameraPermissionsAsync();
+      
+      if (permissionResult.granted === false) {
+        Alert.alert('Permission Required', 'Please enable camera access to take receipt photos.');
+        return;
+      }
+
+      // Launch camera
+      const result = await ImagePicker.launchCameraAsync({
+        allowsEditing: true,
+        aspect: [4, 3],
+        quality: 0.8,
+      });
+
+      if (!result.canceled && result.assets[0]) {
+        setFormData(prev => ({ ...prev, receiptPhoto: result.assets[0].uri }));
+      }
+    } catch (error) {
+      Alert.alert('Error', 'Failed to take photo. Please try again.');
+    }
+  };
+
+  const showImagePickerOptions = () => {
+    Alert.alert(
+      'Receipt Photo',
+      'How would you like to add a receipt photo?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: '📷 Take Photo', onPress: takePhoto },
+        { text: '📁 Choose from Library', onPress: pickImage },
+      ]
+    );
+  };
+
+  const removeReceiptPhoto = () => {
+    setFormData(prev => ({ ...prev, receiptPhoto: null }));
+  };
 
   const handleAddEntry = async () => {
     if (!formData.category || !formData.amount || !formData.description) {
@@ -73,27 +174,35 @@ export const FinancialTrackingScreen: React.FC<FinancialTrackingScreenProps> = (
       return;
     }
 
-    await addEntry({
-      type: formData.type,
-      category: formData.category,
-      subcategory: formData.subcategory,
-      amount,
-      date: formData.date,
-      description: formData.description,
-      tags: formData.tags,
-      userId: 'current-user',
-    });
+    if (editingEntry) {
+      // Update existing entry
+      await updateEntry(editingEntry.id, {
+        type: formData.type,
+        category: formData.category,
+        subcategory: formData.subcategory,
+        amount,
+        date: formData.date,
+        description: formData.description,
+        tags: formData.tags,
+        attachments: formData.receiptPhoto ? [formData.receiptPhoto] : undefined,
+      });
+    } else {
+      // Create new entry
+      await addEntry({
+        type: formData.type,
+        category: formData.category,
+        subcategory: formData.subcategory,
+        amount,
+        date: formData.date,
+        description: formData.description,
+        tags: formData.tags,
+        attachments: formData.receiptPhoto ? [formData.receiptPhoto] : undefined,
+        userId: 'current-user',
+      });
+    }
 
     // Reset form
-    setFormData({
-      type: 'expense',
-      category: '',
-      subcategory: '',
-      amount: '',
-      date: new Date(),
-      description: '',
-      tags: [],
-    });
+    resetForm();
     setShowAddModal(false);
   };
 
@@ -188,24 +297,7 @@ export const FinancialTrackingScreen: React.FC<FinancialTrackingScreenProps> = (
               : EXPENSE_CATEGORIES.find(c => c.id === entry.category);
               
             return (
-              <TouchableOpacity 
-                key={entry.id} 
-                style={styles.entryItem}
-                onLongPress={() => {
-                  Alert.alert(
-                    'Delete Entry',
-                    'Are you sure you want to delete this entry?',
-                    [
-                      { text: 'Cancel', style: 'cancel' },
-                      { 
-                        text: 'Delete', 
-                        style: 'destructive',
-                        onPress: () => deleteEntry(entry.id)
-                      }
-                    ]
-                  );
-                }}
-              >
+              <View key={entry.id} style={styles.entryItem}>
                 <View style={styles.entryLeft}>
                   <Text style={styles.entryIcon}>{category?.icon || '💰'}</Text>
                   <View>
@@ -216,13 +308,42 @@ export const FinancialTrackingScreen: React.FC<FinancialTrackingScreenProps> = (
                     </Text>
                   </View>
                 </View>
-                <Text style={[
-                  styles.entryAmount,
-                  entry.type === 'income' ? styles.incomeAmount : styles.expenseAmount
-                ]}>
-                  {entry.type === 'income' ? '+' : '-'}${entry.amount.toFixed(2)}
-                </Text>
-              </TouchableOpacity>
+                <View style={styles.entryRight}>
+                  <Text style={[
+                    styles.entryAmount,
+                    entry.type === 'income' ? styles.incomeAmount : styles.expenseAmount
+                  ]}>
+                    {entry.type === 'income' ? '+' : '-'}${entry.amount.toFixed(2)}
+                  </Text>
+                  <View style={styles.entryActions}>
+                    <TouchableOpacity 
+                      style={styles.editButton}
+                      onPress={() => openEditModal(entry)}
+                    >
+                      <Text style={styles.editButtonText}>✏️</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity 
+                      style={styles.deleteButton}
+                      onPress={() => {
+                        Alert.alert(
+                          'Delete Entry',
+                          'Are you sure you want to delete this entry?',
+                          [
+                            { text: 'Cancel', style: 'cancel' },
+                            { 
+                              text: 'Delete', 
+                              style: 'destructive',
+                              onPress: () => deleteEntry(entry.id)
+                            }
+                          ]
+                        );
+                      }}
+                    >
+                      <Text style={styles.deleteButtonText}>🗑️</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              </View>
             );
           })
       )}
@@ -329,7 +450,18 @@ export const FinancialTrackingScreen: React.FC<FinancialTrackingScreenProps> = (
         <View style={styles.quickActionsCard}>
           <Text style={styles.quickActionsTitle}>⚡ Quick Actions</Text>
           <View style={styles.quickActionsList}>
-            <TouchableOpacity style={styles.quickActionButton}>
+            <TouchableOpacity 
+              style={styles.quickActionButton}
+              onPress={() => {
+                setFormData(prev => ({ 
+                  ...prev, 
+                  type: 'expense', 
+                  category: 'feed_supplies',
+                  description: 'Feed purchase'
+                }));
+                setShowAddModal(true);
+              }}
+            >
               <Text style={styles.quickActionIcon}>📱</Text>
               <Text style={styles.quickActionText}>Quick Feed Entry</Text>
             </TouchableOpacity>
@@ -358,7 +490,18 @@ export const FinancialTrackingScreen: React.FC<FinancialTrackingScreenProps> = (
             <View style={styles.noDataContainer}>
               <Text style={styles.noDataIcon}>🌾</Text>
               <Text style={styles.noDataText}>Start tracking feed purchases to see brand analytics!</Text>
-              <TouchableOpacity style={styles.startTrackingButton}>
+              <TouchableOpacity 
+                style={styles.startTrackingButton}
+                onPress={() => {
+                  setFormData(prev => ({ 
+                    ...prev, 
+                    type: 'expense', 
+                    category: 'feed_supplies',
+                    description: 'Feed purchase'
+                  }));
+                  setShowAddModal(true);
+                }}
+              >
                 <Text style={styles.startTrackingText}>📝 Add First Feed Purchase</Text>
               </TouchableOpacity>
             </View>
@@ -523,8 +666,11 @@ export const FinancialTrackingScreen: React.FC<FinancialTrackingScreenProps> = (
       <View style={styles.modalOverlay}>
         <View style={styles.modalContent}>
           <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>Add Entry</Text>
-            <TouchableOpacity onPress={() => setShowAddModal(false)}>
+            <Text style={styles.modalTitle}>{editingEntry ? 'Edit Entry' : 'Add Entry'}</Text>
+            <TouchableOpacity onPress={() => {
+              resetForm();
+              setShowAddModal(false);
+            }}>
               <Text style={styles.closeButton}>✕</Text>
             </TouchableOpacity>
           </View>
@@ -596,12 +742,53 @@ export const FinancialTrackingScreen: React.FC<FinancialTrackingScreenProps> = (
                 numberOfLines={3}
               />
             </View>
+
+            {/* Receipt Photo Upload - Only for Expenses */}
+            {formData.type === 'expense' && (
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>Receipt Photo</Text>
+              {formData.receiptPhoto ? (
+                <View style={styles.receiptPhotoContainer}>
+                  <Image 
+                    source={{ uri: formData.receiptPhoto }} 
+                    style={styles.receiptPhotoPreview} 
+                  />
+                  <View style={styles.receiptPhotoActions}>
+                    <TouchableOpacity 
+                      style={styles.changePhotoButton}
+                      onPress={showImagePickerOptions}
+                    >
+                      <Text style={styles.changePhotoButtonText}>Change Photo</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity 
+                      style={styles.removePhotoButton}
+                      onPress={removeReceiptPhoto}
+                    >
+                      <Text style={styles.removePhotoButtonText}>Remove</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              ) : (
+                <TouchableOpacity 
+                  style={styles.addPhotoButton}
+                  onPress={showImagePickerOptions}
+                >
+                  <Text style={styles.addPhotoIcon}>📷</Text>
+                  <Text style={styles.addPhotoText}>Add Receipt Photo</Text>
+                  <Text style={styles.addPhotoSubtext}>Tap to take a photo or choose from library</Text>
+                </TouchableOpacity>
+              )}
+              </View>
+            )}
           </ScrollView>
 
           <View style={styles.modalFooter}>
             <TouchableOpacity 
               style={[styles.modalButton, styles.cancelButton]}
-              onPress={() => setShowAddModal(false)}
+              onPress={() => {
+                resetForm();
+                setShowAddModal(false);
+              }}
             >
               <Text style={styles.cancelButtonText}>Cancel</Text>
             </TouchableOpacity>
@@ -609,7 +796,7 @@ export const FinancialTrackingScreen: React.FC<FinancialTrackingScreenProps> = (
               style={[styles.modalButton, styles.saveButton]}
               onPress={handleAddEntry}
             >
-              <Text style={styles.saveButtonText}>Save Entry</Text>
+              <Text style={styles.saveButtonText}>{editingEntry ? 'Update Entry' : 'Save Entry'}</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -724,14 +911,17 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 16,
-    paddingVertical: 16,
+    paddingVertical: 12,
     backgroundColor: '#fff',
     borderBottomWidth: 1,
     borderBottomColor: '#eee',
+    minHeight: 60,
   },
   backButton: {
     paddingVertical: 8,
     paddingHorizontal: 12,
+    flex: 0,
+    minWidth: 60,
   },
   backButtonText: {
     color: '#007AFF',
@@ -742,32 +932,36 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: 'bold',
     color: '#333',
+    flex: 1,
+    textAlign: 'center',
   },
   addButton: {
     backgroundColor: '#007AFF',
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 20,
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+    borderRadius: 14,
     shadowColor: '#007AFF',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.3,
     shadowRadius: 4,
     elevation: 4,
-    minWidth: 70,
+    flex: 0,
+    minWidth: 55,
+    maxWidth: 65,
     justifyContent: 'center',
   },
   addButtonIcon: {
     color: '#fff',
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: 'bold',
-    marginRight: 4,
+    marginRight: 3,
   },
   addButtonText: {
     color: '#fff',
     fontWeight: '600',
-    fontSize: 14,
+    fontSize: 13,
   },
   tabContainer: {
     flexDirection: 'row',
@@ -1003,6 +1197,36 @@ const styles = StyleSheet.create({
   },
   expenseAmount: {
     color: '#f44336',
+  },
+  entryRight: {
+    alignItems: 'flex-end',
+    gap: 8,
+  },
+  entryActions: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  editButton: {
+    backgroundColor: '#007AFF',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+    minWidth: 32,
+    alignItems: 'center',
+  },
+  editButtonText: {
+    fontSize: 14,
+  },
+  deleteButton: {
+    backgroundColor: '#ff3b30',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+    minWidth: 32,
+    alignItems: 'center',
+  },
+  deleteButtonText: {
+    fontSize: 14,
   },
   feedSummaryCard: {
     backgroundColor: '#fff',
@@ -1304,7 +1528,7 @@ const styles = StyleSheet.create({
   },
   fab: {
     position: 'absolute',
-    bottom: 20,
+    bottom: 80,
     right: 20,
     width: 56,
     height: 56,
@@ -1532,5 +1756,73 @@ const styles = StyleSheet.create({
   },
   feedJournalContent: {
     flex: 1,
+  },
+  // Receipt Photo Upload Styles
+  receiptPhotoContainer: {
+    alignItems: 'center',
+    gap: 12,
+  },
+  receiptPhotoPreview: {
+    width: '100%',
+    height: 200,
+    borderRadius: 8,
+    backgroundColor: '#f0f0f0',
+  },
+  receiptPhotoActions: {
+    flexDirection: 'row',
+    gap: 12,
+    width: '100%',
+  },
+  changePhotoButton: {
+    flex: 1,
+    backgroundColor: '#007AFF',
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 6,
+    alignItems: 'center',
+  },
+  changePhotoButtonText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  removePhotoButton: {
+    flex: 1,
+    backgroundColor: '#f44336',
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 6,
+    alignItems: 'center',
+  },
+  removePhotoButtonText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  addPhotoButton: {
+    backgroundColor: '#f8f9fa',
+    borderWidth: 2,
+    borderColor: '#ddd',
+    borderStyle: 'dashed',
+    borderRadius: 8,
+    padding: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 120,
+  },
+  addPhotoIcon: {
+    fontSize: 32,
+    marginBottom: 8,
+  },
+  addPhotoText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: 4,
+  },
+  addPhotoSubtext: {
+    fontSize: 12,
+    color: '#666',
+    textAlign: 'center',
   },
 });

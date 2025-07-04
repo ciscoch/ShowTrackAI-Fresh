@@ -16,6 +16,8 @@ import { useJournalStore } from '../../../core/stores/JournalStore';
 import { EXPENSE_CATEGORIES, INCOME_CATEGORIES, FinancialEntry } from '../../../core/models/Financial';
 import { DatePicker } from '../../../shared/components/DatePicker';
 import { FormPicker } from '../../../shared/components/FormPicker';
+import { FeedCostCalculator } from '../../../core/services/FeedCostCalculator';
+import { KidFriendlyAnalytics } from '../../../core/services/KidFriendlyAnalytics';
 
 interface FinancialTrackingScreenProps {
   onBack: () => void;
@@ -37,6 +39,10 @@ export const FinancialTrackingScreen: React.FC<FinancialTrackingScreenProps> = (
   const [activeTab, setActiveTab] = useState<'overview' | 'entries' | 'feed' | 'aet'>('overview');
   const [entryType, setEntryType] = useState<'income' | 'expense'>('expense');
   const [selectedTimeRange, setSelectedTimeRange] = useState<'month' | 'quarter' | 'year'>('month');
+  
+  // Analytics services
+  const feedCalculator = new FeedCostCalculator();
+  const kidAnalytics = new KidFriendlyAnalytics();
   
   // Form state
   const [formData, setFormData] = useState({
@@ -225,23 +231,116 @@ export const FinancialTrackingScreen: React.FC<FinancialTrackingScreenProps> = (
 
   const renderFeedAnalyticsTab = () => {
     const feedAnalytics = summary.feedAnalytics;
+    const recentFeedEntries = journalEntries.filter(e => e.feedData && e.feedData.feeds.length > 0);
+    
+    // Sample data for demonstration - in real app this would come from actual feed tracking
+    const sampleMetrics = {
+      feedConversionRatio: 7.2,
+      costPerLbGain: 3.45,
+      dailyWeightGain: 2.1,
+      profitPerLb: 0.75,
+      dailyFeedCost: 4.75,
+      costPerPoundFeed: 0.56,
+      efficiencyGrade: "B+ (Good)",
+      recommendations: [
+        "Switch to Premium Cattle Feed - could save $0.12/lb",
+        "Buy feed in bulk (100+ lbs) - save 8% on cost",
+        "Feed Store Plus has your feed $0.04/lb cheaper"
+      ]
+    };
+
+    const efficiency = feedCalculator.efficiencyEmojiScale(sampleMetrics.feedConversionRatio);
+    const profitStatus = feedCalculator.profitSimpleIndicator(sampleMetrics.profitPerLb);
+    const reportCard = feedCalculator.calculateReportCard(sampleMetrics);
     
     return (
       <ScrollView showsVerticalScrollIndicator={false}>
-        {/* Feed Cost Summary */}
-        <View style={styles.feedSummaryCard}>
-          <Text style={styles.feedTitle}>🌾 Feed Analytics Integration</Text>
-          <View style={styles.feedMetrics}>
-            <View style={styles.feedMetric}>
-              <Text style={styles.feedMetricValue}>${feedAnalytics.totalFeedCost.toFixed(2)}</Text>
-              <Text style={styles.feedMetricLabel}>Total Feed Cost</Text>
+        {/* Kid-Friendly Feed Performance Dashboard */}
+        <View style={styles.kidDashboardCard}>
+          <Text style={styles.kidDashboardTitle}>📊 Your Feed Performance This Month</Text>
+          
+          {/* Key Numbers - Easy to Understand */}
+          <View style={styles.keyNumbersSection}>
+            <Text style={styles.keyNumbersTitle}>🎯 KEY NUMBERS (Easy to Understand!)</Text>
+            
+            <View style={styles.keyMetricsContainer}>
+              <View style={styles.keyMetric}>
+                <Text style={styles.keyMetricIcon}>💰</Text>
+                <Text style={styles.keyMetricLabel}>Feed Cost per Day</Text>
+                <Text style={styles.keyMetricValue}>${sampleMetrics.dailyFeedCost}</Text>
+              </View>
+              
+              <View style={styles.keyMetric}>
+                <Text style={styles.keyMetricIcon}>⚖️</Text>
+                <Text style={styles.keyMetricLabel}>Weight Gain This Month</Text>
+                <Text style={styles.keyMetricValue}>+{Math.round(sampleMetrics.dailyWeightGain * 30)} lbs</Text>
+              </View>
+              
+              <View style={styles.keyMetric}>
+                <Text style={styles.keyMetricIcon}>🏆</Text>
+                <Text style={styles.keyMetricLabel}>Cost per Pound Gained</Text>
+                <Text style={styles.keyMetricValue}>${sampleMetrics.costPerLbGain}</Text>
+              </View>
             </View>
-            <View style={styles.feedMetric}>
-              <Text style={styles.feedMetricValue}>
-                {journalEntries.filter(e => e.feedData && e.feedData.feeds.length > 0).length}
+          </View>
+
+          {/* Profitability Status */}
+          <View style={styles.profitabilitySection}>
+            <Text style={styles.profitabilityTitle}>📈 IS YOUR FEEDING PROFITABLE?</Text>
+            <View style={[styles.profitabilityCard, { backgroundColor: profitStatus.color === 'green' ? '#d4edda' : '#cce7ff' }]}>
+              <Text style={styles.profitabilityStatus}>
+                {profitStatus.status === 'profitable' ? '✅ YES! You\'re doing great!' : '📚 Learning experience!'}
               </Text>
-              <Text style={styles.feedMetricLabel}>Feed Entries</Text>
+              <Text style={styles.profitabilityMessage}>{profitStatus.message}</Text>
+              {profitStatus.status === 'profitable' && (
+                <Text style={styles.profitabilityEncouragement}>
+                  🎉 Keep it up! Your animal is gaining efficiently!
+                </Text>
+              )}
             </View>
+          </View>
+
+          {/* Smart Suggestions */}
+          <View style={styles.suggestionsSection}>
+            <Text style={styles.suggestionsTitle}>🤔 SMART SUGGESTIONS:</Text>
+            {sampleMetrics.recommendations.map((suggestion, index) => (
+              <Text key={index} style={styles.suggestionItem}>• {suggestion}</Text>
+            ))}
+          </View>
+
+          {/* Report Card */}
+          <View style={styles.reportCardSection}>
+            <Text style={styles.reportCardTitle}>📊 THIS MONTH'S REPORT CARD:</Text>
+            <View style={styles.reportCardItems}>
+              <Text style={styles.reportCardItem}>Feed Efficiency: {reportCard.feedEfficiency}</Text>
+              <Text style={styles.reportCardItem}>Cost Management: {reportCard.costManagement}</Text>
+              <Text style={styles.reportCardItem}>Weight Gain: {reportCard.weightGain}</Text>
+            </View>
+          </View>
+
+          {/* Efficiency Scale */}
+          <View style={styles.efficiencySection}>
+            <Text style={styles.efficiencyTitle}>🔥 Your Efficiency Level:</Text>
+            <Text style={styles.efficiencyScale}>{efficiency}</Text>
+          </View>
+        </View>
+
+        {/* Quick Actions */}
+        <View style={styles.quickActionsCard}>
+          <Text style={styles.quickActionsTitle}>⚡ Quick Actions</Text>
+          <View style={styles.quickActionsList}>
+            <TouchableOpacity style={styles.quickActionButton}>
+              <Text style={styles.quickActionIcon}>📱</Text>
+              <Text style={styles.quickActionText}>Quick Feed Entry</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.quickActionButton}>
+              <Text style={styles.quickActionIcon}>🛒</Text>
+              <Text style={styles.quickActionText}>Find Better Deals</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.quickActionButton}>
+              <Text style={styles.quickActionIcon}>📈</Text>
+              <Text style={styles.quickActionText}>View Trends</Text>
+            </TouchableOpacity>
           </View>
         </View>
 
@@ -256,19 +355,23 @@ export const FinancialTrackingScreen: React.FC<FinancialTrackingScreenProps> = (
               </View>
             ))
           ) : (
-            <Text style={styles.noDataText}>No feed brand data available</Text>
+            <View style={styles.noDataContainer}>
+              <Text style={styles.noDataIcon}>🌾</Text>
+              <Text style={styles.noDataText}>Start tracking feed purchases to see brand analytics!</Text>
+              <TouchableOpacity style={styles.startTrackingButton}>
+                <Text style={styles.startTrackingText}>📝 Add First Feed Purchase</Text>
+              </TouchableOpacity>
+            </View>
           )}
         </View>
 
         {/* Journal Feed Data Integration */}
         <View style={styles.integrationSection}>
           <Text style={styles.sectionTitle}>📝 Recent Feed Tracking</Text>
-          {journalEntries
-            .filter(entry => entry.feedData && entry.feedData.feeds.length > 0)
-            .slice(0, 5)
-            .map((entry, index) => (
+          {recentFeedEntries.length > 0 ? (
+            recentFeedEntries.slice(0, 5).map((entry, index) => (
               <View key={index} style={styles.feedJournalItem}>
-                <View>
+                <View style={styles.feedJournalContent}>
                   <Text style={styles.feedJournalTitle}>{entry.title}</Text>
                   <Text style={styles.feedJournalDate}>
                     {new Date(entry.date).toLocaleDateString()}
@@ -308,7 +411,13 @@ export const FinancialTrackingScreen: React.FC<FinancialTrackingScreenProps> = (
                   <Text style={styles.linkButtonText}>Link 🔗</Text>
                 </TouchableOpacity>
               </View>
-            ))}
+            ))
+          ) : (
+            <View style={styles.noDataContainer}>
+              <Text style={styles.noDataIcon}>📋</Text>
+              <Text style={styles.noDataText}>No feed tracking entries yet. Start by adding feed data in your journal entries!</Text>
+            </View>
+          )}
         </View>
       </ScrollView>
     );
@@ -1214,5 +1323,214 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 24,
     fontWeight: 'bold',
+  },
+  // Kid-Friendly Feed Analytics Styles
+  kidDashboardCard: {
+    backgroundColor: '#fff',
+    margin: 16,
+    padding: 20,
+    borderRadius: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
+    borderLeftWidth: 4,
+    borderLeftColor: '#28a745',
+  },
+  kidDashboardTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 20,
+    textAlign: 'center',
+  },
+  keyNumbersSection: {
+    marginBottom: 20,
+  },
+  keyNumbersTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: 12,
+  },
+  keyMetricsContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    flexWrap: 'wrap',
+  },
+  keyMetric: {
+    alignItems: 'center',
+    backgroundColor: '#f8fbff',
+    padding: 12,
+    borderRadius: 12,
+    minWidth: '30%',
+    marginBottom: 8,
+  },
+  keyMetricIcon: {
+    fontSize: 24,
+    marginBottom: 4,
+  },
+  keyMetricLabel: {
+    fontSize: 11,
+    color: '#666',
+    textAlign: 'center',
+    marginBottom: 4,
+  },
+  keyMetricValue: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#007AFF',
+  },
+  profitabilitySection: {
+    marginBottom: 20,
+  },
+  profitabilityTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: 12,
+  },
+  profitabilityCard: {
+    padding: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+  },
+  profitabilityStatus: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 8,
+  },
+  profitabilityMessage: {
+    fontSize: 14,
+    color: '#333',
+    marginBottom: 4,
+  },
+  profitabilityEncouragement: {
+    fontSize: 14,
+    color: '#28a745',
+    fontWeight: '500',
+  },
+  suggestionsSection: {
+    marginBottom: 20,
+  },
+  suggestionsTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: 8,
+  },
+  suggestionItem: {
+    fontSize: 14,
+    color: '#333',
+    marginBottom: 4,
+    lineHeight: 18,
+  },
+  reportCardSection: {
+    marginBottom: 20,
+  },
+  reportCardTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: 8,
+  },
+  reportCardItems: {
+    backgroundColor: '#f8f9fa',
+    padding: 12,
+    borderRadius: 8,
+  },
+  reportCardItem: {
+    fontSize: 14,
+    color: '#333',
+    marginBottom: 4,
+  },
+  efficiencySection: {
+    backgroundColor: '#fff3cd',
+    padding: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#ffeaa7',
+  },
+  efficiencyTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#856404',
+    marginBottom: 4,
+  },
+  efficiencyScale: {
+    fontSize: 14,
+    color: '#856404',
+    fontWeight: '500',
+  },
+  quickActionsCard: {
+    backgroundColor: '#fff',
+    margin: 16,
+    marginTop: 0,
+    padding: 16,
+    borderRadius: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  quickActionsTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: 12,
+  },
+  quickActionsList: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  quickActionButton: {
+    alignItems: 'center',
+    backgroundColor: '#f8f9fa',
+    padding: 12,
+    borderRadius: 8,
+    flex: 1,
+    marginHorizontal: 4,
+    borderWidth: 1,
+    borderColor: '#e9ecef',
+  },
+  quickActionIcon: {
+    fontSize: 20,
+    marginBottom: 4,
+  },
+  quickActionText: {
+    fontSize: 11,
+    color: '#333',
+    fontWeight: '500',
+    textAlign: 'center',
+  },
+  noDataContainer: {
+    alignItems: 'center',
+    padding: 20,
+    backgroundColor: '#f8f9fa',
+    borderRadius: 12,
+    margin: 16,
+  },
+  noDataIcon: {
+    fontSize: 48,
+    marginBottom: 12,
+  },
+  startTrackingButton: {
+    backgroundColor: '#007AFF',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 6,
+    marginTop: 8,
+  },
+  startTrackingText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  feedJournalContent: {
+    flex: 1,
   },
 });

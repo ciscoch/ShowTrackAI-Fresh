@@ -16,6 +16,10 @@ export const STORAGE_KEYS = {
   HEALTH_ALERTS: '@ShowTrackAI:healthAlerts',
   FINANCIAL_ENTRIES: '@ShowTrackAI:financialEntries',
   TIME_TRACKING: '@ShowTrackAI:timeTracking',
+  // Follow-up system keys
+  FOLLOW_UP_TASKS: '@ShowTrackAI:followUpTasks',
+  FOLLOW_UP_UPDATES: '@ShowTrackAI:followUpUpdates',
+  EDUCATOR_MONITORING: '@ShowTrackAI:educatorMonitoring',
   // System keys
   DATA_VERSION: '@ShowTrackAI:dataVersion',
   LAST_BACKUP: '@ShowTrackAI:lastBackup',

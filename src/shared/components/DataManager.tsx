@@ -233,6 +233,9 @@ export const DataManager: React.FC<DataManagerProps> = ({ visible, onClose }) =>
       '@ShowTrackAI:healthAlerts': 'Health Alerts',
       '@ShowTrackAI:financialEntries': 'Financial Entries',
       '@ShowTrackAI:timeTracking': 'Time Tracking',
+      '@ShowTrackAI:followUpTasks': 'Follow-up Tasks',
+      '@ShowTrackAI:followUpUpdates': 'Follow-up Updates',
+      '@ShowTrackAI:educatorMonitoring': 'Educator Monitoring',
     };
     return keyMap[key] || key.replace('@ShowTrackAI:', '');
   };

@@ -11,9 +11,12 @@ import {
 } from 'react-native';
 import { useHealthRecordStore } from '../../../core/stores/HealthRecordStore';
 import { useAnimalStore } from '../../../core/stores/AnimalStore';
+import { useProfileStore } from '../../../core/stores/ProfileStore';
 import { HealthRecord, HealthAlert, OBSERVATION_TYPES } from '../../../core/models/HealthRecord';
 import { AddHealthRecordModal } from '../components/AddHealthRecordModal';
 import { HealthRecordDetailModal } from '../components/HealthRecordDetailModal';
+import { PendingHealthIssuesScreen } from './PendingHealthIssuesScreen';
+import { EducatorDashboardScreen } from './EducatorDashboardScreen';
 
 interface MedicalRecordsScreenProps {
   onBack: () => void;
@@ -33,8 +36,9 @@ export const MedicalRecordsScreen: React.FC<MedicalRecordsScreenProps> = ({ onBa
   } = useHealthRecordStore();
 
   const { animals } = useAnimalStore();
+  const { currentProfile } = useProfileStore();
   
-  const [activeTab, setActiveTab] = useState<'overview' | 'records' | 'alerts' | 'trends'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'records' | 'alerts' | 'trends' | 'follow_up'>('overview');
   const [selectedAnimal, setSelectedAnimal] = useState<string>('');
   const [showAddModal, setShowAddModal] = useState(false);
   const [showDetailModal, setShowDetailModal] = useState(false);
@@ -123,7 +127,8 @@ export const MedicalRecordsScreen: React.FC<MedicalRecordsScreenProps> = ({ onBa
         { id: 'overview', name: 'Overview', icon: '📊' },
         { id: 'records', name: 'Records', icon: '🏥' },
         { id: 'alerts', name: 'Alerts', icon: '🚨' },
-        { id: 'trends', name: 'Trends', icon: '📈' }
+        { id: 'trends', name: 'Trends', icon: '📈' },
+        { id: 'follow_up', name: 'Follow-up', icon: '📋' }
       ].map((tab) => (
         <TouchableOpacity
           key={tab.id}
@@ -447,6 +452,34 @@ export const MedicalRecordsScreen: React.FC<MedicalRecordsScreenProps> = ({ onBa
     </ScrollView>
   );
 
+  const renderFollowUpTab = () => {
+    if (!currentProfile) {
+      return (
+        <View style={styles.emptyState}>
+          <Text style={styles.emptyTitle}>Profile Required</Text>
+          <Text style={styles.emptySubtitle}>Please log in to access follow-up management</Text>
+        </View>
+      );
+    }
+
+    // Check if user is an educator/instructor
+    const isEducator = currentProfile.type === 'educator' || currentProfile.type === 'instructor';
+    
+    if (isEducator) {
+      return (
+        <EducatorDashboardScreen 
+          onBack={() => setActiveTab('overview')}
+        />
+      );
+    } else {
+      return (
+        <PendingHealthIssuesScreen 
+          onBack={() => setActiveTab('overview')}
+        />
+      );
+    }
+  };
+
   if (isLoading) {
     return (
       <SafeAreaView style={styles.container}>
@@ -468,6 +501,7 @@ export const MedicalRecordsScreen: React.FC<MedicalRecordsScreenProps> = ({ onBa
       {activeTab === 'records' && renderRecordsTab()}
       {activeTab === 'alerts' && renderAlertsTab()}
       {activeTab === 'trends' && renderTrendsTab()}
+      {activeTab === 'follow_up' && renderFollowUpTab()}
 
       <AddHealthRecordModal
         visible={showAddModal}

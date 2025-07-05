@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -8,6 +8,8 @@ import {
 } from 'react-native';
 import { useProfileStore } from '../../../core/stores/ProfileStore';
 import { QRCodeGenerator } from '../../qrcode/components/QRCodeGenerator';
+import { calendarService } from '../../../core/services/CalendarService';
+import { Event } from '../../../core/models/Event';
 
 interface EliteDashboardProps {
   onSwitchProfile: () => void;
@@ -19,6 +21,7 @@ interface EliteDashboardProps {
   onNavigateToJournal: () => void;
   onNavigateToFinancial: () => void;
   onNavigateToMedical: () => void;
+  onNavigateToCalendar: () => void;
   onAddAnimal?: () => void;
   onTakePhoto?: () => void;
 }
@@ -33,11 +36,57 @@ export const EliteDashboard: React.FC<EliteDashboardProps> = ({
   onNavigateToJournal,
   onNavigateToFinancial,
   onNavigateToMedical,
+  onNavigateToCalendar,
   onAddAnimal,
   onTakePhoto,
 }) => {
   const { currentProfile } = useProfileStore();
   const [showQRGenerator, setShowQRGenerator] = useState(false);
+  const [upcomingEvents, setUpcomingEvents] = useState<Event[]>([]);
+  const [countyShow, setCountyShow] = useState<Event | null>(null);
+  const [daysUntilCountyShow, setDaysUntilCountyShow] = useState<number>(0);
+
+  useEffect(() => {
+    if (currentProfile) {
+      loadCalendarData();
+    }
+  }, [currentProfile]);
+
+  const loadCalendarData = async () => {
+    if (!currentProfile) return;
+
+    try {
+      // Load upcoming events (next 7 days for dashboard preview)
+      const events = await calendarService.getUpcomingEvents(currentProfile.id, 7);
+      setUpcomingEvents(events.slice(0, 3)); // Show only first 3 events
+
+      // Load county show
+      const show = await calendarService.getCountyShow(currentProfile.id);
+      setCountyShow(show);
+      
+      if (show) {
+        const days = calendarService.getDaysUntilEvent(show.date);
+        setDaysUntilCountyShow(days);
+      }
+
+      // Create demo events if none exist
+      if (events.length === 0) {
+        await calendarService.createDemoEvents(currentProfile.id);
+        // Reload after creating demo events
+        const newEvents = await calendarService.getUpcomingEvents(currentProfile.id, 7);
+        setUpcomingEvents(newEvents.slice(0, 3));
+        
+        const newShow = await calendarService.getCountyShow(currentProfile.id);
+        setCountyShow(newShow);
+        if (newShow) {
+          const newDays = calendarService.getDaysUntilEvent(newShow.date);
+          setDaysUntilCountyShow(newDays);
+        }
+      }
+    } catch (error) {
+      console.error('Failed to load calendar data:', error);
+    }
+  };
 
   if (!currentProfile) {
     return (
@@ -114,6 +163,79 @@ export const EliteDashboard: React.FC<EliteDashboardProps> = ({
               <Text style={styles.statLabel}>Achievements</Text>
               <Text style={styles.statNote}>Elite rewards</Text>
             </View>
+          </View>
+        </View>
+
+        {/* Upcoming Events & County Show Countdown */}
+        <View style={styles.calendarSection}>
+          <View style={styles.calendarHeader}>
+            <Text style={styles.sectionTitle}>📅 Student Project Management</Text>
+            <TouchableOpacity onPress={onNavigateToCalendar} style={styles.viewAllButton}>
+              <Text style={styles.viewAllText}>View All</Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* County Show Countdown */}
+          {countyShow && (
+            <View style={styles.countyShowCard}>
+              <View style={styles.countyShowHeader}>
+                <Text style={styles.countyShowIcon}>🏆</Text>
+                <View style={styles.countyShowInfo}>
+                  <Text style={styles.countyShowTitle}>Days until County Show</Text>
+                  <Text style={styles.countyShowDate}>
+                    {countyShow.date.toLocaleDateString()}
+                  </Text>
+                </View>
+              </View>
+              <View style={styles.countdownContainer}>
+                <Text style={styles.countdownNumber}>{daysUntilCountyShow}</Text>
+                <Text style={styles.countdownLabel}>
+                  {daysUntilCountyShow === 1 ? 'day' : 'days'}
+                </Text>
+              </View>
+            </View>
+          )}
+
+          {/* Upcoming Events Preview */}
+          <View style={styles.upcomingEventsCard}>
+            <Text style={styles.eventsTitle}>Upcoming Events</Text>
+            {upcomingEvents.length > 0 ? (
+              <View style={styles.eventsList}>
+                {upcomingEvents.map((event) => (
+                  <View key={event.id} style={styles.eventItem}>
+                    <View style={styles.eventDate}>
+                      <Text style={styles.eventDay}>
+                        {event.date.toLocaleDateString([], { day: 'numeric' })}
+                      </Text>
+                      <Text style={styles.eventMonth}>
+                        {event.date.toLocaleDateString([], { month: 'short' })}
+                      </Text>
+                    </View>
+                    <View style={styles.eventDetails}>
+                      <Text style={styles.eventTitle} numberOfLines={1}>
+                        {event.title}
+                      </Text>
+                      <Text style={styles.eventTime}>
+                        {event.isAllDay ? 'All Day' : event.date.toLocaleTimeString([], { 
+                          hour: 'numeric', 
+                          minute: '2-digit' 
+                        })}
+                      </Text>
+                      {event.location && (
+                        <Text style={styles.eventLocation} numberOfLines={1}>
+                          📍 {event.location}
+                        </Text>
+                      )}
+                    </View>
+                  </View>
+                ))}
+              </View>
+            ) : (
+              <View style={styles.noEventsContainer}>
+                <Text style={styles.noEventsText}>No upcoming events</Text>
+                <Text style={styles.noEventsSubtext}>Your schedule is clear!</Text>
+              </View>
+            )}
           </View>
         </View>
 
@@ -682,5 +804,155 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 12,
     fontWeight: '500',
+  },
+  // Calendar Section Styles
+  calendarSection: {
+    marginBottom: 24,
+  },
+  calendarHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  viewAllButton: {
+    backgroundColor: '#007AFF',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 12,
+  },
+  viewAllText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  countyShowCard: {
+    backgroundColor: '#fff3cd',
+    borderRadius: 16,
+    padding: 20,
+    marginBottom: 16,
+    borderWidth: 2,
+    borderColor: '#ffc107',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  countyShowHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  countyShowIcon: {
+    fontSize: 24,
+    marginRight: 12,
+  },
+  countyShowInfo: {
+    flex: 1,
+  },
+  countyShowTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#856404',
+    marginBottom: 2,
+  },
+  countyShowDate: {
+    fontSize: 14,
+    color: '#856404',
+  },
+  countdownContainer: {
+    alignItems: 'center',
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 16,
+    marginTop: 8,
+  },
+  countdownNumber: {
+    fontSize: 32,
+    fontWeight: 'bold',
+    color: '#ffc107',
+    marginBottom: 4,
+  },
+  countdownLabel: {
+    fontSize: 14,
+    color: '#856404',
+    fontWeight: '500',
+  },
+  upcomingEventsCard: {
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    padding: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  eventsTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: 16,
+  },
+  eventsList: {
+    gap: 12,
+  },
+  eventItem: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    padding: 12,
+    backgroundColor: '#f8f9fa',
+    borderRadius: 12,
+  },
+  eventDate: {
+    backgroundColor: '#007AFF',
+    borderRadius: 8,
+    padding: 8,
+    alignItems: 'center',
+    marginRight: 12,
+    minWidth: 50,
+  },
+  eventDay: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#fff',
+  },
+  eventMonth: {
+    fontSize: 12,
+    color: '#fff',
+    fontWeight: '500',
+  },
+  eventDetails: {
+    flex: 1,
+  },
+  eventTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: 2,
+  },
+  eventTime: {
+    fontSize: 12,
+    color: '#666',
+    marginBottom: 2,
+  },
+  eventLocation: {
+    fontSize: 12,
+    color: '#666',
+  },
+  noEventsContainer: {
+    alignItems: 'center',
+    paddingVertical: 24,
+  },
+  noEventsText: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#666',
+    marginBottom: 4,
+  },
+  noEventsSubtext: {
+    fontSize: 14,
+    color: '#999',
   },
 });

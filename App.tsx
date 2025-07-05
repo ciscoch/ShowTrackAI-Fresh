@@ -19,8 +19,9 @@ import { UserProfile, Animal, Journal } from './src/core/models';
 import { autoSyncService } from './src/core/services/AutoSyncService';
 import { ObserverAccessScreen } from './src/features/qrcode/screens/ObserverAccessScreen';
 import { ExportScreen } from './src/features/export/screens/ExportScreen';
+import { UpcomingEventsScreen } from './src/features/calendar/screens/UpcomingEventsScreen';
 
-type AppScreen = 'demoChooser' | 'profileChooser' | 'profileSettings' | 'freemiumDashboard' | 'eliteDashboard' | 'educatorDashboard' | 'animalList' | 'animalForm' | 'journalList' | 'journalEntry' | 'journalAnalytics' | 'financial' | 'medical' | 'upgrade' | 'observerAccess' | 'export';
+type AppScreen = 'demoChooser' | 'profileChooser' | 'profileSettings' | 'freemiumDashboard' | 'eliteDashboard' | 'educatorDashboard' | 'animalList' | 'animalForm' | 'journalList' | 'journalEntry' | 'journalAnalytics' | 'financial' | 'medical' | 'upgrade' | 'observerAccess' | 'export' | 'calendar';
 
 export default function App() {
   const { currentProfile, isFirstLaunch, checkLimitations, createDemoProfiles } = useProfileStore();
@@ -172,6 +173,10 @@ export default function App() {
     setCurrentScreen('export');
   };
 
+  const handleNavigateToCalendar = () => {
+    setCurrentScreen('calendar');
+  };
+
   const handleTakePhoto = () => {
     Alert.alert(
       'Take Photo',
@@ -222,6 +227,7 @@ export default function App() {
             onSwitchProfile={() => handleSafeNavigation('demoChooser')}
             onShowSettings={handleShowSettings}
             onNavigateToAnimals={() => handleSafeNavigation('animalList')}
+            onNavigateToCalendar={handleNavigateToCalendar}
             onUpgrade={handleUpgrade}
           />
         );
@@ -238,6 +244,7 @@ export default function App() {
             onNavigateToJournal={handleNavigateToJournal}
             onNavigateToFinancial={handleNavigateToFinancial}
             onNavigateToMedical={handleNavigateToMedical}
+            onNavigateToCalendar={handleNavigateToCalendar}
             onAddAnimal={handleAddAnimal}
             onTakePhoto={handleTakePhoto}
           />
@@ -394,6 +401,22 @@ export default function App() {
                 setCurrentScreen('eliteDashboard');
               } else {
                 setCurrentScreen('freemiumDashboard');
+              }
+            }}
+          />
+        );
+
+      case 'calendar':
+        return (
+          <UpcomingEventsScreen
+            onBack={() => {
+              // Navigate back to appropriate dashboard
+              if (currentProfile?.type === 'elite_student') {
+                setCurrentScreen('eliteDashboard');
+              } else if (currentProfile?.type === 'freemium_student') {
+                setCurrentScreen('freemiumDashboard');
+              } else {
+                setCurrentScreen('demoChooser');
               }
             }}
           />

@@ -15,6 +15,7 @@ interface FreemiumDashboardProps {
   onSwitchProfile: () => void;
   onShowSettings: () => void;
   onNavigateToAnimals: () => void;
+  onNavigateToCalendar: () => void;
   onUpgrade: () => void;
 }
 
@@ -22,6 +23,7 @@ export const FreemiumDashboard: React.FC<FreemiumDashboardProps> = ({
   onSwitchProfile,
   onShowSettings,
   onNavigateToAnimals,
+  onNavigateToCalendar,
   onUpgrade,
 }) => {
   const { currentProfile, checkLimitations } = useProfileStore();
@@ -159,6 +161,18 @@ export const FreemiumDashboard: React.FC<FreemiumDashboardProps> = ({
               <Text style={styles.featureIcon}>📝</Text>
               <Text style={styles.featureTitle}>Basic Journal</Text>
               <Text style={styles.featureSubtitle}>Log daily activities</Text>
+              <View style={styles.featureStatus}>
+                <Text style={styles.availableText}>Available</Text>
+              </View>
+            </TouchableOpacity>
+
+            <TouchableOpacity 
+              style={styles.featureCard}
+              onPress={onNavigateToCalendar}
+            >
+              <Text style={styles.featureIcon}>📅</Text>
+              <Text style={styles.featureTitle}>Event Calendar</Text>
+              <Text style={styles.featureSubtitle}>Track upcoming events</Text>
               <View style={styles.featureStatus}>
                 <Text style={styles.availableText}>Available</Text>
               </View>

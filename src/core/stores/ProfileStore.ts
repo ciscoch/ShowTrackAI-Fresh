@@ -44,7 +44,13 @@ export const useProfileStore = create<ProfileState>()(
           lastActive: new Date(),
           settings: { ...DEFAULT_SETTINGS },
           stats: { ...DEFAULT_STATS },
-          isDemo: data.isDemo || false
+          isDemo: data.isDemo || false,
+          // Educator-specific fields
+          ffa_chapter_id: data.ffa_chapter_id,
+          educator_role: data.educator_role,
+          certification: data.certification,
+          years_experience: data.years_experience,
+          students_supervised: data.type === 'educator' ? [] : undefined
         };
 
         set((state) => ({
@@ -126,6 +132,22 @@ export const useProfileStore = create<ProfileState>()(
         
         // Don't create demo profiles if they already exist
         if (profiles.some(p => p.isDemo)) {
+          // Migration: Update existing demo profiles to have ffa_chapter_id
+          const demoProfiles = profiles.filter(p => p.isDemo);
+          const needsUpdate = demoProfiles.some(p => 
+            (['freemium_student', 'elite_student', 'educator'].includes(p.type)) && !p.ffa_chapter_id
+          );
+          
+          if (needsUpdate) {
+            console.log('🔄 Migrating demo profiles to include ffa_chapter_id');
+            for (const profile of demoProfiles) {
+              if (['freemium_student', 'elite_student', 'educator'].includes(profile.type) && !profile.ffa_chapter_id) {
+                await get().updateProfile(profile.id, { 
+                  ffa_chapter_id: 'demo_chapter_001' 
+                });
+              }
+            }
+          }
           return;
         }
 
@@ -137,7 +159,8 @@ export const useProfileStore = create<ProfileState>()(
           grade: '11',
           chapter: 'Demo FFA Chapter',
           subscriptionTier: 'Free',
-          isDemo: true
+          isDemo: true,
+          ffa_chapter_id: 'demo_chapter_001'
         });
 
         // Create Elite Student profile
@@ -148,7 +171,23 @@ export const useProfileStore = create<ProfileState>()(
           grade: '12',
           chapter: 'Demo FFA Chapter',
           subscriptionTier: 'Professional',
-          isDemo: true
+          isDemo: true,
+          ffa_chapter_id: 'demo_chapter_001'
+        });
+
+        // Create Educator profile
+        const educator = await createProfile({
+          name: 'Ms. Rodriguez',
+          type: 'educator',
+          school: 'ShowTrackAI Demo School',
+          grade: 'Teacher', // Using grade field for role
+          chapter: 'Demo FFA Chapter',
+          subscriptionTier: 'Professional',
+          isDemo: true,
+          ffa_chapter_id: 'demo_chapter_001',
+          educator_role: 'agriculture_teacher',
+          certification: ['Agriculture Education', 'FFA Advisor', 'Animal Science'],
+          years_experience: 8
         });
 
         // Add some demo data to make profiles look realistic
@@ -166,7 +205,19 @@ export const useProfileStore = create<ProfileState>()(
           achievementsEarned: 8
         });
 
-        console.log('✅ Created demo profiles: Freemium Student & Elite Student');
+        await get().updateProfileStats(educator.id, {
+          animalsManaged: 25, // Managing student animals
+          journalEntries: 8, // Educator notes/observations
+          totalHoursLogged: 2400, // 40 hours supervision
+          achievementsEarned: 12 // Professional development
+        });
+
+        // Establish educator-student relationships
+        await get().updateProfile(educator.id, {
+          students_supervised: [freemiumStudent.id, eliteStudent.id]
+        });
+
+        console.log('✅ Created demo profiles: Freemium Student, Elite Student & Educator');
       },
 
       getDemoProfiles: () => {

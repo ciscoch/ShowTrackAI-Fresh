@@ -11,6 +11,8 @@ import {
 } from 'react-native';
 import * as DocumentPicker from 'expo-document-picker';
 import { storageService, STORAGE_KEYS } from '../../core/services/StorageService';
+import { DocumentationLoader } from '../services/DocumentationLoader';
+import { helpContentService } from '../services/HelpContentService';
 
 interface DataManagerProps {
   visible: boolean;
@@ -236,8 +238,76 @@ export const DataManager: React.FC<DataManagerProps> = ({ visible, onClose }) =>
       '@ShowTrackAI:followUpTasks': 'Follow-up Tasks',
       '@ShowTrackAI:followUpUpdates': 'Follow-up Updates',
       '@ShowTrackAI:educatorMonitoring': 'Educator Monitoring',
+      '@ShowTrackAI:helpContent': 'Help Content',
+      '@ShowTrackAI:contextualHelp': 'Contextual Help',
     };
     return keyMap[key] || key.replace('@ShowTrackAI:', '');
+  };
+
+  const handleLoadDocumentation = async () => {
+    setIsLoading(true);
+    try {
+      await DocumentationLoader.loadDocumentationFromDocs();
+      Alert.alert(
+        'Documentation Loaded',
+        'Help content has been loaded from documentation files.',
+        [{ text: 'OK' }]
+      );
+    } catch (error) {
+      Alert.alert('Load Failed', 'Failed to load documentation: ' + String(error));
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleExportDocumentation = async () => {
+    setIsLoading(true);
+    try {
+      const jsonContent = await DocumentationLoader.exportAllDocumentation();
+      // In a real app, this would save to device storage or share
+      console.log('Documentation exported:', jsonContent.length, 'characters');
+      Alert.alert(
+        'Documentation Exported',
+        'Help content has been exported to console log.',
+        [{ text: 'OK' }]
+      );
+    } catch (error) {
+      Alert.alert('Export Failed', 'Failed to export documentation: ' + String(error));
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleImportDocumentation = async () => {
+    try {
+      const result = await DocumentPicker.getDocumentAsync({
+        type: 'application/json',
+        copyToCacheDirectory: true,
+      });
+
+      if (!result.canceled && result.assets[0]) {
+        setIsLoading(true);
+        try {
+          // Read file content (simplified - in real app would read from URI)
+          const success = await DocumentationLoader.importDocumentationFromJSON('{}');
+          if (success) {
+            Alert.alert(
+              'Import Successful',
+              'Documentation has been imported successfully.',
+              [{ text: 'OK' }]
+            );
+          } else {
+            Alert.alert('Import Failed', 'Invalid documentation format');
+          }
+        } catch (error) {
+          Alert.alert('Import Failed', String(error));
+        } finally {
+          setIsLoading(false);
+        }
+      }
+    } catch (error) {
+      Alert.alert('File Selection Failed', String(error));
+    }
   };
 
   const renderTabBar = () => (
@@ -404,6 +474,30 @@ export const DataManager: React.FC<DataManagerProps> = ({ visible, onClose }) =>
         >
           <Text style={styles.secondaryButtonText}>🔍 Verify Data Integrity</Text>
         </TouchableOpacity>
+      </View>
+
+      {/* Documentation Management */}
+      <View style={styles.card}>
+        <Text style={styles.cardTitle}>📚 Documentation Management</Text>
+        <Text style={styles.cardDescription}>
+          Manage help content and documentation for the app.
+        </Text>
+        <View style={styles.actionButtons}>
+          <TouchableOpacity 
+            style={[styles.actionButton, styles.secondaryButton]}
+            onPress={handleLoadDocumentation}
+            disabled={isLoading}
+          >
+            <Text style={styles.secondaryButtonText}>📥 Load Docs</Text>
+          </TouchableOpacity>
+          <TouchableOpacity 
+            style={[styles.actionButton, styles.secondaryButton]}
+            onPress={handleExportDocumentation}
+            disabled={isLoading}
+          >
+            <Text style={styles.secondaryButtonText}>📤 Export Docs</Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
       {/* Cache Management */}

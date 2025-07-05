@@ -18,6 +18,8 @@ import {
   StudentHealthOverview 
 } from '../../../core/models/FollowUpTask';
 import { StudentHealthModal } from '../components/StudentHealthModal';
+import { StudentRecordsViewer } from '../components/StudentRecordsViewer';
+import { ContextualHelpButton } from '../../../shared/components/ContextualHelpButton';
 
 interface EducatorDashboardScreenProps {
   onBack: () => void;
@@ -40,6 +42,7 @@ export const EducatorDashboardScreen: React.FC<EducatorDashboardScreenProps> = (
   // Student management
   const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null);
   const [showStudentModal, setShowStudentModal] = useState(false);
+  const [showStudentRecords, setShowStudentRecords] = useState(false);
   const [studentOverviews, setStudentOverviews] = useState<Record<string, StudentHealthOverview>>({});
 
   useEffect(() => {
@@ -305,6 +308,32 @@ export const EducatorDashboardScreen: React.FC<EducatorDashboardScreenProps> = (
           ))}
         </View>
       )}
+
+      {/* Quick Actions */}
+      <View style={styles.card}>
+        <Text style={styles.cardTitle}>⚡ Quick Actions</Text>
+        <View style={styles.quickActionsGrid}>
+          <TouchableOpacity 
+            style={styles.quickActionItem}
+            onPress={() => setShowStudentRecords(true)}
+          >
+            <Text style={styles.quickActionIcon}>📚</Text>
+            <Text style={styles.quickActionText}>View Student Records</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.quickActionItem}>
+            <Text style={styles.quickActionIcon}>📝</Text>
+            <Text style={styles.quickActionText}>Assign New Task</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.quickActionItem}>
+            <Text style={styles.quickActionIcon}>📊</Text>
+            <Text style={styles.quickActionText}>Generate Report</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.quickActionItem}>
+            <Text style={styles.quickActionIcon}>💬</Text>
+            <Text style={styles.quickActionText}>Send Message</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
     </ScrollView>
   );
 
@@ -315,7 +344,15 @@ export const EducatorDashboardScreen: React.FC<EducatorDashboardScreenProps> = (
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
     >
       <View style={styles.card}>
-        <Text style={styles.cardTitle}>👥 Student Health Monitoring</Text>
+        <View style={styles.cardHeader}>
+          <Text style={styles.cardTitle}>👥 Student Health Monitoring</Text>
+          <TouchableOpacity 
+            style={styles.viewRecordsButton}
+            onPress={() => setShowStudentRecords(true)}
+          >
+            <Text style={styles.viewRecordsButtonText}>📚 View All Records</Text>
+          </TouchableOpacity>
+        </View>
         {Object.entries(studentOverviews).map(([studentId, overview]) => (
           <TouchableOpacity
             key={studentId}
@@ -491,6 +528,12 @@ export const EducatorDashboardScreen: React.FC<EducatorDashboardScreenProps> = (
         <Text style={styles.subtitle}>{currentProfile?.name}</Text>
       </View>
 
+      <ContextualHelpButton 
+        screen="EducatorDashboardScreen"
+        userType="educator"
+        position="top-right"
+      />
+
       {renderTabBar()}
 
       {activeTab === 'overview' && renderOverviewTab()}
@@ -508,6 +551,11 @@ export const EducatorDashboardScreen: React.FC<EducatorDashboardScreenProps> = (
           onUpdate={loadDashboardData}
         />
       )}
+
+      <StudentRecordsViewer
+        visible={showStudentRecords}
+        onClose={() => setShowStudentRecords(false)}
+      />
     </View>
   );
 };
@@ -927,5 +975,41 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#666',
     marginTop: 12,
+  },
+  viewRecordsButton: {
+    backgroundColor: '#007AFF',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 6,
+  },
+  viewRecordsButtonText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  quickActionsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+  },
+  quickActionItem: {
+    flex: 1,
+    minWidth: '45%',
+    backgroundColor: '#f8f9fa',
+    borderRadius: 8,
+    padding: 12,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#e9ecef',
+  },
+  quickActionIcon: {
+    fontSize: 20,
+    marginBottom: 4,
+  },
+  quickActionText: {
+    fontSize: 11,
+    color: '#333',
+    fontWeight: '500',
+    textAlign: 'center',
   },
 });

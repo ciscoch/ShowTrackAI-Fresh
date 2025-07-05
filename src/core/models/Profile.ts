@@ -22,6 +22,12 @@ export interface UserProfile {
     achievementsEarned: number;
   };
   isDemo?: boolean;
+  // Educator-specific fields
+  ffa_chapter_id?: string;
+  educator_role?: 'agriculture_teacher' | 'ffa_advisor' | 'substitute' | 'administrator';
+  certification?: string[];
+  years_experience?: number;
+  students_supervised?: string[]; // Array of student IDs
 }
 
 export interface ProfileCreationData {
@@ -33,6 +39,11 @@ export interface ProfileCreationData {
   avatar?: string;
   subscriptionTier?: 'Free' | 'Basic' | 'Professional' | 'Enterprise';
   isDemo?: boolean;
+  // Educator-specific creation data
+  ffa_chapter_id?: string;
+  educator_role?: 'agriculture_teacher' | 'ffa_advisor' | 'substitute' | 'administrator';
+  certification?: string[];
+  years_experience?: number;
 }
 
 export const PROFILE_TYPES = {

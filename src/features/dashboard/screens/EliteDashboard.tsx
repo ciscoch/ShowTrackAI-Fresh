@@ -48,6 +48,7 @@ export const EliteDashboard: React.FC<EliteDashboardProps> = ({
         <View>
           <Text style={styles.welcomeText}>Welcome back,</Text>
           <Text style={styles.profileName}>{currentProfile.name}</Text>
+          <Text style={styles.profileType}>Elite Student • {currentProfile.school}</Text>
           <View style={styles.tierBadge}>
             <Text style={styles.tierText}>⭐ ELITE</Text>
           </View>
@@ -112,7 +113,7 @@ export const EliteDashboard: React.FC<EliteDashboardProps> = ({
 
         {/* Premium Features */}
         <View style={styles.featuresSection}>
-          <Text style={styles.sectionTitle}>🌟 Premium Features</Text>
+          <Text style={styles.sectionTitle}>🎓 Elite Student Features</Text>
           
           <View style={styles.featuresGrid}>
             <TouchableOpacity 
@@ -167,7 +168,7 @@ export const EliteDashboard: React.FC<EliteDashboardProps> = ({
 
         {/* Standard Features */}
         <View style={styles.featuresSection}>
-          <Text style={styles.sectionTitle}>🛠️ Core Features</Text>
+          <Text style={styles.sectionTitle}>📚 Student Project Management</Text>
           
           <View style={styles.featuresGrid}>
             <TouchableOpacity 
@@ -321,6 +322,12 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#fff',
     marginBottom: 4,
+  },
+  profileType: {
+    fontSize: 14,
+    color: '#fff',
+    opacity: 0.8,
+    marginBottom: 8,
   },
   tierBadge: {
     backgroundColor: 'rgba(255, 255, 255, 0.2)',

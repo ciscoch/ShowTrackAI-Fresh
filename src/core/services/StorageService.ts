@@ -20,6 +20,9 @@ export const STORAGE_KEYS = {
   FOLLOW_UP_TASKS: '@ShowTrackAI:followUpTasks',
   FOLLOW_UP_UPDATES: '@ShowTrackAI:followUpUpdates',
   EDUCATOR_MONITORING: '@ShowTrackAI:educatorMonitoring',
+  // Help system keys
+  HELP_CONTENT: '@ShowTrackAI:helpContent',
+  CONTEXTUAL_HELP: '@ShowTrackAI:contextualHelp',
   // System keys
   DATA_VERSION: '@ShowTrackAI:dataVersion',
   LAST_BACKUP: '@ShowTrackAI:lastBackup',

@@ -5,6 +5,7 @@ import { ProfileChooserScreen } from './src/features/profile/screens/ProfileChoo
 import { ProfileSettingsScreen } from './src/features/profile/screens/ProfileSettingsScreen';
 import { FreemiumDashboard } from './src/features/dashboard/screens/FreemiumDashboard';
 import { EliteDashboard } from './src/features/dashboard/screens/EliteDashboard';
+import { EducatorDashboard } from './src/features/dashboard/screens/EducatorDashboard';
 import { AnimalListScreen } from './src/features/animals/screens/AnimalListScreen';
 import { AnimalFormScreen } from './src/features/animals/screens/AnimalFormScreen';
 import { JournalListScreen } from './src/features/journal/screens/JournalListScreen';
@@ -17,10 +18,10 @@ import { useProfileStore } from './src/core/stores/ProfileStore';
 import { UserProfile, Animal, Journal } from './src/core/models';
 import { autoSyncService } from './src/core/services/AutoSyncService';
 
-type AppScreen = 'demoChooser' | 'profileChooser' | 'profileSettings' | 'freemiumDashboard' | 'eliteDashboard' | 'animalList' | 'animalForm' | 'journalList' | 'journalEntry' | 'journalAnalytics' | 'financial' | 'medical' | 'upgrade';
+type AppScreen = 'demoChooser' | 'profileChooser' | 'profileSettings' | 'freemiumDashboard' | 'eliteDashboard' | 'educatorDashboard' | 'animalList' | 'animalForm' | 'journalList' | 'journalEntry' | 'journalAnalytics' | 'financial' | 'medical' | 'upgrade';
 
 export default function App() {
-  const { currentProfile, isFirstLaunch, checkLimitations } = useProfileStore();
+  const { currentProfile, isFirstLaunch, checkLimitations, createDemoProfiles } = useProfileStore();
   const [currentScreen, setCurrentScreen] = useState<AppScreen>('demoChooser');
   const [selectedAnimal, setSelectedAnimal] = useState<Animal | undefined>();
   const [selectedJournalEntry, setSelectedJournalEntry] = useState<Journal | undefined>();
@@ -29,6 +30,11 @@ export default function App() {
     // Initialize auto-sync service
     autoSyncService.initialize().catch(error => {
       console.error('Failed to initialize AutoSync service:', error);
+    });
+
+    // Ensure demo profiles exist and are properly migrated
+    createDemoProfiles().catch(error => {
+      console.error('Failed to create/migrate demo profiles:', error);
     });
 
     // Always start with demo chooser on first launch
@@ -48,8 +54,17 @@ export default function App() {
       case 'elite_student':
         setCurrentScreen('eliteDashboard');
         break;
+      case 'educator':
+        setCurrentScreen('educatorDashboard');
+        break;
+      case 'admin':
+        setCurrentScreen('eliteDashboard'); // Admin uses elite dashboard for now
+        break;
+      case 'parent':
+        setCurrentScreen('freemiumDashboard'); // Parent uses basic dashboard
+        break;
       default:
-        setCurrentScreen('eliteDashboard'); // Default to elite for other types
+        setCurrentScreen('eliteDashboard'); // Default fallback
     }
   };
 
@@ -202,6 +217,18 @@ export default function App() {
             onNavigateToAnalytics={() => console.log('Navigate to Analytics')}
             onNavigateToAI={() => console.log('Navigate to AI')}
             onNavigateToExport={() => console.log('Navigate to Export')}
+            onNavigateToJournal={handleNavigateToJournal}
+            onNavigateToFinancial={handleNavigateToFinancial}
+            onNavigateToMedical={handleNavigateToMedical}
+          />
+        );
+
+      case 'educatorDashboard':
+        return (
+          <EducatorDashboard
+            onSwitchProfile={() => handleSafeNavigation('demoChooser')}
+            onShowSettings={handleShowSettings}
+            onNavigateToAnimals={() => handleSafeNavigation('animalList')}
             onNavigateToJournal={handleNavigateToJournal}
             onNavigateToFinancial={handleNavigateToFinancial}
             onNavigateToMedical={handleNavigateToMedical}

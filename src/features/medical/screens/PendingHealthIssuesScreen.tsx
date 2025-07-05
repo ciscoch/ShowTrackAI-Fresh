@@ -13,6 +13,7 @@ import { useProfileStore } from '../../../core/stores/ProfileStore';
 import { followUpTaskService } from '../../../core/services/FollowUpTaskService';
 import { FollowUpTask, HealthAlert } from '../../../core/models/FollowUpTask';
 import { FollowUpTaskModal } from '../components/FollowUpTaskModal';
+import { ContextualHelpButton } from '../../../shared/components/ContextualHelpButton';
 
 interface PendingHealthIssuesScreenProps {
   onBack: () => void;
@@ -241,6 +242,12 @@ export const PendingHealthIssuesScreen: React.FC<PendingHealthIssuesScreenProps>
         <Text style={styles.title}>My Pending Health Issues</Text>
         <Text style={styles.subtitle}>{currentProfile?.name}</Text>
       </View>
+
+      <ContextualHelpButton 
+        screen="PendingHealthIssuesScreen"
+        userType="student"
+        position="top-right"
+      />
 
       <ScrollView
         style={styles.content}

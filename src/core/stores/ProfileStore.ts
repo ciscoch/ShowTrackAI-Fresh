@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { UserProfile, ProfileCreationData, DEFAULT_SETTINGS, DEFAULT_STATS } from '../models/Profile';
+import { UserProfile, ProfileCreationData, DEFAULT_SETTINGS, DEFAULT_STATS, PROFILE_TYPES } from '../models/Profile';
 import { useJournalStore } from './JournalStore';
 import { useAnimalStore } from './AnimalStore';
 

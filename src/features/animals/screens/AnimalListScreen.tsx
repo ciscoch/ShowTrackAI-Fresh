@@ -154,14 +154,12 @@ export const AnimalListScreen: React.FC<AnimalListScreenProps> = ({
               <Text style={styles.tagText}>{item.tagNumber}</Text>
             </View>
           </View>
-          {item.penNumber && (
-            <View style={styles.penContainer}>
-              <Text style={styles.penLabel}>Pen:</Text>
-              <View style={styles.penNumber}>
-                <Text style={styles.penText}>{item.penNumber}</Text>
-              </View>
+          <View style={styles.penContainer}>
+            <Text style={styles.penLabel}>Pen:</Text>
+            <View style={styles.penNumber}>
+              <Text style={styles.penText}>{item.penNumber}</Text>
             </View>
-          )}
+          </View>
         </View>
       </View>
 

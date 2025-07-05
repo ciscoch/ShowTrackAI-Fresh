@@ -2,7 +2,7 @@ export interface Animal {
   id: string;
   name: string;
   tagNumber: string;
-  penNumber?: string;
+  penNumber: string;
   species: 'Cattle' | 'Goat' | 'Pig' | 'Sheep';
   breed: string;
   breeder: string;

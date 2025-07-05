@@ -40,6 +40,7 @@ export const AnimalFormScreen: React.FC<AnimalFormScreenProps> = ({
 
     if (!formData.name.trim()) newErrors.name = 'Name is required';
     if (!formData.tagNumber.trim()) newErrors.tagNumber = 'Tag number is required';
+    if (!formData.penNumber.trim()) newErrors.penNumber = 'Pen number is required';
     if (!formData.species) newErrors.species = 'Species is required';
     if (!formData.breed) newErrors.breed = 'Breed is required';
     if (!formData.breeder.trim()) newErrors.breeder = 'Breeder is required';
@@ -65,7 +66,7 @@ export const AnimalFormScreen: React.FC<AnimalFormScreenProps> = ({
       const animalData = {
         name: formData.name,
         tagNumber: formData.tagNumber,
-        penNumber: formData.penNumber || undefined,
+        penNumber: formData.penNumber,
         species: formData.species as 'Cattle' | 'Goat' | 'Pig' | 'Sheep',
         breed: formData.breed,
         breeder: formData.breeder,
@@ -143,12 +144,12 @@ export const AnimalFormScreen: React.FC<AnimalFormScreenProps> = ({
         </View>
 
         <View style={styles.inputGroup}>
-          <Text style={styles.label}>Pen Number</Text>
+          <Text style={styles.label}>Pen Number *</Text>
           <TextInput
             style={[styles.input, errors.penNumber && styles.inputError]}
             value={formData.penNumber}
             onChangeText={(text) => setFormData({ ...formData, penNumber: text })}
-            placeholder="Enter pen number (optional)"
+            placeholder="Enter pen number"
           />
           {errors.penNumber && <Text style={styles.errorText}>{errors.penNumber}</Text>}
         </View>

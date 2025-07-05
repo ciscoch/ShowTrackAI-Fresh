@@ -17,8 +17,9 @@ import { UpgradeScreen } from './src/features/subscription/screens/UpgradeScreen
 import { useProfileStore } from './src/core/stores/ProfileStore';
 import { UserProfile, Animal, Journal } from './src/core/models';
 import { autoSyncService } from './src/core/services/AutoSyncService';
+import { ObserverAccessScreen } from './src/features/qrcode/screens/ObserverAccessScreen';
 
-type AppScreen = 'demoChooser' | 'profileChooser' | 'profileSettings' | 'freemiumDashboard' | 'eliteDashboard' | 'educatorDashboard' | 'animalList' | 'animalForm' | 'journalList' | 'journalEntry' | 'journalAnalytics' | 'financial' | 'medical' | 'upgrade';
+type AppScreen = 'demoChooser' | 'profileChooser' | 'profileSettings' | 'freemiumDashboard' | 'eliteDashboard' | 'educatorDashboard' | 'animalList' | 'animalForm' | 'journalList' | 'journalEntry' | 'journalAnalytics' | 'financial' | 'medical' | 'upgrade' | 'observerAccess';
 
 export default function App() {
   const { currentProfile, isFirstLaunch, checkLimitations, createDemoProfiles } = useProfileStore();
@@ -236,11 +237,13 @@ export default function App() {
         );
 
       case 'animalList':
+        const isEducator = currentProfile?.type === 'educator';
         return (
           <AnimalListScreen
-            onAddAnimal={handleAddAnimal}
-            onEditAnimal={handleEditAnimal}
+            onAddAnimal={!isEducator ? handleAddAnimal : undefined}
+            onEditAnimal={!isEducator ? handleEditAnimal : undefined}
             onViewAnimal={handleViewAnimal}
+            isReadOnly={isEducator}
             onBack={() => {
               // Go back to appropriate dashboard
               if (currentProfile) {
@@ -347,12 +350,20 @@ export default function App() {
           />
         );
 
+      case 'observerAccess':
+        return (
+          <ObserverAccessScreen
+            onBack={() => setCurrentScreen('demoChooser')}
+          />
+        );
+
       default:
         return (
           <DemoProfileChooserScreen
             onProfileSelected={handleProfileSelected}
             onCreateCustomProfile={handleCreateCustomProfile}
             onShowSettings={handleShowSettings}
+            onObserverAccess={() => setCurrentScreen('observerAccess')}
           />
         );
     }

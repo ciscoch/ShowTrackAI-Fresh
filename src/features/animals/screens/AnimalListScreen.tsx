@@ -1,14 +1,17 @@
-import React, { useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, FlatList, Alert } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, FlatList, Alert, SafeAreaView, ScrollView } from 'react-native';
 import { Animal } from '../../../core/models';
 import { useAnimalStore } from '../../../core/stores';
+import { useProfileStore } from '../../../core/stores/ProfileStore';
+import { educatorStudentService } from '../../../core/services/EducatorStudentService';
 
 interface AnimalListScreenProps {
-  onAddAnimal: () => void;
-  onEditAnimal: (animal: Animal) => void;
+  onAddAnimal?: () => void;
+  onEditAnimal?: (animal: Animal) => void;
   onViewAnimal: (animal: Animal) => void;
   onViewHealthRecords?: (animal: Animal) => void;
   onBack?: () => void;
+  isReadOnly?: boolean;
 }
 
 export const AnimalListScreen: React.FC<AnimalListScreenProps> = ({
@@ -17,12 +20,50 @@ export const AnimalListScreen: React.FC<AnimalListScreenProps> = ({
   onViewAnimal,
   onViewHealthRecords,
   onBack,
+  isReadOnly = false,
 }) => {
   const { animals, loadAnimals, deleteAnimal, error } = useAnimalStore();
+  const { currentProfile } = useProfileStore();
+  const [filteredAnimals, setFilteredAnimals] = useState<Animal[]>([]);
+  const [isLoadingFiltered, setIsLoadingFiltered] = useState(false);
 
   useEffect(() => {
-    loadAnimals();
-  }, [loadAnimals]);
+    if (isReadOnly && currentProfile?.type === 'educator') {
+      loadEducatorAnimals();
+    } else {
+      loadAnimals();
+    }
+  }, [loadAnimals, isReadOnly, currentProfile]);
+
+  useEffect(() => {
+    if (!isReadOnly) {
+      setFilteredAnimals(animals);
+    }
+  }, [animals, isReadOnly]);
+
+  const loadEducatorAnimals = async () => {
+    if (!currentProfile || currentProfile.type !== 'educator') return;
+    
+    try {
+      setIsLoadingFiltered(true);
+      const students = await educatorStudentService.getStudentsForEducator(currentProfile.id);
+      const allStudentAnimals: Animal[] = [];
+      
+      for (const student of students) {
+        const studentRecord = await educatorStudentService.getStudentRecord(student.id, currentProfile.id);
+        if (studentRecord) {
+          allStudentAnimals.push(...studentRecord.animals);
+        }
+      }
+      
+      setFilteredAnimals(allStudentAnimals);
+    } catch (error) {
+      console.error('Failed to load educator animals:', error);
+      setFilteredAnimals([]);
+    } finally {
+      setIsLoadingFiltered(false);
+    }
+  };
 
   const handleDeleteAnimal = (animal: Animal) => {
     Alert.alert(
@@ -39,31 +80,109 @@ export const AnimalListScreen: React.FC<AnimalListScreenProps> = ({
     );
   };
 
+  const getAnimalEmoji = (species: string): string => {
+    switch (species.toLowerCase()) {
+      case 'cattle': case 'cow': case 'bull': return '🐄';
+      case 'goat': return '🐐';
+      case 'sheep': return '🐑';
+      case 'pig': case 'swine': return '🐷';
+      case 'horse': return '🐴';
+      case 'chicken': case 'poultry': return '🐔';
+      case 'duck': return '🦆';
+      case 'rabbit': return '🐰';
+      default: return '🐾';
+    }
+  };
+
+  const getSpeciesColor = (species: string): string => {
+    switch (species.toLowerCase()) {
+      case 'cattle': case 'cow': case 'bull': return '#8B4513';
+      case 'goat': return '#A0522D';
+      case 'sheep': return '#F5F5DC';
+      case 'pig': case 'swine': return '#FFC0CB';
+      case 'horse': return '#654321';
+      case 'chicken': case 'poultry': return '#FFD700';
+      case 'duck': return '#4682B4';
+      case 'rabbit': return '#DEB887';
+      default: return '#6B7280';
+    }
+  };
+
   const renderAnimal = ({ item }: { item: Animal }) => (
     <TouchableOpacity 
       style={styles.animalCard}
       onPress={() => onViewAnimal(item)}
+      activeOpacity={0.7}
     >
-      <View style={styles.animalInfo}>
-        <Text style={styles.animalName}>{item.name}</Text>
-        <Text style={styles.animalDetails}>
-          {item.species} • Tag: {item.tagNumber}
-        </Text>
-        <Text style={styles.animalBreed}>{item.breed}</Text>
+      <View style={styles.cardHeader}>
+        <View style={styles.animalIconContainer}>
+          <Text style={styles.animalEmoji}>{getAnimalEmoji(item.species)}</Text>
+          <View style={[styles.speciesBadge, { backgroundColor: getSpeciesColor(item.species) }]}>
+            <Text style={styles.speciesText}>{item.species}</Text>
+          </View>
+        </View>
+        {!isReadOnly && (
+          <View style={styles.cardActions}>
+            <TouchableOpacity 
+              style={styles.actionButton}
+              onPress={(e) => {
+                e.stopPropagation();
+                onEditAnimal?.(item);
+              }}
+            >
+              <Text style={styles.actionIcon}>✏️</Text>
+            </TouchableOpacity>
+            <TouchableOpacity 
+              style={[styles.actionButton, styles.deleteAction]}
+              onPress={(e) => {
+                e.stopPropagation();
+                handleDeleteAnimal(item);
+              }}
+            >
+              <Text style={styles.actionIcon}>🗑️</Text>
+            </TouchableOpacity>
+          </View>
+        )}
       </View>
-      
-      <View style={styles.animalActions}>
-        <TouchableOpacity 
-          style={styles.editButton}
-          onPress={() => onEditAnimal(item)}
-        >
-          <Text style={styles.editButtonText}>Edit</Text>
-        </TouchableOpacity>
-        <TouchableOpacity 
-          style={styles.deleteButton}
-          onPress={() => handleDeleteAnimal(item)}
-        >
-          <Text style={styles.deleteButtonText}>Delete</Text>
+
+      <View style={styles.animalMainInfo}>
+        <Text style={styles.animalName}>{item.name}</Text>
+        <View style={styles.tagContainer}>
+          <Text style={styles.tagLabel}>Tag:</Text>
+          <View style={styles.tagNumber}>
+            <Text style={styles.tagText}>{item.tagNumber}</Text>
+          </View>
+        </View>
+      </View>
+
+      <View style={styles.animalDetails}>
+        <View style={styles.detailRow}>
+          <Text style={styles.detailIcon}>🏷️</Text>
+          <Text style={styles.detailLabel}>Breed:</Text>
+          <Text style={styles.detailValue}>{item.breed}</Text>
+        </View>
+        {item.dateOfBirth && (
+          <View style={styles.detailRow}>
+            <Text style={styles.detailIcon}>🎂</Text>
+            <Text style={styles.detailLabel}>Born:</Text>
+            <Text style={styles.detailValue}>
+              {new Date(item.dateOfBirth).toLocaleDateString()}
+            </Text>
+          </View>
+        )}
+        {item.weight && (
+          <View style={styles.detailRow}>
+            <Text style={styles.detailIcon}>⚖️</Text>
+            <Text style={styles.detailLabel}>Weight:</Text>
+            <Text style={styles.detailValue}>{item.weight} lbs</Text>
+          </View>
+        )}
+      </View>
+
+      <View style={styles.cardFooter}>
+        <TouchableOpacity style={styles.viewDetailsButton}>
+          <Text style={styles.viewDetailsText}>Tap to view details</Text>
+          <Text style={styles.arrowIcon}>→</Text>
         </TouchableOpacity>
       </View>
     </TouchableOpacity>
@@ -71,18 +190,36 @@ export const AnimalListScreen: React.FC<AnimalListScreenProps> = ({
 
   const renderEmptyState = () => (
     <View style={styles.emptyState}>
-      <Text style={styles.emptyTitle}>No Animals Added</Text>
+      <View style={styles.emptyIconContainer}>
+        <Text style={styles.emptyIcon}>🐾</Text>
+        <View style={styles.emptyIconBackground} />
+      </View>
+      <Text style={styles.emptyTitle}>{isReadOnly ? 'No Animals to Display' : 'No Animals Yet'}</Text>
       <Text style={styles.emptySubtitle}>
-        Add your first animal to start tracking your livestock project
+        {isReadOnly 
+          ? 'Students have not added any animals to their projects yet. Animal records will appear here once students begin their livestock management.' 
+          : 'Start building your livestock project by adding your first animal. Track their health, growth, and progress!'
+        }
       </Text>
-      <TouchableOpacity style={styles.button} onPress={onAddAnimal}>
-        <Text style={styles.buttonText}>Add First Animal</Text>
-      </TouchableOpacity>
+      {!isReadOnly && onAddAnimal && (
+        <TouchableOpacity style={styles.primaryButton} onPress={onAddAnimal}>
+          <Text style={styles.addIcon}>+</Text>
+          <Text style={styles.primaryButtonText}>Add Your First Animal</Text>
+        </TouchableOpacity>
+      )}
+      {!isReadOnly && (
+        <View style={styles.helpTip}>
+          <Text style={styles.helpTipIcon}>💡</Text>
+          <Text style={styles.helpTipText}>
+            Pro tip: Add photos and detailed info to make the most of your tracking
+          </Text>
+        </View>
+      )}
     </View>
   );
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container}>
       <View style={styles.header}>
         <View style={styles.headerLeft}>
           {onBack && (
@@ -90,45 +227,84 @@ export const AnimalListScreen: React.FC<AnimalListScreenProps> = ({
               <Text style={styles.backButtonText}>← Back</Text>
             </TouchableOpacity>
           )}
-          <Text style={styles.title}>My Animals ({animals.length})</Text>
+          <View style={styles.titleContainer}>
+            <Text style={styles.title}>{isReadOnly ? 'Student Animals' : 'My Animals'}</Text>
+            <View style={styles.countBadge}>
+              <Text style={styles.countText}>{filteredAnimals.length}</Text>
+            </View>
+          </View>
         </View>
-        <TouchableOpacity style={styles.addButton} onPress={onAddAnimal}>
-          <Text style={styles.addButtonText}>Add Animal</Text>
-        </TouchableOpacity>
+        {!isReadOnly && onAddAnimal && (
+          <TouchableOpacity style={styles.addButton} onPress={onAddAnimal}>
+            <Text style={styles.addButtonIcon}>+</Text>
+            <Text style={styles.addButtonText}>Add Animal</Text>
+          </TouchableOpacity>
+        )}
       </View>
 
       {error && (
         <View style={styles.errorContainer}>
+          <View style={styles.errorIconContainer}>
+            <Text style={styles.errorIcon}>⚠️</Text>
+          </View>
           <Text style={styles.errorText}>{error}</Text>
         </View>
       )}
 
-      <FlatList
-        data={animals}
-        keyExtractor={(item) => item.id}
-        renderItem={renderAnimal}
-        ListEmptyComponent={renderEmptyState}
-        contentContainerStyle={styles.listContainer}
-        showsVerticalScrollIndicator={false}
-      />
-    </View>
+      <View style={styles.content}>
+        {filteredAnimals.length > 0 && (
+          <View style={styles.statsBar}>
+            <View style={styles.statItem}>
+              <Text style={styles.statIcon}>🐾</Text>
+              <Text style={styles.statLabel}>Total Animals</Text>
+              <Text style={styles.statValue}>{filteredAnimals.length}</Text>
+            </View>
+            <View style={styles.statDivider} />
+            <View style={styles.statItem}>
+              <Text style={styles.statIcon}>📊</Text>
+              <Text style={styles.statLabel}>Species</Text>
+              <Text style={styles.statValue}>
+                {new Set(filteredAnimals.map(a => a.species)).size}
+              </Text>
+            </View>
+          </View>
+        )}
+
+        <FlatList
+          data={filteredAnimals}
+          keyExtractor={(item) => item.id}
+          renderItem={renderAnimal}
+          ListEmptyComponent={renderEmptyState}
+          contentContainerStyle={styles.listContainer}
+          showsVerticalScrollIndicator={false}
+          ItemSeparatorComponent={() => <View style={styles.separator} />}
+        />
+      </View>
+    </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+    backgroundColor: '#f8f9fa',
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 16,
+    paddingHorizontal: 20,
     paddingVertical: 16,
-    backgroundColor: '#fff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#eee',
+    paddingTop: 20,
+    backgroundColor: '#007AFF',
+    borderBottomLeftRadius: 20,
+    borderBottomRightRadius: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 8,
   },
   headerLeft: {
     flexDirection: 'row',
@@ -136,136 +312,353 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   backButton: {
-    marginRight: 12,
+    marginRight: 16,
     paddingVertical: 8,
     paddingHorizontal: 12,
-    borderRadius: 6,
-    backgroundColor: '#f0f0f0',
+    borderRadius: 12,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.3)',
   },
   backButtonText: {
     fontSize: 16,
-    color: '#007AFF',
-    fontWeight: '500',
+    color: '#fff',
+    fontWeight: '600',
+  },
+  titleContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
   title: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#333',
+    color: '#fff',
+  },
+  countBadge: {
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    borderRadius: 12,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    minWidth: 24,
+    alignItems: 'center',
+  },
+  countText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: 'bold',
   },
   addButton: {
-    backgroundColor: '#007AFF',
-    paddingVertical: 8,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.3)',
+    paddingVertical: 10,
     paddingHorizontal: 16,
-    borderRadius: 6,
+    borderRadius: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  addButtonIcon: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: 'bold',
   },
   addButtonText: {
     color: '#fff',
     fontWeight: '600',
+    fontSize: 14,
+  },
+  content: {
+    flex: 1,
+    paddingTop: 20,
+  },
+  statsBar: {
+    flexDirection: 'row',
+    backgroundColor: '#fff',
+    marginHorizontal: 20,
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  statItem: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  statIcon: {
+    fontSize: 20,
+    marginBottom: 4,
+  },
+  statLabel: {
+    fontSize: 12,
+    color: '#666',
+    marginBottom: 2,
+  },
+  statValue: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#007AFF',
+  },
+  statDivider: {
+    width: 1,
+    backgroundColor: '#e9ecef',
+    marginHorizontal: 16,
+  },
+  separator: {
+    height: 12,
+  },
+  listContainer: {
+    paddingHorizontal: 20,
+    paddingBottom: 20,
+    flexGrow: 1,
+  },
+  animalCard: {
+    backgroundColor: '#fff',
+    borderRadius: 20,
+    padding: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.12,
+    shadowRadius: 12,
+    elevation: 6,
+    borderWidth: 1,
+    borderColor: '#f0f0f0',
+  },
+  cardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 16,
+  },
+  animalIconContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  animalEmoji: {
+    fontSize: 32,
+  },
+  speciesBadge: {
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  speciesText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '600',
+    textTransform: 'capitalize',
+  },
+  cardActions: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  actionButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#f8f9fa',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#e9ecef',
+  },
+  deleteAction: {
+    backgroundColor: '#fff5f5',
+    borderColor: '#ffe6e6',
+  },
+  actionIcon: {
+    fontSize: 16,
+  },
+  animalMainInfo: {
+    marginBottom: 16,
+  },
+  animalName: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#1a202c',
+    marginBottom: 8,
+  },
+  tagContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  tagLabel: {
+    fontSize: 14,
+    color: '#666',
+    fontWeight: '500',
+  },
+  tagNumber: {
+    backgroundColor: '#007AFF',
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  tagText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: 'bold',
+  },
+  animalDetails: {
+    gap: 8,
+    marginBottom: 16,
+  },
+  detailRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  detailIcon: {
+    fontSize: 16,
+    width: 20,
+  },
+  detailLabel: {
+    fontSize: 14,
+    color: '#666',
+    fontWeight: '500',
+    minWidth: 60,
+  },
+  detailValue: {
+    fontSize: 14,
+    color: '#333',
+    fontWeight: '600',
+    flex: 1,
+  },
+  cardFooter: {
+    borderTopWidth: 1,
+    borderTopColor: '#f0f0f0',
+    paddingTop: 12,
+  },
+  viewDetailsButton: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 8,
+  },
+  viewDetailsText: {
+    fontSize: 14,
+    color: '#007AFF',
+    fontWeight: '600',
+  },
+  arrowIcon: {
+    fontSize: 14,
+    color: '#007AFF',
+    fontWeight: 'bold',
   },
   emptyState: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: 32,
+    paddingHorizontal: 40,
+  },
+  emptyIconContainer: {
+    position: 'relative',
+    marginBottom: 24,
+  },
+  emptyIcon: {
+    fontSize: 64,
+    zIndex: 1,
+  },
+  emptyIconBackground: {
+    position: 'absolute',
+    top: '50%',
+    left: '50%',
+    width: 80,
+    height: 80,
+    backgroundColor: 'rgba(0, 122, 255, 0.1)',
+    borderRadius: 40,
+    transform: [{ translateX: -40 }, { translateY: -40 }],
   },
   emptyTitle: {
-    fontSize: 24,
-    fontWeight: '600',
-    color: '#333',
-    marginBottom: 8,
+    fontSize: 28,
+    fontWeight: 'bold',
+    color: '#1a202c',
+    marginBottom: 12,
+    textAlign: 'center',
   },
   emptySubtitle: {
     fontSize: 16,
     color: '#666',
     textAlign: 'center',
-    marginBottom: 24,
-    lineHeight: 22,
+    marginBottom: 32,
+    lineHeight: 24,
   },
-  button: {
+  primaryButton: {
     backgroundColor: '#007AFF',
     paddingVertical: 16,
     paddingHorizontal: 32,
-    borderRadius: 8,
+    borderRadius: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    shadowColor: '#007AFF',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 6,
+    marginBottom: 24,
   },
-  buttonText: {
+  addIcon: {
+    color: '#fff',
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
+  primaryButtonText: {
     fontSize: 16,
     fontWeight: '600',
     color: '#fff',
-    textAlign: 'center',
   },
-  listContainer: {
-    padding: 16,
-    flexGrow: 1,
-  },
-  animalCard: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+  helpTip: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-  },
-  animalInfo: {
-    flex: 1,
-  },
-  animalName: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#333',
-    marginBottom: 4,
-  },
-  animalDetails: {
-    fontSize: 14,
-    color: '#666',
-    marginBottom: 2,
-  },
-  animalBreed: {
-    fontSize: 14,
-    color: '#999',
-  },
-  animalActions: {
-    flexDirection: 'row',
+    backgroundColor: '#fff3cd',
+    borderColor: '#ffeaa7',
+    borderWidth: 1,
+    borderRadius: 12,
+    padding: 12,
     gap: 8,
   },
-  editButton: {
-    backgroundColor: '#007AFF',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 6,
+  helpTipIcon: {
+    fontSize: 16,
   },
-  editButtonText: {
-    color: '#fff',
-    fontSize: 14,
-    fontWeight: '500',
-  },
-  deleteButton: {
-    backgroundColor: '#FF3B30',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 6,
-  },
-  deleteButtonText: {
-    color: '#fff',
-    fontSize: 14,
-    fontWeight: '500',
+  helpTipText: {
+    fontSize: 12,
+    color: '#856404',
+    flex: 1,
+    lineHeight: 16,
   },
   errorContainer: {
     backgroundColor: '#fff5f5',
-    borderColor: '#FF3B30',
+    borderColor: '#ff6b6b',
     borderWidth: 1,
-    borderRadius: 8,
-    padding: 12,
-    margin: 16,
+    borderRadius: 12,
+    padding: 16,
+    margin: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  errorIconContainer: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#ffe6e6',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  errorIcon: {
+    fontSize: 16,
   },
   errorText: {
-    color: '#FF3B30',
+    color: '#d63031',
     fontSize: 14,
-    textAlign: 'center',
+    flex: 1,
+    fontWeight: '500',
   },
 });

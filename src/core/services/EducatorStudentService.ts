@@ -1,7 +1,7 @@
 import { storageService } from './StorageService';
 import { UserProfile } from '../models/Profile';
 import { Animal } from '../models/Animal';
-import { JournalEntry } from '../models/Journal';
+import { Journal } from '../models/Journal';
 import { HealthRecord } from '../models/HealthRecord';
 import { FollowUpTask } from '../models/FollowUpTask';
 import { FinancialEntry } from '../models/Financial';
@@ -9,7 +9,7 @@ import { FinancialEntry } from '../models/Financial';
 export interface StudentRecord {
   student: UserProfile;
   animals: Animal[];
-  journalEntries: JournalEntry[];
+  journalEntries: Journal[];
   healthRecords: HealthRecord[];
   followUpTasks: FollowUpTask[];
   financialEntries: FinancialEntry[];
@@ -45,6 +45,8 @@ class EducatorStudentService {
   async getStudentsForEducator(educatorId: string): Promise<UserProfile[]> {
     try {
       const allProfiles = await storageService.loadData('@ShowTrackAI:ffaProfiles') || [];
+      if (!Array.isArray(allProfiles)) return [];
+      
       const educator = allProfiles.find((p: UserProfile) => p.id === educatorId);
       
       if (!educator || educator.type !== 'educator') {
@@ -190,6 +192,7 @@ class EducatorStudentService {
   private async getStudentAnimals(studentId: string): Promise<Animal[]> {
     try {
       const allAnimals = await storageService.loadData('@ShowTrackAI:animals') || [];
+      if (!Array.isArray(allAnimals)) return [];
       return allAnimals.filter((animal: Animal) => animal.ownerId === studentId);
     } catch (error) {
       console.error('Failed to get student animals:', error);
@@ -197,10 +200,11 @@ class EducatorStudentService {
     }
   }
 
-  private async getStudentJournalEntries(studentId: string): Promise<JournalEntry[]> {
+  private async getStudentJournalEntries(studentId: string): Promise<Journal[]> {
     try {
       const allEntries = await storageService.loadData('@ShowTrackAI:journal') || [];
-      return allEntries.filter((entry: JournalEntry) => entry.userId === studentId);
+      if (!Array.isArray(allEntries)) return [];
+      return allEntries.filter((entry: Journal) => entry.userId === studentId);
     } catch (error) {
       console.error('Failed to get student journal entries:', error);
       return [];
@@ -210,6 +214,7 @@ class EducatorStudentService {
   private async getStudentHealthRecords(studentId: string): Promise<HealthRecord[]> {
     try {
       const allRecords = await storageService.loadData('@ShowTrackAI:healthRecords') || [];
+      if (!Array.isArray(allRecords)) return [];
       return allRecords.filter((record: HealthRecord) => record.studentId === studentId);
     } catch (error) {
       console.error('Failed to get student health records:', error);
@@ -220,6 +225,7 @@ class EducatorStudentService {
   private async getStudentFollowUpTasks(studentId: string): Promise<FollowUpTask[]> {
     try {
       const allTasks = await storageService.loadData('@ShowTrackAI:followUpTasks') || [];
+      if (!Array.isArray(allTasks)) return [];
       return allTasks.filter((task: FollowUpTask) => task.studentId === studentId);
     } catch (error) {
       console.error('Failed to get student follow-up tasks:', error);
@@ -230,6 +236,7 @@ class EducatorStudentService {
   private async getStudentFinancialEntries(studentId: string): Promise<FinancialEntry[]> {
     try {
       const allEntries = await storageService.loadData('@ShowTrackAI:financialEntries') || [];
+      if (!Array.isArray(allEntries)) return [];
       return allEntries.filter((entry: FinancialEntry) => entry.userId === studentId);
     } catch (error) {
       console.error('Failed to get student financial entries:', error);
@@ -243,7 +250,7 @@ class EducatorStudentService {
     return new Date(Math.max(...validDates.map(d => d.getTime())));
   }
 
-  private calculateCompetencyProgress(journalEntries: JournalEntry[], followUpTasks: FollowUpTask[]): Record<string, number> {
+  private calculateCompetencyProgress(journalEntries: Journal[], followUpTasks: FollowUpTask[]): Record<string, number> {
     const competencies: Record<string, { attempted: number; completed: number }> = {};
 
     // Count from journal entries
@@ -300,7 +307,7 @@ class EducatorStudentService {
     return Math.round((onTimeUpdates / followUpTasks.length) * 100);
   }
 
-  private calculateEngagementScore(journalEntries: JournalEntry[], followUpTasks: FollowUpTask[]): number {
+  private calculateEngagementScore(journalEntries: Journal[], followUpTasks: FollowUpTask[]): number {
     const now = new Date();
     const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
 

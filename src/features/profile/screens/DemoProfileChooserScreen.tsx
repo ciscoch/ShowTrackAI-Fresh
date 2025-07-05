@@ -15,12 +15,14 @@ interface DemoProfileChooserScreenProps {
   onProfileSelected: (profile: UserProfile) => void;
   onCreateCustomProfile: () => void;
   onShowSettings?: () => void;
+  onObserverAccess?: () => void;
 }
 
 export const DemoProfileChooserScreen: React.FC<DemoProfileChooserScreenProps> = ({
   onProfileSelected,
   onCreateCustomProfile,
   onShowSettings,
+  onObserverAccess,
 }) => {
   const { 
     profiles, 
@@ -195,6 +197,16 @@ export const DemoProfileChooserScreen: React.FC<DemoProfileChooserScreenProps> =
           Personalize your ShowTrackAI experience
         </Text>
       </TouchableOpacity>
+
+      {onObserverAccess && (
+        <TouchableOpacity
+          style={[styles.actionButton, styles.observerButton]}
+          onPress={onObserverAccess}
+        >
+          <Text style={styles.actionButtonIcon}>👥</Text>
+          <Text style={styles.actionButtonText}>Observer Access</Text>
+        </TouchableOpacity>
+      )}
 
       {onShowSettings && (
         <TouchableOpacity
@@ -636,6 +648,9 @@ const styles = StyleSheet.create({
   },
   secondaryButton: {
     backgroundColor: '#f0f0f0',
+  },
+  observerButton: {
+    backgroundColor: '#17a2b8',
   },
   actionButtonIcon: {
     fontSize: 16,

@@ -11,6 +11,8 @@ import {
 import { useProfileStore } from '../../../core/stores/ProfileStore';
 import { EducatorDashboardScreen } from '../../medical/screens/EducatorDashboardScreen';
 import { PendingHealthIssuesScreen } from '../../medical/screens/PendingHealthIssuesScreen';
+import { SupervisedStudentsScreen } from './SupervisedStudentsScreen';
+import { StudentRecordsViewer } from '../../medical/components/StudentRecordsViewer';
 
 interface EducatorDashboardProps {
   onSwitchProfile: () => void;
@@ -21,7 +23,7 @@ interface EducatorDashboardProps {
   onNavigateToMedical: () => void;
 }
 
-type EducatorView = 'main' | 'healthDashboard' | 'studentHealth';
+type EducatorView = 'main' | 'healthDashboard' | 'studentHealth' | 'studentsList' | 'studentRecords';
 
 export const EducatorDashboard: React.FC<EducatorDashboardProps> = ({
   onSwitchProfile,
@@ -34,9 +36,15 @@ export const EducatorDashboard: React.FC<EducatorDashboardProps> = ({
   const { currentProfile } = useProfileStore();
   const [currentView, setCurrentView] = useState<EducatorView>('main');
   const [showCertificationsModal, setShowCertificationsModal] = useState(false);
+  const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null);
 
   const handleViewChange = (view: EducatorView) => {
     setCurrentView(view);
+  };
+
+  const handleStudentSelect = (studentId: string) => {
+    setSelectedStudentId(studentId);
+    setCurrentView('studentRecords');
   };
 
   const renderCertificationsModal = () => (
@@ -146,7 +154,7 @@ export const EducatorDashboard: React.FC<EducatorDashboardProps> = ({
         <View style={styles.statsContainer}>
           <TouchableOpacity 
             style={[styles.statCard, styles.interactiveStatCard]}
-            onPress={() => handleViewChange('studentHealth')}
+            onPress={() => handleViewChange('studentsList')}
           >
             <Text style={styles.statNumber}>{currentProfile?.students_supervised?.length || 0}</Text>
             <Text style={styles.statLabel}>Students Supervised</Text>
@@ -299,6 +307,20 @@ export const EducatorDashboard: React.FC<EducatorDashboardProps> = ({
         return (
           <PendingHealthIssuesScreen 
             onBack={() => setCurrentView('main')}
+          />
+        );
+      case 'studentsList':
+        return (
+          <SupervisedStudentsScreen
+            onBack={() => setCurrentView('main')}
+            onStudentSelect={handleStudentSelect}
+          />
+        );
+      case 'studentRecords':
+        return (
+          <StudentRecordsViewer
+            visible={true}
+            onClose={() => setCurrentView('studentsList')}
           />
         );
       default:

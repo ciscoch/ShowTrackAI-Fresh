@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -7,6 +7,7 @@ import {
   ScrollView,
 } from 'react-native';
 import { useProfileStore } from '../../../core/stores/ProfileStore';
+import { QRCodeGenerator } from '../../qrcode/components/QRCodeGenerator';
 
 interface EliteDashboardProps {
   onSwitchProfile: () => void;
@@ -32,6 +33,7 @@ export const EliteDashboard: React.FC<EliteDashboardProps> = ({
   onNavigateToMedical,
 }) => {
   const { currentProfile } = useProfileStore();
+  const [showQRGenerator, setShowQRGenerator] = useState(false);
 
   if (!currentProfile) {
     return (
@@ -266,6 +268,14 @@ export const EliteDashboard: React.FC<EliteDashboardProps> = ({
               <Text style={styles.quickActionIcon}>📊</Text>
               <Text style={styles.quickActionText}>Generate Report</Text>
             </TouchableOpacity>
+            
+            <TouchableOpacity 
+              style={styles.quickAction}
+              onPress={() => setShowQRGenerator(true)}
+            >
+              <Text style={styles.quickActionIcon}>📱</Text>
+              <Text style={styles.quickActionText}>Share QR Code</Text>
+            </TouchableOpacity>
           </View>
         </View>
 
@@ -283,6 +293,16 @@ export const EliteDashboard: React.FC<EliteDashboardProps> = ({
           </TouchableOpacity>
         </View>
       </ScrollView>
+      
+      {/* QR Code Generator Modal */}
+      {currentProfile && (
+        <QRCodeGenerator
+          studentId={currentProfile.id}
+          studentName={currentProfile.name}
+          visible={showQRGenerator}
+          onClose={() => setShowQRGenerator(false)}
+        />
+      )}
     </View>
   );
 };

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -9,6 +9,7 @@ import {
 } from 'react-native';
 import { useProfileStore } from '../../../core/stores/ProfileStore';
 import { UserProfile } from '../../../core/models/Profile';
+import { QRCodeGenerator } from '../../qrcode/components/QRCodeGenerator';
 
 interface FreemiumDashboardProps {
   onSwitchProfile: () => void;
@@ -24,6 +25,7 @@ export const FreemiumDashboard: React.FC<FreemiumDashboardProps> = ({
   onUpgrade,
 }) => {
   const { currentProfile, checkLimitations } = useProfileStore();
+  const [showQRGenerator, setShowQRGenerator] = useState(false);
 
   if (!currentProfile) {
     return (
@@ -185,6 +187,18 @@ export const FreemiumDashboard: React.FC<FreemiumDashboardProps> = ({
                 <Text style={styles.availableText}>Available</Text>
               </View>
             </TouchableOpacity>
+
+            <TouchableOpacity 
+              style={styles.featureCard}
+              onPress={() => setShowQRGenerator(true)}
+            >
+              <Text style={styles.featureIcon}>📱</Text>
+              <Text style={styles.featureTitle}>Observer Access</Text>
+              <Text style={styles.featureSubtitle}>Share with QR codes</Text>
+              <View style={styles.featureStatus}>
+                <Text style={styles.availableText}>Available</Text>
+              </View>
+            </TouchableOpacity>
           </View>
         </View>
 
@@ -257,6 +271,16 @@ export const FreemiumDashboard: React.FC<FreemiumDashboardProps> = ({
           </TouchableOpacity>
         </View>
       </ScrollView>
+      
+      {/* QR Code Generator Modal */}
+      {currentProfile && (
+        <QRCodeGenerator
+          studentId={currentProfile.id}
+          studentName={currentProfile.name}
+          visible={showQRGenerator}
+          onClose={() => setShowQRGenerator(false)}
+        />
+      )}
     </View>
   );
 };

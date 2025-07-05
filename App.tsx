@@ -18,8 +18,9 @@ import { useProfileStore } from './src/core/stores/ProfileStore';
 import { UserProfile, Animal, Journal } from './src/core/models';
 import { autoSyncService } from './src/core/services/AutoSyncService';
 import { ObserverAccessScreen } from './src/features/qrcode/screens/ObserverAccessScreen';
+import { ExportScreen } from './src/features/export/screens/ExportScreen';
 
-type AppScreen = 'demoChooser' | 'profileChooser' | 'profileSettings' | 'freemiumDashboard' | 'eliteDashboard' | 'educatorDashboard' | 'animalList' | 'animalForm' | 'journalList' | 'journalEntry' | 'journalAnalytics' | 'financial' | 'medical' | 'upgrade' | 'observerAccess';
+type AppScreen = 'demoChooser' | 'profileChooser' | 'profileSettings' | 'freemiumDashboard' | 'eliteDashboard' | 'educatorDashboard' | 'animalList' | 'animalForm' | 'journalList' | 'journalEntry' | 'journalAnalytics' | 'financial' | 'medical' | 'upgrade' | 'observerAccess' | 'export';
 
 export default function App() {
   const { currentProfile, isFirstLaunch, checkLimitations, createDemoProfiles } = useProfileStore();
@@ -167,6 +168,22 @@ export default function App() {
     setCurrentScreen('medical');
   };
 
+  const handleNavigateToExport = () => {
+    setCurrentScreen('export');
+  };
+
+  const handleTakePhoto = () => {
+    Alert.alert(
+      'Take Photo',
+      'Choose an option:',
+      [
+        { text: 'Camera', onPress: () => console.log('Open camera') },
+        { text: 'Photo Library', onPress: () => console.log('Open photo library') },
+        { text: 'Cancel', style: 'cancel' }
+      ]
+    );
+  };
+
   // Navigation with safety - always provide a way back
   const handleSafeNavigation = (targetScreen: AppScreen) => {
     setCurrentScreen(targetScreen);
@@ -217,10 +234,12 @@ export default function App() {
             onNavigateToAnimals={() => handleSafeNavigation('animalList')}
             onNavigateToAnalytics={() => console.log('Navigate to Analytics')}
             onNavigateToAI={() => console.log('Navigate to AI')}
-            onNavigateToExport={() => console.log('Navigate to Export')}
+            onNavigateToExport={handleNavigateToExport}
             onNavigateToJournal={handleNavigateToJournal}
             onNavigateToFinancial={handleNavigateToFinancial}
             onNavigateToMedical={handleNavigateToMedical}
+            onAddAnimal={handleAddAnimal}
+            onTakePhoto={handleTakePhoto}
           />
         );
 
@@ -354,6 +373,29 @@ export default function App() {
         return (
           <ObserverAccessScreen
             onBack={() => setCurrentScreen('demoChooser')}
+          />
+        );
+
+      case 'export':
+        return (
+          <ExportScreen
+            onExportComplete={(result) => {
+              console.log('Export completed:', result);
+              // Navigate back to appropriate dashboard
+              if (currentProfile?.type === 'elite_student') {
+                setCurrentScreen('eliteDashboard');
+              } else {
+                setCurrentScreen('freemiumDashboard');
+              }
+            }}
+            onClose={() => {
+              // Navigate back to appropriate dashboard
+              if (currentProfile?.type === 'elite_student') {
+                setCurrentScreen('eliteDashboard');
+              } else {
+                setCurrentScreen('freemiumDashboard');
+              }
+            }}
           />
         );
 

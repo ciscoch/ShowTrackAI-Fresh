@@ -19,6 +19,8 @@ interface EliteDashboardProps {
   onNavigateToJournal: () => void;
   onNavigateToFinancial: () => void;
   onNavigateToMedical: () => void;
+  onAddAnimal?: () => void;
+  onTakePhoto?: () => void;
 }
 
 export const EliteDashboard: React.FC<EliteDashboardProps> = ({
@@ -31,6 +33,8 @@ export const EliteDashboard: React.FC<EliteDashboardProps> = ({
   onNavigateToJournal,
   onNavigateToFinancial,
   onNavigateToMedical,
+  onAddAnimal,
+  onTakePhoto,
 }) => {
   const { currentProfile } = useProfileStore();
   const [showQRGenerator, setShowQRGenerator] = useState(false);
@@ -246,7 +250,10 @@ export const EliteDashboard: React.FC<EliteDashboardProps> = ({
         <View style={styles.quickActionsCard}>
           <Text style={styles.quickActionsTitle}>⚡ Quick Actions</Text>
           <View style={styles.quickActionsList}>
-            <TouchableOpacity style={styles.quickAction}>
+            <TouchableOpacity 
+              style={styles.quickAction}
+              onPress={onAddAnimal || onNavigateToAnimals}
+            >
               <Text style={styles.quickActionIcon}>➕</Text>
               <Text style={styles.quickActionText}>Add Animal</Text>
             </TouchableOpacity>
@@ -259,12 +266,18 @@ export const EliteDashboard: React.FC<EliteDashboardProps> = ({
               <Text style={styles.quickActionText}>Log Activity</Text>
             </TouchableOpacity>
             
-            <TouchableOpacity style={styles.quickAction}>
+            <TouchableOpacity 
+              style={styles.quickAction}
+              onPress={onTakePhoto}
+            >
               <Text style={styles.quickActionIcon}>📸</Text>
               <Text style={styles.quickActionText}>Take Photo</Text>
             </TouchableOpacity>
             
-            <TouchableOpacity style={styles.quickAction}>
+            <TouchableOpacity 
+              style={styles.quickAction}
+              onPress={onNavigateToExport}
+            >
               <Text style={styles.quickActionIcon}>📊</Text>
               <Text style={styles.quickActionText}>Generate Report</Text>
             </TouchableOpacity>

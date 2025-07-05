@@ -21,6 +21,7 @@ export const AnimalFormScreen: React.FC<AnimalFormScreenProps> = ({
   const [formData, setFormData] = useState({
     name: animal?.name || '',
     tagNumber: animal?.tagNumber || '',
+    penNumber: animal?.penNumber || '',
     species: animal?.species || '',
     breed: animal?.breed || '',
     breeder: animal?.breeder || '',
@@ -64,6 +65,7 @@ export const AnimalFormScreen: React.FC<AnimalFormScreenProps> = ({
       const animalData = {
         name: formData.name,
         tagNumber: formData.tagNumber,
+        penNumber: formData.penNumber || undefined,
         species: formData.species as 'Cattle' | 'Goat' | 'Pig' | 'Sheep',
         breed: formData.breed,
         breeder: formData.breeder,
@@ -138,6 +140,17 @@ export const AnimalFormScreen: React.FC<AnimalFormScreenProps> = ({
             placeholder="Enter tag number"
           />
           {errors.tagNumber && <Text style={styles.errorText}>{errors.tagNumber}</Text>}
+        </View>
+
+        <View style={styles.inputGroup}>
+          <Text style={styles.label}>Pen Number</Text>
+          <TextInput
+            style={[styles.input, errors.penNumber && styles.inputError]}
+            value={formData.penNumber}
+            onChangeText={(text) => setFormData({ ...formData, penNumber: text })}
+            placeholder="Enter pen number (optional)"
+          />
+          {errors.penNumber && <Text style={styles.errorText}>{errors.penNumber}</Text>}
         </View>
 
         <FormPicker

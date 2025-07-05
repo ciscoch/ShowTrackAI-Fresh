@@ -147,11 +147,21 @@ export const AnimalListScreen: React.FC<AnimalListScreenProps> = ({
 
       <View style={styles.animalMainInfo}>
         <Text style={styles.animalName}>{item.name}</Text>
-        <View style={styles.tagContainer}>
-          <Text style={styles.tagLabel}>Tag:</Text>
-          <View style={styles.tagNumber}>
-            <Text style={styles.tagText}>{item.tagNumber}</Text>
+        <View style={styles.identificationContainer}>
+          <View style={styles.tagContainer}>
+            <Text style={styles.tagLabel}>Tag:</Text>
+            <View style={styles.tagNumber}>
+              <Text style={styles.tagText}>{item.tagNumber}</Text>
+            </View>
           </View>
+          {item.penNumber && (
+            <View style={styles.penContainer}>
+              <Text style={styles.penLabel}>Pen:</Text>
+              <View style={styles.penNumber}>
+                <Text style={styles.penText}>{item.penNumber}</Text>
+              </View>
+            </View>
+          )}
         </View>
       </View>
 
@@ -484,6 +494,12 @@ const styles = StyleSheet.create({
     color: '#1a202c',
     marginBottom: 8,
   },
+  identificationContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    flexWrap: 'wrap',
+  },
   tagContainer: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -501,6 +517,27 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
   tagText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: 'bold',
+  },
+  penContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  penLabel: {
+    fontSize: 14,
+    color: '#666',
+    fontWeight: '500',
+  },
+  penNumber: {
+    backgroundColor: '#28a745',
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  penText: {
     color: '#fff',
     fontSize: 12,
     fontWeight: 'bold',

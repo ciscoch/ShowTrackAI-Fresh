@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -8,6 +8,8 @@ import {
 } from 'react-native';
 import { useProfileStore } from '../../../core/stores/ProfileStore';
 import { QRCodeGenerator } from '../../qrcode/components/QRCodeGenerator';
+import { calendarService } from '../../../core/services/CalendarService';
+import { Event } from '../../../core/models/Event';
 
 interface EliteDashboardProps {
   onSwitchProfile: () => void;
@@ -19,6 +21,11 @@ interface EliteDashboardProps {
   onNavigateToJournal: () => void;
   onNavigateToFinancial: () => void;
   onNavigateToMedical: () => void;
+  onNavigateToCalendar: () => void;
+  onAddAnimal?: () => void;
+  onTakePhoto?: () => void;
+  onAddEvent?: () => void;
+  onNavigateToVetConnect?: () => void;
 }
 
 export const EliteDashboard: React.FC<EliteDashboardProps> = ({
@@ -31,9 +38,59 @@ export const EliteDashboard: React.FC<EliteDashboardProps> = ({
   onNavigateToJournal,
   onNavigateToFinancial,
   onNavigateToMedical,
+  onNavigateToCalendar,
+  onAddAnimal,
+  onTakePhoto,
+  onAddEvent,
+  onNavigateToVetConnect,
 }) => {
   const { currentProfile } = useProfileStore();
   const [showQRGenerator, setShowQRGenerator] = useState(false);
+  const [upcomingEvents, setUpcomingEvents] = useState<Event[]>([]);
+  const [countyShow, setCountyShow] = useState<Event | null>(null);
+  const [daysUntilCountyShow, setDaysUntilCountyShow] = useState<number>(0);
+
+  useEffect(() => {
+    if (currentProfile) {
+      loadCalendarData();
+    }
+  }, [currentProfile]);
+
+  const loadCalendarData = async () => {
+    if (!currentProfile) return;
+
+    try {
+      // Load upcoming events (next 7 days for dashboard preview)
+      const events = await calendarService.getUpcomingEvents(currentProfile.id, 7);
+      setUpcomingEvents(events.slice(0, 3)); // Show only first 3 events
+
+      // Load county show
+      const show = await calendarService.getCountyShow(currentProfile.id);
+      setCountyShow(show);
+      
+      if (show) {
+        const days = calendarService.getDaysUntilEvent(show.date);
+        setDaysUntilCountyShow(days);
+      }
+
+      // Create demo events if none exist
+      if (events.length === 0) {
+        await calendarService.createDemoEvents(currentProfile.id);
+        // Reload after creating demo events
+        const newEvents = await calendarService.getUpcomingEvents(currentProfile.id, 7);
+        setUpcomingEvents(newEvents.slice(0, 3));
+        
+        const newShow = await calendarService.getCountyShow(currentProfile.id);
+        setCountyShow(newShow);
+        if (newShow) {
+          const newDays = calendarService.getDaysUntilEvent(newShow.date);
+          setDaysUntilCountyShow(newDays);
+        }
+      }
+    } catch (error) {
+      console.error('Failed to load calendar data:', error);
+    }
+  };
 
   if (!currentProfile) {
     return (
@@ -111,6 +168,140 @@ export const EliteDashboard: React.FC<EliteDashboardProps> = ({
               <Text style={styles.statNote}>Elite rewards</Text>
             </View>
           </View>
+        </View>
+
+        {/* Upcoming Events & County Show Countdown */}
+        <View style={styles.calendarSection}>
+          <View style={styles.calendarHeader}>
+            <Text style={styles.sectionTitle}>📅 Student Project Management</Text>
+            <View style={styles.calendarActions}>
+              {onAddEvent && (
+                <TouchableOpacity onPress={onAddEvent} style={styles.addEventButton}>
+                  <Text style={styles.addEventText}>+ Event</Text>
+                </TouchableOpacity>
+              )}
+              <TouchableOpacity onPress={onNavigateToCalendar} style={styles.viewAllButton}>
+                <Text style={styles.viewAllText}>View All</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          {/* County Show Countdown */}
+          {countyShow && (
+            <View style={styles.countyShowCard}>
+              <View style={styles.countyShowHeader}>
+                <Text style={styles.countyShowIcon}>🏆</Text>
+                <View style={styles.countyShowInfo}>
+                  <Text style={styles.countyShowTitle}>Days until County Show</Text>
+                  <Text style={styles.countyShowDate}>
+                    {countyShow.date.toLocaleDateString()}
+                  </Text>
+                </View>
+              </View>
+              <View style={styles.countdownContainer}>
+                <Text style={styles.countdownNumber}>{daysUntilCountyShow}</Text>
+                <Text style={styles.countdownLabel}>
+                  {daysUntilCountyShow === 1 ? 'day' : 'days'}
+                </Text>
+              </View>
+            </View>
+          )}
+
+          {/* Upcoming Events Preview */}
+          <View style={styles.upcomingEventsCard}>
+            <Text style={styles.eventsTitle}>Upcoming Events</Text>
+            {upcomingEvents.length > 0 ? (
+              <View style={styles.eventsList}>
+                {upcomingEvents.map((event) => (
+                  <View key={event.id} style={styles.eventItem}>
+                    <View style={styles.eventDate}>
+                      <Text style={styles.eventDay}>
+                        {event.date.toLocaleDateString([], { day: 'numeric' })}
+                      </Text>
+                      <Text style={styles.eventMonth}>
+                        {event.date.toLocaleDateString([], { month: 'short' })}
+                      </Text>
+                    </View>
+                    <View style={styles.eventDetails}>
+                      <Text style={styles.eventTitle} numberOfLines={1}>
+                        {event.title}
+                      </Text>
+                      <Text style={styles.eventTime}>
+                        {event.isAllDay ? 'All Day' : event.date.toLocaleTimeString([], { 
+                          hour: 'numeric', 
+                          minute: '2-digit' 
+                        })}
+                      </Text>
+                      {event.location && (
+                        <Text style={styles.eventLocation} numberOfLines={1}>
+                          📍 {event.location}
+                        </Text>
+                      )}
+                    </View>
+                  </View>
+                ))}
+              </View>
+            ) : (
+              <View style={styles.noEventsContainer}>
+                <Text style={styles.noEventsText}>No upcoming events</Text>
+                <Text style={styles.noEventsSubtext}>Your schedule is clear!</Text>
+              </View>
+            )}
+          </View>
+        </View>
+
+        {/* VetConnect Feature - Highlighted */}
+        <View style={styles.vetConnectSection}>
+          <Text style={styles.sectionTitle}>🏥 VetConnect Platform</Text>
+          <Text style={styles.vetConnectSubtitle}>
+            AI-powered veterinary diagnostics with real-time professional consultations
+          </Text>
+          
+          <TouchableOpacity 
+            style={styles.vetConnectCard}
+            onPress={onNavigateToVetConnect}
+          >
+            <View style={styles.vetConnectHeader}>
+              <Text style={styles.vetConnectIcon}>🤖👨‍⚕️</Text>
+              <View style={styles.vetConnectInfo}>
+                <Text style={styles.vetConnectTitle}>AI Veterinary Assistant</Text>
+                <Text style={styles.vetConnectDescription}>
+                  Instant health assessments • Licensed vet consultations • Educational learning
+                </Text>
+              </View>
+              <Text style={styles.vetConnectArrow}>→</Text>
+            </View>
+            
+            <View style={styles.vetConnectFeatures}>
+              <View style={styles.vetConnectFeature}>
+                <Text style={styles.featureCheckmark}>✓</Text>
+                <Text style={styles.featureText}>Computer vision health scanning</Text>
+              </View>
+              <View style={styles.vetConnectFeature}>
+                <Text style={styles.featureCheckmark}>✓</Text>
+                <Text style={styles.featureText}>Smart diagnostic recommendations</Text>
+              </View>
+              <View style={styles.vetConnectFeature}>
+                <Text style={styles.featureCheckmark}>✓</Text>
+                <Text style={styles.featureText}>Real-time vet consultations</Text>
+              </View>
+            </View>
+            
+            <View style={styles.vetConnectStats}>
+              <View style={styles.statItem}>
+                <Text style={styles.statNumber}>91%</Text>
+                <Text style={styles.statLabel}>AI Accuracy</Text>
+              </View>
+              <View style={styles.statItem}>
+                <Text style={styles.statNumber}>12min</Text>
+                <Text style={styles.statLabel}>Avg Response</Text>
+              </View>
+              <View style={styles.statItem}>
+                <Text style={styles.statNumber}>4.8⭐</Text>
+                <Text style={styles.statLabel}>User Rating</Text>
+              </View>
+            </View>
+          </TouchableOpacity>
         </View>
 
         {/* Premium Features */}
@@ -246,7 +437,10 @@ export const EliteDashboard: React.FC<EliteDashboardProps> = ({
         <View style={styles.quickActionsCard}>
           <Text style={styles.quickActionsTitle}>⚡ Quick Actions</Text>
           <View style={styles.quickActionsList}>
-            <TouchableOpacity style={styles.quickAction}>
+            <TouchableOpacity 
+              style={styles.quickAction}
+              onPress={onAddAnimal || onNavigateToAnimals}
+            >
               <Text style={styles.quickActionIcon}>➕</Text>
               <Text style={styles.quickActionText}>Add Animal</Text>
             </TouchableOpacity>
@@ -259,12 +453,18 @@ export const EliteDashboard: React.FC<EliteDashboardProps> = ({
               <Text style={styles.quickActionText}>Log Activity</Text>
             </TouchableOpacity>
             
-            <TouchableOpacity style={styles.quickAction}>
+            <TouchableOpacity 
+              style={styles.quickAction}
+              onPress={onTakePhoto}
+            >
               <Text style={styles.quickActionIcon}>📸</Text>
               <Text style={styles.quickActionText}>Take Photo</Text>
             </TouchableOpacity>
             
-            <TouchableOpacity style={styles.quickAction}>
+            <TouchableOpacity 
+              style={styles.quickAction}
+              onPress={onNavigateToExport}
+            >
               <Text style={styles.quickActionIcon}>📊</Text>
               <Text style={styles.quickActionText}>Generate Report</Text>
             </TouchableOpacity>
@@ -669,5 +869,257 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 12,
     fontWeight: '500',
+  },
+  // Calendar Section Styles
+  calendarSection: {
+    marginBottom: 24,
+  },
+  calendarHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  calendarActions: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  addEventButton: {
+    backgroundColor: '#28a745',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 12,
+  },
+  addEventText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  viewAllButton: {
+    backgroundColor: '#007AFF',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 12,
+  },
+  viewAllText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  countyShowCard: {
+    backgroundColor: '#fff3cd',
+    borderRadius: 16,
+    padding: 20,
+    marginBottom: 16,
+    borderWidth: 2,
+    borderColor: '#ffc107',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  countyShowHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  countyShowIcon: {
+    fontSize: 24,
+    marginRight: 12,
+  },
+  countyShowInfo: {
+    flex: 1,
+  },
+  countyShowTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#856404',
+    marginBottom: 2,
+  },
+  countyShowDate: {
+    fontSize: 14,
+    color: '#856404',
+  },
+  countdownContainer: {
+    alignItems: 'center',
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 16,
+    marginTop: 8,
+  },
+  countdownNumber: {
+    fontSize: 32,
+    fontWeight: 'bold',
+    color: '#ffc107',
+    marginBottom: 4,
+  },
+  countdownLabel: {
+    fontSize: 14,
+    color: '#856404',
+    fontWeight: '500',
+  },
+  upcomingEventsCard: {
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    padding: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  eventsTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: 16,
+  },
+  eventsList: {
+    gap: 12,
+  },
+  eventItem: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    padding: 12,
+    backgroundColor: '#f8f9fa',
+    borderRadius: 12,
+  },
+  eventDate: {
+    backgroundColor: '#007AFF',
+    borderRadius: 8,
+    padding: 8,
+    alignItems: 'center',
+    marginRight: 12,
+    minWidth: 50,
+  },
+  eventDay: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#fff',
+  },
+  eventMonth: {
+    fontSize: 12,
+    color: '#fff',
+    fontWeight: '500',
+  },
+  eventDetails: {
+    flex: 1,
+  },
+  eventTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: 2,
+  },
+  eventTime: {
+    fontSize: 12,
+    color: '#666',
+    marginBottom: 2,
+  },
+  eventLocation: {
+    fontSize: 12,
+    color: '#666',
+  },
+  noEventsContainer: {
+    alignItems: 'center',
+    paddingVertical: 24,
+  },
+  noEventsText: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#666',
+    marginBottom: 4,
+  },
+  noEventsSubtext: {
+    fontSize: 14,
+    color: '#999',
+  },
+  // VetConnect Styles
+  vetConnectSection: {
+    marginBottom: 24,
+  },
+  vetConnectSubtitle: {
+    fontSize: 14,
+    color: '#666',
+    marginBottom: 16,
+    lineHeight: 20,
+  },
+  vetConnectCard: {
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    padding: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 6,
+    borderLeftWidth: 4,
+    borderLeftColor: '#28a745',
+  },
+  vetConnectHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  vetConnectIcon: {
+    fontSize: 32,
+    marginRight: 16,
+  },
+  vetConnectInfo: {
+    flex: 1,
+  },
+  vetConnectTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 4,
+  },
+  vetConnectDescription: {
+    fontSize: 12,
+    color: '#666',
+    lineHeight: 16,
+  },
+  vetConnectArrow: {
+    fontSize: 24,
+    color: '#28a745',
+    fontWeight: 'bold',
+  },
+  vetConnectFeatures: {
+    marginBottom: 16,
+    gap: 8,
+  },
+  vetConnectFeature: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  featureCheckmark: {
+    fontSize: 14,
+    color: '#28a745',
+    fontWeight: 'bold',
+  },
+  featureText: {
+    fontSize: 12,
+    color: '#333',
+    fontWeight: '500',
+  },
+  vetConnectStats: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    backgroundColor: '#f8fbff',
+    borderRadius: 12,
+    padding: 12,
+  },
+  statNumber: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#28a745',
+    textAlign: 'center',
+  },
+  statLabel: {
+    fontSize: 10,
+    color: '#666',
+    textAlign: 'center',
   },
 });

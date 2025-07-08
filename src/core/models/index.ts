@@ -8,3 +8,5 @@ export * from './TimeTracking';
 export * from './AETMapping';
 export * from './FFAProfiles';
 export * from './Profile';
+export * from './VetConnect';
+export * from './VeterinarianProfile';

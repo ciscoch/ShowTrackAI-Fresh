@@ -2,6 +2,7 @@ export interface Animal {
   id: string;
   name: string;
   tagNumber: string;
+  penNumber: string;
   species: 'Cattle' | 'Goat' | 'Pig' | 'Sheep';
   breed: string;
   breeder: string;
@@ -14,6 +15,7 @@ export interface Animal {
   notes?: string;
   createdAt: Date;
   updatedAt: Date;
+  owner_id?: string; // For backend compatibility - links animal to authenticated user
 }
 
 export interface CreateAnimalRequest extends Omit<Animal, 'id' | 'createdAt' | 'updatedAt' | 'healthStatus'> {}

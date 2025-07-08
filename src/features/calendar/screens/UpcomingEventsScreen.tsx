@@ -14,10 +14,12 @@ import { useProfileStore } from '../../../core/stores/ProfileStore';
 
 interface UpcomingEventsScreenProps {
   onBack: () => void;
+  onAddEvent?: () => void;
 }
 
 export const UpcomingEventsScreen: React.FC<UpcomingEventsScreenProps> = ({
   onBack,
+  onAddEvent,
 }) => {
   const { currentProfile } = useProfileStore();
   const [events, setEvents] = useState<Event[]>([]);
@@ -173,7 +175,11 @@ export const UpcomingEventsScreen: React.FC<UpcomingEventsScreenProps> = ({
           <Text style={styles.backButtonText}>← Back</Text>
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Upcoming Events</Text>
-        <View style={styles.headerSpacer} />
+        {onAddEvent && (
+          <TouchableOpacity onPress={onAddEvent} style={styles.addButton}>
+            <Text style={styles.addButtonText}>+ Add</Text>
+          </TouchableOpacity>
+        )}
       </View>
 
       <ScrollView 
@@ -227,8 +233,18 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#fff',
   },
-  headerSpacer: {
-    width: 60,
+  addButton: {
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.3)',
+  },
+  addButtonText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '600',
   },
   content: {
     flex: 1,

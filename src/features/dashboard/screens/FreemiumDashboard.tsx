@@ -17,6 +17,7 @@ interface FreemiumDashboardProps {
   onNavigateToAnimals: () => void;
   onNavigateToCalendar: () => void;
   onUpgrade: () => void;
+  onAddEvent?: () => void;
 }
 
 export const FreemiumDashboard: React.FC<FreemiumDashboardProps> = ({
@@ -25,6 +26,7 @@ export const FreemiumDashboard: React.FC<FreemiumDashboardProps> = ({
   onNavigateToAnimals,
   onNavigateToCalendar,
   onUpgrade,
+  onAddEvent,
 }) => {
   const { currentProfile, checkLimitations } = useProfileStore();
   const [showQRGenerator, setShowQRGenerator] = useState(false);
@@ -176,6 +178,14 @@ export const FreemiumDashboard: React.FC<FreemiumDashboardProps> = ({
               <View style={styles.featureStatus}>
                 <Text style={styles.availableText}>Available</Text>
               </View>
+              {onAddEvent && (
+                <TouchableOpacity 
+                  style={styles.addEventMini}
+                  onPress={onAddEvent}
+                >
+                  <Text style={styles.addEventMiniText}>+ Add Event</Text>
+                </TouchableOpacity>
+              )}
             </TouchableOpacity>
 
             <TouchableOpacity 
@@ -551,5 +561,18 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 14,
     fontWeight: '600',
+  },
+  addEventMini: {
+    marginTop: 8,
+    backgroundColor: '#28a745',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+  },
+  addEventMiniText: {
+    color: '#fff',
+    fontSize: 10,
+    fontWeight: '600',
+    textAlign: 'center',
   },
 });

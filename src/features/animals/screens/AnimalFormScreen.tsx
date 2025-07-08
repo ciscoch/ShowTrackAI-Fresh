@@ -253,9 +253,14 @@ export const AnimalFormScreen: React.FC<AnimalFormScreenProps> = ({
         <TouchableOpacity style={[styles.button, styles.cancelButton]} onPress={onCancel}>
           <Text style={[styles.buttonText, styles.cancelButtonText]}>Cancel</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={styles.button} onPress={handleSave}>
+        <TouchableOpacity 
+          style={[styles.button, isLoading && styles.disabledButton]} 
+          onPress={handleSave}
+          disabled={isLoading}
+        >
           <Text style={styles.buttonText}>
-            {animal ? 'Update Animal' : 'Add Animal'}
+            {isLoading ? 'Saving...' : (animal ? 'Update Animal' : 'Add Animal')}
+            {useBackend && user && ' (Backend)'}
           </Text>
         </TouchableOpacity>
       </View>
@@ -342,5 +347,8 @@ const styles = StyleSheet.create({
   },
   cancelButtonText: {
     color: '#007AFF',
+  },
+  disabledButton: {
+    opacity: 0.6,
   },
 });

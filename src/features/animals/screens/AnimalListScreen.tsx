@@ -4,6 +4,8 @@ import { Animal } from '../../../core/models';
 import { useAnimalStore } from '../../../core/stores';
 import { useProfileStore } from '../../../core/stores/ProfileStore';
 import { educatorStudentService } from '../../../core/services/EducatorStudentService';
+import { useAuth } from '../../../core/contexts/AuthContext';
+import { useSupabaseBackend } from '../../../core/hooks/useSupabaseBackend';
 
 interface AnimalListScreenProps {
   onAddAnimal?: () => void;
@@ -22,18 +24,25 @@ export const AnimalListScreen: React.FC<AnimalListScreenProps> = ({
   onBack,
   isReadOnly = false,
 }) => {
-  const { animals, loadAnimals, deleteAnimal, error } = useAnimalStore();
+  const { animals, loadAnimals, deleteAnimal, error, isLoading } = useAnimalStore();
   const { currentProfile } = useProfileStore();
+  const { user, profile } = useAuth();
+  const { isEnabled: useBackend } = useSupabaseBackend();
   const [filteredAnimals, setFilteredAnimals] = useState<Animal[]>([]);
   const [isLoadingFiltered, setIsLoadingFiltered] = useState(false);
 
   useEffect(() => {
-    if (isReadOnly && currentProfile?.type === 'educator') {
+    if (useBackend && !user) {
+      // Don't load animals if using backend but not authenticated
+      return;
+    }
+    
+    if (isReadOnly && (currentProfile?.type === 'educator' || profile?.role === 'educator')) {
       loadEducatorAnimals();
     } else {
       loadAnimals();
     }
-  }, [loadAnimals, isReadOnly, currentProfile]);
+  }, [loadAnimals, isReadOnly, currentProfile, user, profile, useBackend]);
 
   useEffect(() => {
     if (!isReadOnly) {
@@ -42,21 +51,32 @@ export const AnimalListScreen: React.FC<AnimalListScreenProps> = ({
   }, [animals, isReadOnly]);
 
   const loadEducatorAnimals = async () => {
-    if (!currentProfile || currentProfile.type !== 'educator') return;
+    const activeProfile = profile || currentProfile;
+    if (!activeProfile || (activeProfile.type !== 'educator' && activeProfile.role !== 'educator')) return;
     
     try {
       setIsLoadingFiltered(true);
-      const students = await educatorStudentService.getStudentsForEducator(currentProfile.id);
-      const allStudentAnimals: Animal[] = [];
       
-      for (const student of students) {
-        const studentRecord = await educatorStudentService.getStudentRecord(student.id, currentProfile.id);
-        if (studentRecord) {
-          allStudentAnimals.push(...studentRecord.animals);
+      if (useBackend && profile) {
+        // For backend: Load students linked to this educator
+        // TODO: Implement proper educator-student relationship queries
+        // For now, load all animals (would need proper filtering in production)
+        await loadAnimals();
+        setFilteredAnimals(animals);
+      } else {
+        // For local storage: Use existing local service
+        const students = await educatorStudentService.getStudentsForEducator(activeProfile.id);
+        const allStudentAnimals: Animal[] = [];
+        
+        for (const student of students) {
+          const studentRecord = await educatorStudentService.getStudentRecord(student.id, activeProfile.id);
+          if (studentRecord) {
+            allStudentAnimals.push(...studentRecord.animals);
+          }
         }
+        
+        setFilteredAnimals(allStudentAnimals);
       }
-      
-      setFilteredAnimals(allStudentAnimals);
     } catch (error) {
       console.error('Failed to load educator animals:', error);
       setFilteredAnimals([]);
@@ -229,24 +249,25 @@ export const AnimalListScreen: React.FC<AnimalListScreenProps> = ({
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
-        <View style={styles.headerLeft}>
-          {onBack && (
-            <TouchableOpacity style={styles.backButton} onPress={onBack}>
-              <Text style={styles.backButtonText}>← Back</Text>
-            </TouchableOpacity>
-          )}
-          <View style={styles.titleContainer}>
-            <Text style={styles.title}>{isReadOnly ? 'Student Animals' : 'My Animals'}</Text>
-            <View style={styles.countBadge}>
-              <Text style={styles.countText}>{filteredAnimals.length}</Text>
-            </View>
-          </View>
-        </View>
-        {!isReadOnly && onAddAnimal && (
-          <TouchableOpacity style={styles.addButton} onPress={onAddAnimal}>
-            <Text style={styles.addButtonIcon}>+</Text>
-            <Text style={styles.addButtonText}>Add Animal</Text>
+        {onBack && (
+          <TouchableOpacity style={styles.backButton} onPress={onBack}>
+            <Text style={styles.backButtonText}>← Back</Text>
           </TouchableOpacity>
+        )}
+        <View style={styles.titleContainer}>
+          <Text style={styles.title}>
+            {isReadOnly ? 'Student Animals' : 'My Animals'}
+            {useBackend && user && (
+              <Text style={styles.authIndicator}> (Authenticated)</Text>
+            )}
+          </Text>
+        </View>
+        {!isReadOnly && onAddAnimal ? (
+          <TouchableOpacity style={styles.addButton} onPress={onAddAnimal}>
+            <Text style={styles.addButtonText}>+ Add Animal</Text>
+          </TouchableOpacity>
+        ) : (
+          <View style={styles.headerSpacer} />
         )}
       </View>
 
@@ -256,6 +277,15 @@ export const AnimalListScreen: React.FC<AnimalListScreenProps> = ({
             <Text style={styles.errorIcon}>⚠️</Text>
           </View>
           <Text style={styles.errorText}>{error}</Text>
+        </View>
+      )}
+      
+      {useBackend && !user && (
+        <View style={styles.warningContainer}>
+          <View style={styles.warningIconContainer}>
+            <Text style={styles.warningIcon}>🔒</Text>
+          </View>
+          <Text style={styles.warningText}>Please sign in to access your animals</Text>
         </View>
       )}
 
@@ -314,13 +344,7 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 8,
   },
-  headerLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-  },
   backButton: {
-    marginRight: 16,
     paddingVertical: 8,
     paddingHorizontal: 12,
     borderRadius: 12,
@@ -334,43 +358,29 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   titleContainer: {
-    flexDirection: 'row',
+    flex: 1,
     alignItems: 'center',
-    gap: 8,
   },
   title: {
-    fontSize: 24,
+    fontSize: 20,
     fontWeight: 'bold',
     color: '#fff',
   },
-  countBadge: {
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    borderRadius: 12,
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    minWidth: 24,
-    alignItems: 'center',
-  },
-  countText: {
-    color: '#fff',
+  authIndicator: {
     fontSize: 12,
-    fontWeight: 'bold',
+    fontWeight: 'normal',
+    color: 'rgba(255, 255, 255, 0.8)',
+  },
+  headerSpacer: {
+    width: 100,
   },
   addButton: {
     backgroundColor: 'rgba(255, 255, 255, 0.2)',
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.3)',
-    paddingVertical: 10,
+    paddingVertical: 8,
     paddingHorizontal: 16,
-    borderRadius: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  addButtonIcon: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: 'bold',
+    borderRadius: 12,
   },
   addButtonText: {
     color: '#fff',
@@ -692,6 +702,34 @@ const styles = StyleSheet.create({
   },
   errorText: {
     color: '#d63031',
+    fontSize: 14,
+    flex: 1,
+    fontWeight: '500',
+  },
+  warningContainer: {
+    backgroundColor: '#fff3cd',
+    borderColor: '#ffeaa7',
+    borderWidth: 1,
+    borderRadius: 12,
+    padding: 16,
+    margin: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  warningIconContainer: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#ffeaa7',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  warningIcon: {
+    fontSize: 16,
+  },
+  warningText: {
+    color: '#856404',
     fontSize: 14,
     flex: 1,
     fontWeight: '500',

@@ -24,6 +24,8 @@ interface EliteDashboardProps {
   onNavigateToCalendar: () => void;
   onAddAnimal?: () => void;
   onTakePhoto?: () => void;
+  onAddEvent?: () => void;
+  onNavigateToVetConnect?: () => void;
 }
 
 export const EliteDashboard: React.FC<EliteDashboardProps> = ({
@@ -39,6 +41,8 @@ export const EliteDashboard: React.FC<EliteDashboardProps> = ({
   onNavigateToCalendar,
   onAddAnimal,
   onTakePhoto,
+  onAddEvent,
+  onNavigateToVetConnect,
 }) => {
   const { currentProfile } = useProfileStore();
   const [showQRGenerator, setShowQRGenerator] = useState(false);
@@ -170,9 +174,16 @@ export const EliteDashboard: React.FC<EliteDashboardProps> = ({
         <View style={styles.calendarSection}>
           <View style={styles.calendarHeader}>
             <Text style={styles.sectionTitle}>📅 Student Project Management</Text>
-            <TouchableOpacity onPress={onNavigateToCalendar} style={styles.viewAllButton}>
-              <Text style={styles.viewAllText}>View All</Text>
-            </TouchableOpacity>
+            <View style={styles.calendarActions}>
+              {onAddEvent && (
+                <TouchableOpacity onPress={onAddEvent} style={styles.addEventButton}>
+                  <Text style={styles.addEventText}>+ Event</Text>
+                </TouchableOpacity>
+              )}
+              <TouchableOpacity onPress={onNavigateToCalendar} style={styles.viewAllButton}>
+                <Text style={styles.viewAllText}>View All</Text>
+              </TouchableOpacity>
+            </View>
           </View>
 
           {/* County Show Countdown */}
@@ -237,6 +248,60 @@ export const EliteDashboard: React.FC<EliteDashboardProps> = ({
               </View>
             )}
           </View>
+        </View>
+
+        {/* VetConnect Feature - Highlighted */}
+        <View style={styles.vetConnectSection}>
+          <Text style={styles.sectionTitle}>🏥 VetConnect Platform</Text>
+          <Text style={styles.vetConnectSubtitle}>
+            AI-powered veterinary diagnostics with real-time professional consultations
+          </Text>
+          
+          <TouchableOpacity 
+            style={styles.vetConnectCard}
+            onPress={onNavigateToVetConnect}
+          >
+            <View style={styles.vetConnectHeader}>
+              <Text style={styles.vetConnectIcon}>🤖👨‍⚕️</Text>
+              <View style={styles.vetConnectInfo}>
+                <Text style={styles.vetConnectTitle}>AI Veterinary Assistant</Text>
+                <Text style={styles.vetConnectDescription}>
+                  Instant health assessments • Licensed vet consultations • Educational learning
+                </Text>
+              </View>
+              <Text style={styles.vetConnectArrow}>→</Text>
+            </View>
+            
+            <View style={styles.vetConnectFeatures}>
+              <View style={styles.vetConnectFeature}>
+                <Text style={styles.featureCheckmark}>✓</Text>
+                <Text style={styles.featureText}>Computer vision health scanning</Text>
+              </View>
+              <View style={styles.vetConnectFeature}>
+                <Text style={styles.featureCheckmark}>✓</Text>
+                <Text style={styles.featureText}>Smart diagnostic recommendations</Text>
+              </View>
+              <View style={styles.vetConnectFeature}>
+                <Text style={styles.featureCheckmark}>✓</Text>
+                <Text style={styles.featureText}>Real-time vet consultations</Text>
+              </View>
+            </View>
+            
+            <View style={styles.vetConnectStats}>
+              <View style={styles.statItem}>
+                <Text style={styles.statNumber}>91%</Text>
+                <Text style={styles.statLabel}>AI Accuracy</Text>
+              </View>
+              <View style={styles.statItem}>
+                <Text style={styles.statNumber}>12min</Text>
+                <Text style={styles.statLabel}>Avg Response</Text>
+              </View>
+              <View style={styles.statItem}>
+                <Text style={styles.statNumber}>4.8⭐</Text>
+                <Text style={styles.statLabel}>User Rating</Text>
+              </View>
+            </View>
+          </TouchableOpacity>
         </View>
 
         {/* Premium Features */}
@@ -815,6 +880,21 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 16,
   },
+  calendarActions: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  addEventButton: {
+    backgroundColor: '#28a745',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 12,
+  },
+  addEventText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '600',
+  },
   viewAllButton: {
     backgroundColor: '#007AFF',
     paddingHorizontal: 12,
@@ -954,5 +1034,92 @@ const styles = StyleSheet.create({
   noEventsSubtext: {
     fontSize: 14,
     color: '#999',
+  },
+  // VetConnect Styles
+  vetConnectSection: {
+    marginBottom: 24,
+  },
+  vetConnectSubtitle: {
+    fontSize: 14,
+    color: '#666',
+    marginBottom: 16,
+    lineHeight: 20,
+  },
+  vetConnectCard: {
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    padding: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 6,
+    borderLeftWidth: 4,
+    borderLeftColor: '#28a745',
+  },
+  vetConnectHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  vetConnectIcon: {
+    fontSize: 32,
+    marginRight: 16,
+  },
+  vetConnectInfo: {
+    flex: 1,
+  },
+  vetConnectTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 4,
+  },
+  vetConnectDescription: {
+    fontSize: 12,
+    color: '#666',
+    lineHeight: 16,
+  },
+  vetConnectArrow: {
+    fontSize: 24,
+    color: '#28a745',
+    fontWeight: 'bold',
+  },
+  vetConnectFeatures: {
+    marginBottom: 16,
+    gap: 8,
+  },
+  vetConnectFeature: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  featureCheckmark: {
+    fontSize: 14,
+    color: '#28a745',
+    fontWeight: 'bold',
+  },
+  featureText: {
+    fontSize: 12,
+    color: '#333',
+    fontWeight: '500',
+  },
+  vetConnectStats: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    backgroundColor: '#f8fbff',
+    borderRadius: 12,
+    padding: 12,
+  },
+  statNumber: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#28a745',
+    textAlign: 'center',
+  },
+  statLabel: {
+    fontSize: 10,
+    color: '#666',
+    textAlign: 'center',
   },
 });

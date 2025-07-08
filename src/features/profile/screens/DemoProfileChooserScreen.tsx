@@ -10,12 +10,15 @@ import {
 } from 'react-native';
 import { useProfileStore } from '../../../core/stores/ProfileStore';
 import { UserProfile, PROFILE_TYPES } from '../../../core/models/Profile';
+import { veterinarianService } from '../../../core/services/VeterinarianService';
 
 interface DemoProfileChooserScreenProps {
   onProfileSelected: (profile: UserProfile) => void;
   onCreateCustomProfile: () => void;
   onShowSettings?: () => void;
   onObserverAccess?: () => void;
+  onVeterinarianAccess?: () => void;
+  onVeterinarianDemo?: (veterinarianId: string) => void;
 }
 
 export const DemoProfileChooserScreen: React.FC<DemoProfileChooserScreenProps> = ({
@@ -23,6 +26,8 @@ export const DemoProfileChooserScreen: React.FC<DemoProfileChooserScreenProps> =
   onCreateCustomProfile,
   onShowSettings,
   onObserverAccess,
+  onVeterinarianAccess,
+  onVeterinarianDemo,
 }) => {
   const { 
     profiles, 
@@ -205,6 +210,45 @@ export const DemoProfileChooserScreen: React.FC<DemoProfileChooserScreenProps> =
         >
           <Text style={styles.actionButtonIcon}>👥</Text>
           <Text style={styles.actionButtonText}>Observer Access</Text>
+        </TouchableOpacity>
+      )}
+
+      {onVeterinarianAccess && (
+        <TouchableOpacity
+          style={[styles.actionButton, styles.vetButton]}
+          onPress={onVeterinarianAccess}
+        >
+          <Text style={styles.actionButtonIcon}>🩺</Text>
+          <Text style={styles.actionButtonText}>Veterinarian Portal</Text>
+        </TouchableOpacity>
+      )}
+
+      {onVeterinarianDemo && (
+        <TouchableOpacity
+          style={[styles.actionButton, styles.vetDemoButton]}
+          onPress={async () => {
+            try {
+              setLoading(true);
+              // Create demo veterinarian and go directly to dashboard
+              await veterinarianService.createDemoVeterinarians();
+              // Get the first demo vet ID 
+              const profiles = await veterinarianService.loadVeterinarianProfiles();
+              if (profiles.length > 0) {
+                onVeterinarianDemo(profiles[0].id);
+              }
+            } catch (error) {
+              console.error('Failed to create demo veterinarian:', error);
+              Alert.alert('Error', 'Failed to create demo veterinarian');
+            } finally {
+              setLoading(false);
+            }
+          }}
+          disabled={loading}
+        >
+          <Text style={styles.actionButtonIcon}>⚡</Text>
+          <Text style={styles.actionButtonText}>
+            {loading ? 'Setting up...' : 'Quick Vet Demo'}
+          </Text>
         </TouchableOpacity>
       )}
 
@@ -651,6 +695,12 @@ const styles = StyleSheet.create({
   },
   observerButton: {
     backgroundColor: '#17a2b8',
+  },
+  vetButton: {
+    backgroundColor: '#34C759',
+  },
+  vetDemoButton: {
+    backgroundColor: '#FF9500',
   },
   actionButtonIcon: {
     fontSize: 16,

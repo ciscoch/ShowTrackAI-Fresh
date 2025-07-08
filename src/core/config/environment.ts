@@ -77,7 +77,7 @@ const defaultConfig: EnvironmentConfig = {
   
   supabase: {
     url: 'https://zifbuzsdhparxlhsifdi.supabase.co',
-    anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InppZmJ1enNkaHBhcnhsaHNpZmRpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTE5MjY2NTIsImV4cCI6MjA2NzUwMjY1Mn0.GD_W57Wgt2-5Gp9GGVOyiuxSfhdP_ZXtiXwCkOMjt40',
+    anonKey: '', // Use environment variable only
   },
   
   openai: {
@@ -125,8 +125,8 @@ const environments = {
     
     supabase: {
       url: process.env.EXPO_PUBLIC_SUPABASE_URL || 'https://zifbuzsdhparxlhsifdi.supabase.co',
-      anonKey: process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InppZmJ1enNkaHBhcnhsaHNpZmRpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTE5MjY2NTIsImV4cCI6MjA2NzUwMjY1Mn0.GD_W57Wgt2-5Gp9GGVOyiuxSfhdP_ZXtiXwCkOMjt40',
-      serviceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InppZmJ1enNkaHBhcnhsaHNpZmRpIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc1MTkyNjY1MiwiZXhwIjoyMDY3NTAyNjUyfQ.Hjr1Gf6IOMnMwUWrcAY2CLJ_ang6gSMw3WXk8LaKYL0',
+      anonKey: process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || '',
+      serviceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY || '',
     },
     
     openai: {

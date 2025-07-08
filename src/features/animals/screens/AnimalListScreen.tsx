@@ -129,11 +129,8 @@ export const AnimalListScreen: React.FC<AnimalListScreenProps> = ({
   };
 
   const renderAnimal = ({ item }: { item: Animal }) => (
-    <TouchableOpacity 
-      style={styles.animalCard}
-      onPress={() => onViewAnimal(item)}
-      activeOpacity={0.7}
-    >
+    <View style={styles.animalCard}>
+      {/* Card Header */}
       <View style={styles.cardHeader}>
         <View style={styles.animalIconContainer}>
           <Text style={styles.animalEmoji}>{getAnimalEmoji(item.species)}</Text>
@@ -145,19 +142,15 @@ export const AnimalListScreen: React.FC<AnimalListScreenProps> = ({
           <View style={styles.cardActions}>
             <TouchableOpacity 
               style={styles.actionButton}
-              onPress={(e) => {
-                e.stopPropagation();
-                onEditAnimal?.(item);
-              }}
+              onPress={() => onEditAnimal?.(item)}
+              activeOpacity={0.7}
             >
               <Text style={styles.actionIcon}>✏️</Text>
             </TouchableOpacity>
             <TouchableOpacity 
               style={[styles.actionButton, styles.deleteAction]}
-              onPress={(e) => {
-                e.stopPropagation();
-                handleDeleteAnimal(item);
-              }}
+              onPress={() => handleDeleteAnimal(item)}
+              activeOpacity={0.7}
             >
               <Text style={styles.actionIcon}>🗑️</Text>
             </TouchableOpacity>
@@ -165,55 +158,99 @@ export const AnimalListScreen: React.FC<AnimalListScreenProps> = ({
         )}
       </View>
 
-      <View style={styles.animalMainInfo}>
-        <Text style={styles.animalName}>{item.name}</Text>
-        <View style={styles.identificationContainer}>
-          <View style={styles.tagContainer}>
-            <Text style={styles.tagLabel}>Tag:</Text>
-            <View style={styles.tagNumber}>
-              <Text style={styles.tagText}>{item.tagNumber}</Text>
+      {/* Main touchable area for animal details */}
+      <TouchableOpacity 
+        style={styles.cardMainContent}
+        onPress={() => onViewAnimal(item)}
+        activeOpacity={0.7}
+      >
+        <View style={styles.animalMainInfo}>
+          <Text style={styles.animalName}>{item.name}</Text>
+          <View style={styles.identificationContainer}>
+            <View style={styles.tagContainer}>
+              <Text style={styles.tagLabel}>Tag:</Text>
+              <View style={styles.tagNumber}>
+                <Text style={styles.tagText}>{item.tagNumber}</Text>
+              </View>
             </View>
-          </View>
-          <View style={styles.penContainer}>
-            <Text style={styles.penLabel}>Pen:</Text>
-            <View style={styles.penNumber}>
-              <Text style={styles.penText}>{item.penNumber}</Text>
+            <View style={styles.penContainer}>
+              <Text style={styles.penLabel}>Pen:</Text>
+              <View style={styles.penNumber}>
+                <Text style={styles.penText}>{item.penNumber}</Text>
+              </View>
             </View>
           </View>
         </View>
-      </View>
 
-      <View style={styles.animalDetails}>
-        <View style={styles.detailRow}>
-          <Text style={styles.detailIcon}>🏷️</Text>
-          <Text style={styles.detailLabel}>Breed:</Text>
-          <Text style={styles.detailValue}>{item.breed}</Text>
+        <View style={styles.animalDetails}>
+          <View style={styles.detailRow}>
+            <Text style={styles.detailIcon}>🏷️</Text>
+            <Text style={styles.detailLabel}>Breed:</Text>
+            <Text style={styles.detailValue}>{item.breed}</Text>
+          </View>
+          {item.dateOfBirth && (
+            <View style={styles.detailRow}>
+              <Text style={styles.detailIcon}>🎂</Text>
+              <Text style={styles.detailLabel}>Born:</Text>
+              <Text style={styles.detailValue}>
+                {new Date(item.dateOfBirth).toLocaleDateString()}
+              </Text>
+            </View>
+          )}
+          {item.weight && (
+            <View style={styles.detailRow}>
+              <Text style={styles.detailIcon}>⚖️</Text>
+              <Text style={styles.detailLabel}>Weight:</Text>
+              <Text style={styles.detailValue}>{item.weight} lbs</Text>
+            </View>
+          )}
         </View>
-        {item.dateOfBirth && (
-          <View style={styles.detailRow}>
-            <Text style={styles.detailIcon}>🎂</Text>
-            <Text style={styles.detailLabel}>Born:</Text>
-            <Text style={styles.detailValue}>
-              {new Date(item.dateOfBirth).toLocaleDateString()}
-            </Text>
-          </View>
-        )}
-        {item.weight && (
-          <View style={styles.detailRow}>
-            <Text style={styles.detailIcon}>⚖️</Text>
-            <Text style={styles.detailLabel}>Weight:</Text>
-            <Text style={styles.detailValue}>{item.weight} lbs</Text>
-          </View>
-        )}
-      </View>
 
-      <View style={styles.cardFooter}>
-        <TouchableOpacity style={styles.viewDetailsButton}>
-          <Text style={styles.viewDetailsText}>Tap to view details</Text>
-          <Text style={styles.arrowIcon}>→</Text>
+        {/* Clear call-to-action footer */}
+        <View style={styles.cardFooter}>
+          <View style={styles.viewDetailsButton}>
+            <Text style={styles.viewDetailsText}>👆 Tap anywhere to view details</Text>
+            <Text style={styles.arrowIcon}>→</Text>
+          </View>
+        </View>
+      </TouchableOpacity>
+
+      {/* Quick Action Bar */}
+      <View style={styles.quickActionBar}>
+        <TouchableOpacity 
+          style={styles.quickAction}
+          onPress={() => onViewAnimal(item)}
+          activeOpacity={0.7}
+        >
+          <Text style={styles.quickActionIcon}>👁️</Text>
+          <Text style={styles.quickActionText}>View</Text>
         </TouchableOpacity>
+        
+        {!isReadOnly && (
+          <>
+            <View style={styles.quickActionDivider} />
+            <TouchableOpacity 
+              style={styles.quickAction}
+              onPress={() => onEditAnimal?.(item)}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.quickActionIcon}>✏️</Text>
+              <Text style={styles.quickActionText}>Edit</Text>
+            </TouchableOpacity>
+            
+            <View style={styles.quickActionDivider} />
+            <TouchableOpacity 
+              style={styles.quickAction}
+              onPress={() => onViewHealthRecords?.(item)}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.quickActionIcon}>🏥</Text>
+              <Text style={styles.quickActionText}>Health</Text>
+            </TouchableOpacity>
+          </>
+        )}
       </View>
-    </TouchableOpacity>
+    </View>
   );
 
   const renderEmptyState = () => (
@@ -438,7 +475,6 @@ const styles = StyleSheet.create({
   animalCard: {
     backgroundColor: '#fff',
     borderRadius: 20,
-    padding: 20,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.12,
@@ -446,12 +482,18 @@ const styles = StyleSheet.create({
     elevation: 6,
     borderWidth: 1,
     borderColor: '#f0f0f0',
+    overflow: 'hidden',
   },
   cardHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
-    marginBottom: 16,
+    padding: 20,
+    paddingBottom: 12,
+  },
+  cardMainContent: {
+    paddingHorizontal: 20,
+    paddingBottom: 16,
   },
   animalIconContainer: {
     flexDirection: 'row',
@@ -477,21 +519,26 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   actionButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     backgroundColor: '#f8f9fa',
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 1,
     borderColor: '#e9ecef',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
   },
   deleteAction: {
     backgroundColor: '#fff5f5',
     borderColor: '#ffe6e6',
   },
   actionIcon: {
-    fontSize: 16,
+    fontSize: 18,
   },
   animalMainInfo: {
     marginBottom: 16,
@@ -577,24 +624,54 @@ const styles = StyleSheet.create({
   },
   cardFooter: {
     borderTopWidth: 1,
-    borderTopColor: '#f0f0f0',
+    borderTopColor: '#f8f9fa',
     paddingTop: 12,
+    backgroundColor: '#f8f9fa',
   },
   viewDetailsButton: {
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
     gap: 8,
+    paddingVertical: 8,
   },
   viewDetailsText: {
-    fontSize: 14,
-    color: '#007AFF',
-    fontWeight: '600',
+    fontSize: 12,
+    color: '#666',
+    fontWeight: '500',
+    fontStyle: 'italic',
   },
   arrowIcon: {
-    fontSize: 14,
-    color: '#007AFF',
+    fontSize: 12,
+    color: '#666',
     fontWeight: 'bold',
+  },
+  quickActionBar: {
+    flexDirection: 'row',
+    borderTopWidth: 1,
+    borderTopColor: '#e9ecef',
+    backgroundColor: '#f8f9fa',
+  },
+  quickAction: {
+    flex: 1,
+    paddingVertical: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+  },
+  quickActionDivider: {
+    width: 1,
+    backgroundColor: '#e9ecef',
+  },
+  quickActionIcon: {
+    fontSize: 16,
+  },
+  quickActionText: {
+    fontSize: 10,
+    color: '#666',
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
   emptyState: {
     flex: 1,

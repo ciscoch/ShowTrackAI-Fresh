@@ -10,6 +10,82 @@ import { Animal } from '../../models/Animal';
 export class SupabaseAnimalAdapter implements IAnimalService {
   private supabase = getSupabaseClient();
 
+  // Map database fields to frontend model
+  private mapDbToAnimal(dbAnimal: any): Animal {
+    return {
+      id: dbAnimal.id,
+      name: dbAnimal.name,
+      tagNumber: dbAnimal.tag_number || dbAnimal.ear_tag || '',
+      penNumber: dbAnimal.pen_number || 'Pen-1',
+      species: this.mapSpecies(dbAnimal.species),
+      breed: dbAnimal.breed || '',
+      breeder: dbAnimal.breeder || '',
+      birthDate: dbAnimal.birth_date ? new Date(dbAnimal.birth_date) : undefined,
+      pickupDate: dbAnimal.pickup_date ? new Date(dbAnimal.pickup_date) : undefined,
+      projectType: dbAnimal.project_type || 'Market',
+      acquisitionCost: dbAnimal.acquisition_cost || 0,
+      weight: dbAnimal.current_weight,
+      healthStatus: this.mapHealthStatus(dbAnimal.health_status),
+      notes: dbAnimal.notes,
+      createdAt: new Date(dbAnimal.created_at),
+      updatedAt: new Date(dbAnimal.updated_at),
+      owner_id: dbAnimal.owner_id,
+    };
+  }
+
+  // Map frontend model to database fields
+  private mapAnimalToDb(animal: Partial<Animal>): any {
+    const dbAnimal: any = {};
+    
+    if (animal.name !== undefined) dbAnimal.name = animal.name;
+    if (animal.tagNumber !== undefined) dbAnimal.tag_number = animal.tagNumber;
+    if (animal.penNumber !== undefined) dbAnimal.pen_number = animal.penNumber;
+    if (animal.species !== undefined) dbAnimal.species = animal.species.toLowerCase();
+    if (animal.breed !== undefined) dbAnimal.breed = animal.breed;
+    if (animal.breeder !== undefined) dbAnimal.breeder = animal.breeder;
+    if (animal.birthDate !== undefined) dbAnimal.birth_date = animal.birthDate;
+    if (animal.pickupDate !== undefined) dbAnimal.pickup_date = animal.pickupDate;
+    if (animal.projectType !== undefined) dbAnimal.project_type = animal.projectType;
+    if (animal.acquisitionCost !== undefined) dbAnimal.acquisition_cost = animal.acquisitionCost;
+    if (animal.weight !== undefined) dbAnimal.current_weight = animal.weight;
+    if (animal.healthStatus !== undefined) dbAnimal.health_status = this.mapHealthStatusToDb(animal.healthStatus);
+    if (animal.notes !== undefined) dbAnimal.notes = animal.notes;
+    
+    return dbAnimal;
+  }
+
+  private mapSpecies(dbSpecies: string): Animal['species'] {
+    const speciesMap: { [key: string]: Animal['species'] } = {
+      'cattle': 'Cattle',
+      'sheep': 'Sheep',
+      'swine': 'Pig',
+      'goats': 'Goat',
+      'pig': 'Pig',
+      'goat': 'Goat',
+    };
+    return speciesMap[dbSpecies?.toLowerCase()] || 'Cattle';
+  }
+
+  private mapHealthStatus(dbStatus: string): Animal['healthStatus'] {
+    const statusMap: { [key: string]: Animal['healthStatus'] } = {
+      'healthy': 'Healthy',
+      'minor_concern': 'Under Treatment',
+      'needs_attention': 'Sick',
+      'critical': 'Injured',
+    };
+    return statusMap[dbStatus] || 'Healthy';
+  }
+
+  private mapHealthStatusToDb(status: Animal['healthStatus']): string {
+    const statusMap: { [key: string]: string } = {
+      'Healthy': 'healthy',
+      'Sick': 'needs_attention',
+      'Injured': 'critical',
+      'Under Treatment': 'minor_concern',
+    };
+    return statusMap[status] || 'healthy';
+  }
+
   async getAnimals(): Promise<Animal[]> {
     try {
       const user = await getCurrentUser();
@@ -27,7 +103,7 @@ export class SupabaseAnimalAdapter implements IAnimalService {
         throw new Error(`Failed to fetch animals: ${error.message}`);
       }
 
-      return data || [];
+      return (data || []).map(dbAnimal => this.mapDbToAnimal(dbAnimal));
     } catch (error) {
       console.error('SupabaseAnimalAdapter.getAnimals error:', error);
       throw error;
@@ -55,7 +131,7 @@ export class SupabaseAnimalAdapter implements IAnimalService {
         throw new Error(`Failed to fetch animal: ${error.message}`);
       }
 
-      return data;
+      return this.mapDbToAnimal(data);
     } catch (error) {
       console.error('SupabaseAnimalAdapter.getAnimal error:', error);
       throw error;
@@ -69,15 +145,12 @@ export class SupabaseAnimalAdapter implements IAnimalService {
         throw new Error('User not authenticated');
       }
 
-      const newAnimal = {
-        ...animal,
-        owner_id: user.id,
-        health_status: animal.health_status || 'healthy',
-      };
+      const dbAnimal = this.mapAnimalToDb(animal);
+      dbAnimal.owner_id = user.id;
 
       const { data, error } = await this.supabase
         .from('animals')
-        .insert(newAnimal)
+        .insert(dbAnimal)
         .select()
         .single();
 
@@ -85,7 +158,7 @@ export class SupabaseAnimalAdapter implements IAnimalService {
         throw new Error(`Failed to create animal: ${error.message}`);
       }
 
-      return data;
+      return this.mapDbToAnimal(data);
     } catch (error) {
       console.error('SupabaseAnimalAdapter.createAnimal error:', error);
       throw error;
@@ -99,9 +172,12 @@ export class SupabaseAnimalAdapter implements IAnimalService {
         throw new Error('User not authenticated');
       }
 
+      const dbUpdates = this.mapAnimalToDb(updates);
+      dbUpdates.updated_at = new Date().toISOString();
+
       const { data, error } = await this.supabase
         .from('animals')
-        .update(updates)
+        .update(dbUpdates)
         .eq('id', id)
         .eq('owner_id', user.id)
         .select()
@@ -115,7 +191,7 @@ export class SupabaseAnimalAdapter implements IAnimalService {
         throw new Error('Animal not found or access denied');
       }
 
-      return data;
+      return this.mapDbToAnimal(data);
     } catch (error) {
       console.error('SupabaseAnimalAdapter.updateAnimal error:', error);
       throw error;

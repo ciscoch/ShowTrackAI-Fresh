@@ -4,6 +4,8 @@ import { Animal, SPECIES_OPTIONS, BREED_OPTIONS, PROJECT_TYPES } from '../../../
 import { useAnimalStore } from '../../../core/stores';
 import { FormPicker } from '../../../shared/components/FormPicker';
 import { DatePicker } from '../../../shared/components/DatePicker';
+import { useAuth } from '../../../core/contexts/AuthContext';
+import { useSupabaseBackend } from '../../../core/hooks/useSupabaseBackend';
 
 interface AnimalFormScreenProps {
   animal?: Animal;
@@ -16,7 +18,9 @@ export const AnimalFormScreen: React.FC<AnimalFormScreenProps> = ({
   onSave,
   onCancel,
 }) => {
-  const { addAnimal, updateAnimal } = useAnimalStore();
+  const { addAnimal, updateAnimal, isLoading } = useAnimalStore();
+  const { user } = useAuth();
+  const { isEnabled: useBackend } = useSupabaseBackend();
   
   const [formData, setFormData] = useState({
     name: animal?.name || '',
@@ -116,7 +120,7 @@ export const AnimalFormScreen: React.FC<AnimalFormScreenProps> = ({
     <View style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.title}>
-          {animal ? 'Edit Animal' : 'Add New Animal'}
+          {animal ? 'Edit Animal' : 'New Animal'}
         </Text>
       </View>
 
@@ -259,8 +263,7 @@ export const AnimalFormScreen: React.FC<AnimalFormScreenProps> = ({
           disabled={isLoading}
         >
           <Text style={styles.buttonText}>
-            {isLoading ? 'Saving...' : (animal ? 'Update Animal' : 'Add Animal')}
-            {useBackend && user && ' (Backend)'}
+            {isLoading ? 'Saving...' : (animal ? 'Update' : 'Add Animal')}
           </Text>
         </TouchableOpacity>
       </View>
@@ -277,6 +280,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     paddingHorizontal: 16,
     paddingVertical: 16,
+    paddingTop: 60, // Safe area padding for status bar
     borderBottomWidth: 1,
     borderBottomColor: '#eee',
   },
@@ -341,9 +345,10 @@ const styles = StyleSheet.create({
     borderColor: '#007AFF',
   },
   buttonText: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: '600',
     color: '#fff',
+    textAlign: 'center',
   },
   cancelButtonText: {
     color: '#007AFF',

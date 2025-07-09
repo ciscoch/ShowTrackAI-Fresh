@@ -1,6 +1,9 @@
 import { create } from 'zustand';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { FinancialEntry, Budget, FinancialSummary, EXPENSE_CATEGORIES, INCOME_CATEGORIES } from '../models/Financial';
+import { getFinancialService } from '../services/adapters/ServiceFactory';
+import { Expense, Income, CreateExpenseRequest, CreateIncomeRequest } from '../models';
+import { useSupabaseBackend } from '../config/environment';
 
 interface FinancialStore {
   entries: FinancialEntry[];
@@ -39,31 +42,92 @@ export const useFinancialStore = create<FinancialStore>((set, get) => ({
   loadEntries: async () => {
     set({ isLoading: true, error: null });
     try {
-      const [entriesData, budgetsData] = await Promise.all([
-        AsyncStorage.getItem(STORAGE_KEY),
-        AsyncStorage.getItem(BUDGETS_KEY)
-      ]);
+      const isBackend = useSupabaseBackend();
+      console.log('💰 FinancialStore: Loading entries, backend:', isBackend);
       
-      if (entriesData) {
-        const entries = JSON.parse(entriesData);
-        // Convert date strings back to Date objects
-        entries.forEach((entry: any) => {
-          entry.date = new Date(entry.date);
-          entry.createdAt = new Date(entry.createdAt);
-          entry.updatedAt = new Date(entry.updatedAt);
-        });
-        set({ entries });
-      }
-      
-      if (budgetsData) {
-        const budgets = JSON.parse(budgetsData);
-        budgets.forEach((budget: any) => {
-          budget.startDate = new Date(budget.startDate);
-          budget.endDate = new Date(budget.endDate);
-        });
-        set({ budgets });
+      if (isBackend) {
+        // Load from Supabase
+        const financialService = getFinancialService();
+        const [expenses, income, budgets] = await Promise.all([
+          financialService.getExpenses(),
+          financialService.getIncome(),
+          financialService.getBudgets()
+        ]);
+        
+        // Convert Supabase expenses/income to FinancialEntry format
+        const entries: FinancialEntry[] = [
+          ...expenses.map((expense: Expense): FinancialEntry => ({
+            id: expense.id,
+            type: 'expense',
+            category: expense.category,
+            subcategory: expense.subcategory,
+            amount: expense.amount,
+            description: expense.description,
+            vendor: expense.vendor,
+            receiptPhoto: expense.receiptPhoto,
+            animalId: expense.animalId,
+            date: expense.date,
+            createdAt: expense.createdAt,
+            updatedAt: expense.updatedAt,
+            notes: expense.notes,
+            tags: [],
+            paymentMethod: expense.paymentMethod || 'Cash',
+            isDeductible: expense.isDeductible || false,
+            location: expense.location,
+            projectPhase: expense.projectPhase
+          })),
+          ...income.map((incomeItem: Income): FinancialEntry => ({
+            id: incomeItem.id,
+            type: 'income',
+            category: incomeItem.category,
+            subcategory: incomeItem.subcategory,
+            amount: incomeItem.amount,
+            description: incomeItem.description,
+            vendor: incomeItem.source,
+            animalId: incomeItem.animalId,
+            date: incomeItem.date,
+            createdAt: incomeItem.createdAt,
+            updatedAt: incomeItem.updatedAt,
+            notes: incomeItem.notes,
+            tags: [],
+            paymentMethod: incomeItem.paymentMethod || 'Cash',
+            projectPhase: incomeItem.projectPhase
+          }))
+        ];
+        
+        console.log('📊 Loaded from Supabase:', entries.length, 'entries,', budgets.length, 'budgets');
+        set({ entries, budgets });
+      } else {
+        // Load from AsyncStorage (legacy local storage)
+        const [entriesData, budgetsData] = await Promise.all([
+          AsyncStorage.getItem(STORAGE_KEY),
+          AsyncStorage.getItem(BUDGETS_KEY)
+        ]);
+        
+        if (entriesData) {
+          const entries = JSON.parse(entriesData);
+          // Convert date strings back to Date objects
+          entries.forEach((entry: any) => {
+            entry.date = new Date(entry.date);
+            entry.createdAt = new Date(entry.createdAt);
+            entry.updatedAt = new Date(entry.updatedAt);
+          });
+          set({ entries });
+        }
+        
+        if (budgetsData) {
+          const budgets = JSON.parse(budgetsData);
+          budgets.forEach((budget: any) => {
+            budget.startDate = new Date(budget.startDate);
+            budget.endDate = new Date(budget.endDate);
+          });
+          set({ budgets });
+        }
+        
+        console.log('📁 Loaded from AsyncStorage');
       }
     } catch (error) {
+      console.error('Failed to load financial data:', error);
       set({ error: 'Failed to load financial data' });
     } finally {
       set({ isLoading: false });
@@ -71,103 +135,291 @@ export const useFinancialStore = create<FinancialStore>((set, get) => ({
   },
 
   addEntry: async (entryData) => {
-    const { entries } = get();
-    const newEntry: FinancialEntry = {
-      ...entryData,
-      id: `fin_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-      createdAt: new Date(),
-      updatedAt: new Date()
-    };
-    
-    const updatedEntries = [...entries, newEntry];
-    set({ entries: updatedEntries });
-    
+    set({ isLoading: true });
     try {
-      await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(updatedEntries));
+      const isBackend = useSupabaseBackend();
+      
+      if (isBackend) {
+        const financialService = getFinancialService();
+        
+        if (entryData.type === 'expense') {
+          const expenseRequest: CreateExpenseRequest = {
+            description: entryData.description,
+            amount: entryData.amount,
+            date: entryData.date,
+            category: entryData.category,
+            subcategory: entryData.subcategory,
+            vendor: entryData.vendor,
+            receiptPhoto: entryData.receiptPhoto,
+            animalId: entryData.animalId,
+            paymentMethod: entryData.paymentMethod || 'Cash',
+            isDeductible: entryData.isDeductible || false,
+            location: entryData.location,
+            projectPhase: entryData.projectPhase,
+            notes: entryData.notes
+          };
+          
+          // Check if SupabaseFinancialAdapter has enhanced method for business intelligence
+          const financialAdapter = financialService as any;
+          let newExpense;
+          
+          if (entryData.receiptMetadata?.businessIntelligence || entryData.receiptMetadata?.vendorIntelligence) {
+            console.log('💡 Saving expense with business intelligence data:', {
+              businessIntelligence: entryData.receiptMetadata.businessIntelligence,
+              vendorIntelligence: entryData.receiptMetadata.vendorIntelligence
+            });
+            
+            // Use enhanced method if available
+            if (financialAdapter.addExpenseWithIntelligence) {
+              newExpense = await financialAdapter.addExpenseWithIntelligence(
+                expenseRequest,
+                entryData.receiptMetadata.businessIntelligence,
+                entryData.receiptMetadata.vendorIntelligence
+              );
+            } else {
+              // Fallback to standard method
+              newExpense = await financialService.addExpense(expenseRequest);
+            }
+          } else {
+            newExpense = await financialService.addExpense(expenseRequest);
+          }
+          const newEntry: FinancialEntry = {
+            id: newExpense.id,
+            type: 'expense',
+            category: newExpense.category,
+            subcategory: newExpense.subcategory,
+            amount: newExpense.amount,
+            description: newExpense.description,
+            vendor: newExpense.vendor,
+            receiptPhoto: newExpense.receiptPhoto,
+            animalId: newExpense.animalId,
+            date: newExpense.date,
+            createdAt: newExpense.createdAt,
+            updatedAt: newExpense.updatedAt,
+            notes: newExpense.notes,
+            tags: [],
+            paymentMethod: newExpense.paymentMethod || 'Cash',
+            isDeductible: newExpense.isDeductible || false,
+            location: newExpense.location,
+            projectPhase: newExpense.projectPhase
+          };
+          
+          const { entries } = get();
+          set({ entries: [...entries, newEntry] });
+        } else if (entryData.type === 'income') {
+          const incomeRequest: CreateIncomeRequest = {
+            description: entryData.description,
+            amount: entryData.amount,
+            date: entryData.date,
+            source: entryData.vendor || 'Unknown',
+            category: entryData.category,
+            subcategory: entryData.subcategory,
+            animalId: entryData.animalId,
+            paymentMethod: entryData.paymentMethod || 'Cash',
+            projectPhase: entryData.projectPhase,
+            notes: entryData.notes
+          };
+          
+          const newIncome = await financialService.addIncome(incomeRequest);
+          const newEntry: FinancialEntry = {
+            id: newIncome.id,
+            type: 'income',
+            category: newIncome.category,
+            subcategory: newIncome.subcategory,
+            amount: newIncome.amount,
+            description: newIncome.description,
+            vendor: newIncome.source,
+            animalId: newIncome.animalId,
+            date: newIncome.date,
+            createdAt: newIncome.createdAt,
+            updatedAt: newIncome.updatedAt,
+            notes: newIncome.notes,
+            tags: [],
+            paymentMethod: newIncome.paymentMethod || 'Cash',
+            projectPhase: newIncome.projectPhase
+          };
+          
+          const { entries } = get();
+          set({ entries: [...entries, newEntry] });
+        }
+      } else {
+        // Local storage fallback
+        const { entries } = get();
+        const newEntry: FinancialEntry = {
+          ...entryData,
+          id: `fin_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+          createdAt: new Date(),
+          updatedAt: new Date()
+        };
+        
+        const updatedEntries = [...entries, newEntry];
+        set({ entries: updatedEntries });
+        
+        await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(updatedEntries));
+      }
     } catch (error) {
+      console.error('Failed to add entry:', error);
       set({ error: 'Failed to save entry' });
-      // Revert on error
-      set({ entries });
+    } finally {
+      set({ isLoading: false });
     }
   },
 
   updateEntry: async (id, updates) => {
-    const { entries } = get();
-    const updatedEntries = entries.map(entry =>
-      entry.id === id
-        ? { ...entry, ...updates, updatedAt: new Date() }
-        : entry
-    );
-    
-    set({ entries: updatedEntries });
-    
+    set({ isLoading: true });
     try {
-      await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(updatedEntries));
+      const isBackend = useSupabaseBackend();
+      const { entries } = get();
+      
+      if (isBackend) {
+        const financialService = getFinancialService();
+        const existingEntry = entries.find(e => e.id === id);
+        
+        if (existingEntry?.type === 'expense') {
+          await financialService.updateExpense(id, updates);
+        }
+        // Note: Income updates would need to be added to SupabaseFinancialAdapter
+        
+        // Update local state
+        const updatedEntries = entries.map(entry =>
+          entry.id === id
+            ? { ...entry, ...updates, updatedAt: new Date() }
+            : entry
+        );
+        set({ entries: updatedEntries });
+      } else {
+        // Local storage fallback
+        const updatedEntries = entries.map(entry =>
+          entry.id === id
+            ? { ...entry, ...updates, updatedAt: new Date() }
+            : entry
+        );
+        
+        set({ entries: updatedEntries });
+        await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(updatedEntries));
+      }
     } catch (error) {
+      console.error('Failed to update entry:', error);
       set({ error: 'Failed to update entry' });
-      set({ entries });
+    } finally {
+      set({ isLoading: false });
     }
   },
 
   deleteEntry: async (id) => {
-    const { entries } = get();
-    const updatedEntries = entries.filter(entry => entry.id !== id);
-    
-    set({ entries: updatedEntries });
-    
+    set({ isLoading: true });
     try {
-      await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(updatedEntries));
+      const isBackend = useSupabaseBackend();
+      const { entries } = get();
+      
+      if (isBackend) {
+        const financialService = getFinancialService();
+        const existingEntry = entries.find(e => e.id === id);
+        
+        if (existingEntry?.type === 'expense') {
+          await financialService.deleteExpense(id);
+        }
+        // Note: Income deletion would need to be added to SupabaseFinancialAdapter
+        
+        // Update local state
+        const updatedEntries = entries.filter(entry => entry.id !== id);
+        set({ entries: updatedEntries });
+      } else {
+        // Local storage fallback
+        const updatedEntries = entries.filter(entry => entry.id !== id);
+        set({ entries: updatedEntries });
+        await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(updatedEntries));
+      }
     } catch (error) {
+      console.error('Failed to delete entry:', error);
       set({ error: 'Failed to delete entry' });
-      set({ entries });
+    } finally {
+      set({ isLoading: false });
     }
   },
 
   createBudget: async (budgetData) => {
-    const { budgets } = get();
-    const newBudget: Budget = {
-      ...budgetData,
-      id: `budget_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
-    };
-    
-    const updatedBudgets = [...budgets, newBudget];
-    set({ budgets: updatedBudgets });
-    
+    set({ isLoading: true });
     try {
-      await AsyncStorage.setItem(BUDGETS_KEY, JSON.stringify(updatedBudgets));
+      const isBackend = useSupabaseBackend();
+      
+      if (isBackend) {
+        const financialService = getFinancialService();
+        const newBudget = await financialService.createBudget(budgetData);
+        
+        const { budgets } = get();
+        set({ budgets: [...budgets, newBudget] });
+      } else {
+        // Local storage fallback
+        const { budgets } = get();
+        const newBudget: Budget = {
+          ...budgetData,
+          id: `budget_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+        };
+        
+        const updatedBudgets = [...budgets, newBudget];
+        set({ budgets: updatedBudgets });
+        await AsyncStorage.setItem(BUDGETS_KEY, JSON.stringify(updatedBudgets));
+      }
     } catch (error) {
+      console.error('Failed to create budget:', error);
       set({ error: 'Failed to save budget' });
-      set({ budgets });
+    } finally {
+      set({ isLoading: false });
     }
   },
 
   updateBudget: async (id, updates) => {
-    const { budgets } = get();
-    const updatedBudgets = budgets.map(budget =>
-      budget.id === id ? { ...budget, ...updates } : budget
-    );
-    
-    set({ budgets: updatedBudgets });
-    
+    set({ isLoading: true });
     try {
-      await AsyncStorage.setItem(BUDGETS_KEY, JSON.stringify(updatedBudgets));
+      const isBackend = useSupabaseBackend();
+      const { budgets } = get();
+      
+      if (isBackend) {
+        // Note: Budget updates would need to be added to SupabaseFinancialAdapter
+        console.log('Budget updates not yet implemented for Supabase backend');
+      }
+      
+      // Update local state regardless of backend
+      const updatedBudgets = budgets.map(budget =>
+        budget.id === id ? { ...budget, ...updates } : budget
+      );
+      set({ budgets: updatedBudgets });
+      
+      if (!isBackend) {
+        await AsyncStorage.setItem(BUDGETS_KEY, JSON.stringify(updatedBudgets));
+      }
     } catch (error) {
+      console.error('Failed to update budget:', error);
       set({ error: 'Failed to update budget' });
-      set({ budgets });
+    } finally {
+      set({ isLoading: false });
     }
   },
 
   deleteBudget: async (id) => {
-    const { budgets } = get();
-    const updatedBudgets = budgets.filter(budget => budget.id !== id);
-    
-    set({ budgets: updatedBudgets });
-    
+    set({ isLoading: true });
     try {
-      await AsyncStorage.setItem(BUDGETS_KEY, JSON.stringify(updatedBudgets));
+      const isBackend = useSupabaseBackend();
+      const { budgets } = get();
+      
+      if (isBackend) {
+        // Note: Budget deletion would need to be added to SupabaseFinancialAdapter
+        console.log('Budget deletion not yet implemented for Supabase backend');
+      }
+      
+      // Update local state regardless of backend
+      const updatedBudgets = budgets.filter(budget => budget.id !== id);
+      set({ budgets: updatedBudgets });
+      
+      if (!isBackend) {
+        await AsyncStorage.setItem(BUDGETS_KEY, JSON.stringify(updatedBudgets));
+      }
     } catch (error) {
+      console.error('Failed to delete budget:', error);
       set({ error: 'Failed to delete budget' });
-      set({ budgets });
+    } finally {
+      set({ isLoading: false });
     }
   },
 

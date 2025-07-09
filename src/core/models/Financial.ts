@@ -12,9 +12,103 @@ export interface FinancialEntry {
   saeProject?: string;
   tags?: string[];
   attachments?: string[];
+  vendor?: string;
+  vendorLocation?: string;
+  receiptItems?: ReceiptLineItem[];
+  receiptMetadata?: ReceiptMetadata;
   createdAt: Date;
   updatedAt: Date;
   userId: string;
+}
+
+export interface ReceiptLineItem {
+  id: string;
+  description: string;
+  quantity: number;
+  unitPrice: number;
+  totalPrice: number;
+  category?: string;
+  feedWeight?: number;
+}
+
+export interface ReceiptMetadata {
+  receiptNumber?: string;
+  processingMethod: 'manual' | 'ai_vision' | 'ai_ocr';
+  processingConfidence?: number;
+  originalImageUrl?: string;
+  feedAnalysis?: {
+    totalFeedWeight: number;
+    feedTypes: string[];
+    estimatedDaysSupply: number;
+  };
+  // Enhanced fields for business intelligence (internal use)
+  businessIntelligence?: BusinessIntelligenceData;
+  vendorIntelligence?: VendorIntelligenceData;
+}
+
+// Business Intelligence Data (Internal Only)
+export interface BusinessIntelligenceData {
+  feed_type?: string; // e.g., "growth/development"
+  brand_names?: string[]; // e.g., ["JACOBY'S"]
+  equipment_purchased?: string[]; // e.g., ["FENCE FEEDER 16\"", "SCOOP,ENCLOSED 3QT"]
+  seasonal_indicator?: string; // extracted from date
+  purchase_pattern?: string; // frequency analysis
+  supplier_loyalty?: string; // repeat vendor tracking
+  
+  // Monetization Opportunities
+  affiliate_potential?: string[]; // brands for partnerships
+  price_benchmarking?: PriceBenchmark[];
+  bulk_purchase_indicators?: BulkIndicator[];
+  equipment_lifecycle?: EquipmentData[];
+  regional_suppliers?: RegionalData[];
+}
+
+// Enhanced Vendor Data (Internal Only)
+export interface VendorIntelligenceData {
+  vendor_address?: string;
+  vendor_phone?: string;
+  vendor_website?: string;
+  vendor_category?: string;
+  invoice_number?: string;
+  cashier_id?: string;
+  employee_name?: string;
+  payment_method?: string;
+  transaction_time?: string;
+  tax_amount?: number;
+  tax_rate?: number;
+  item_count?: number;
+}
+
+// Supporting interfaces for business intelligence
+export interface PriceBenchmark {
+  item: string;
+  price: number;
+  vendor: string;
+  region: string;
+  date: Date;
+}
+
+export interface BulkIndicator {
+  item: string;
+  quantity: number;
+  unit_price: number;
+  bulk_threshold: number;
+  savings_potential: number;
+}
+
+export interface EquipmentData {
+  equipment_type: string;
+  brand: string;
+  purchase_date: Date;
+  expected_lifecycle: number; // months
+  replacement_indicator?: boolean;
+}
+
+export interface RegionalData {
+  vendor_name: string;
+  location: string;
+  coverage_area: string;
+  service_quality_score?: number;
 }
 
 export interface FinancialCategory {
@@ -114,6 +208,23 @@ export const INCOME_CATEGORIES: FinancialCategory[] = [
 
 export interface FinancialSummary {
   totalIncome: number;
+  actualIncome: number;
+  predictedIncome: {
+    amount: number;
+    note: string;
+    breakdown: Array<{
+      species: string;
+      count: number;
+      totalValue: number;
+      animals: Array<{
+        name: string;
+        earTag: string;
+        predictedValue: number;
+        acquisitionCost: number;
+        potentialProfit: number;
+      }>;
+    }>;
+  };
   totalExpenses: number;
   netProfit: number;
   feedCostPerAnimal: number;

@@ -233,6 +233,62 @@ export class SupabaseFinancialAdapter implements IFinancialService {
     }
   }
 
+  /**
+   * Enhanced method to save expense with business intelligence data
+   * Separates user-facing data from internal business intelligence
+   */
+  async addExpenseWithIntelligence(
+    expense: CreateExpenseRequest, 
+    businessIntelligence?: BusinessIntelligenceData,
+    vendorIntelligence?: VendorIntelligenceData
+  ): Promise<Expense> {
+    try {
+      const user = await getCurrentUser();
+      if (!user) throw new Error('User not authenticated');
+
+      const dbExpense = this.mapExpenseToDb({
+        ...expense,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      });
+
+      // Add user ID
+      dbExpense.user_id = user.id;
+
+      // Add business intelligence data (internal only)
+      if (businessIntelligence) {
+        dbExpense.business_intelligence = businessIntelligence;
+        console.log('💡 Adding business intelligence data:', businessIntelligence);
+      }
+
+      if (vendorIntelligence) {
+        dbExpense.vendor_intelligence = vendorIntelligence;
+        console.log('🏪 Adding vendor intelligence data:', vendorIntelligence);
+      }
+
+      console.log('📝 Enhanced expense data for database:', JSON.stringify(dbExpense, null, 2));
+
+      const { data, error } = await this.supabase
+        .from('expenses')
+        .insert([dbExpense])
+        .select()
+        .single();
+
+      if (error) {
+        console.error('❌ Supabase insert error (enhanced):', error);
+        throw error;
+      }
+
+      console.log('✅ Enhanced expense created successfully in Supabase:', data);
+
+      // Return user-facing expense data only (privacy-safe)
+      return this.mapDbToExpense(data);
+    } catch (error) {
+      console.error('❌ Failed to create enhanced expense:', error);
+      throw error;
+    }
+  }
+
   async updateExpense(id: string, updates: Partial<Expense>): Promise<Expense> {
     try {
       const user = await getCurrentUser();

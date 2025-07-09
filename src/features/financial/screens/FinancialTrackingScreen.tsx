@@ -541,40 +541,124 @@ export const FinancialTrackingScreen: React.FC<FinancialTrackingScreenProps> = (
     setShowAddModal(true);
   };
 
-  const autoPopulateMultiple = () => {
+  const autoPopulateMultiple = async () => {
     if (!receiptProcessingResult) return;
     
-    // Group items by category
-    const categorizedItems = receiptProcessingResult.lineItems.reduce((acc, item) => {
-      const category = item.category || 'other';
-      if (!acc[category]) acc[category] = [];
-      acc[category].push(item);
-      return acc;
-    }, {} as Record<string, any[]>);
-    
-    // Create the first entry
-    const firstCategory = Object.keys(categorizedItems)[0];
-    const firstItems = categorizedItems[firstCategory];
-    const firstAmount = firstItems.reduce((sum, item) => sum + item.amount, 0);
-    const firstDescription = firstItems.length === 1 
-      ? firstItems[0].description 
-      : `${firstItems.length} ${firstCategory} items from ${receiptProcessingResult.receiptData.vendor}`;
-    
-    setFormData(prev => ({
-      ...prev,
-      amount: firstAmount.toString(),
-      description: firstDescription,
-      vendor: receiptProcessingResult.receiptData.vendor,
-      vendorLocation: receiptProcessingResult.receiptData.vendor || '',
-      category: firstCategory,
-    }));
-    
-    // Store remaining categories for sequential creation
-    const remainingCategories = Object.keys(categorizedItems).slice(1);
-    // TODO: Implement sequential category creation workflow
-    
-    setShowReceiptReview(false);
-    setShowAddModal(true);
+    try {
+      // Group items by category
+      const categorizedItems = receiptProcessingResult.lineItems.reduce((acc, item) => {
+        const category = item.category || 'other';
+        if (!acc[category]) acc[category] = [];
+        acc[category].push(item);
+        return acc;
+      }, {} as Record<string, any[]>);
+      
+      const categories = Object.keys(categorizedItems);
+      console.log(`🏷️ Creating ${categories.length} expense entries for categories:`, categories);
+      
+      // Create entries for all categories
+      const createdEntries = [];
+      for (const category of categories) {
+        const items = categorizedItems[category];
+        const amount = items.reduce((sum, item) => sum + item.amount, 0);
+        const description = items.length === 1 
+          ? items[0].description 
+          : `${items.length} ${category} items from ${receiptProcessingResult.receiptData.vendor}`;
+        
+        const entry: FinancialEntry = {
+          id: `temp_${Date.now()}_${category}`,
+          type: 'expense',
+          category,
+          amount,
+          date: receiptProcessingResult.receiptData.date,
+          description,
+          vendor: receiptProcessingResult.receiptData.vendor,
+          vendorLocation: receiptProcessingResult.receiptData.vendor || '',
+          receiptItems: items.map(item => ({
+            id: item.id,
+            description: item.description,
+            quantity: item.quantity || 1,
+            unitPrice: item.unitPrice || item.amount,
+            totalPrice: item.amount,
+            category: item.category,
+            feedWeight: item.feedWeight
+          })),
+          receiptMetadata: {
+            receiptNumber: receiptProcessingResult.receiptData.receiptNumber,
+            processingMethod: 'ai_vision',
+            processingConfidence: receiptProcessingResult.processingMetrics?.ocrConfidence || 0.9,
+            originalImageUrl: receiptProcessingResult.receiptData.originalImageUrl,
+            feedAnalysis: receiptProcessingResult.feedAnalysis
+          },
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          userId: 'current_user' // Will be set by the store
+        };
+        
+        // Extract business intelligence data from receipt processing
+        const businessIntelligence = {
+          feed_type: items.some(item => item.feedWeight > 0) ? 'growth/development' : undefined,
+          brand_names: [...new Set(items.flatMap(item => 
+            item.description.match(/JACOBY'?S|PURINA|WEAVER|KENT|NUTRENA/gi) || []
+          ).map(brand => brand.toUpperCase()))],
+          equipment_purchased: items.filter(item => 
+            /FEEDER|SCOOP|BRUSH|HALTER|LEAD|BUCKET/i.test(item.description)
+          ).map(item => item.description),
+          seasonal_indicator: receiptProcessingResult.receiptData.date ? 
+            getSeasonFromDate(receiptProcessingResult.receiptData.date) : 'unknown',
+          purchase_pattern: items.length > 2 ? 'bulk_purchase' : 'single_purchase',
+          supplier_loyalty: 'new_vendor' // Would be enhanced with user history
+        };
+
+        // Extract detailed vendor information from OCR text
+        const ocrText = receiptProcessingResult.receiptData.ocrText || '';
+        const vendorIntelligence = {
+          vendor_category: category === 'feed_supplies' ? 'feed_pet_supply' : 'equipment_farm',
+          payment_method: 'Debit Purchase',
+          item_count: items.length,
+          // Extract detailed vendor information from receipt OCR
+          vendor_address: extractVendorAddress(ocrText),
+          vendor_phone: extractVendorPhone(ocrText),
+          vendor_website: extractVendorWebsite(ocrText),
+          invoice_number: receiptProcessingResult.receiptData.receiptNumber || extractInvoiceNumber(ocrText),
+          transaction_time: extractTransactionTime(ocrText),
+          tax_amount: extractTaxAmount(ocrText),
+          tax_rate: extractTaxRate(ocrText),
+          employee_name: extractEmployeeName(ocrText),
+          cashier_id: extractCashierId(ocrText)
+        };
+
+        console.log(`💰 Creating expense entry for ${category}: $${amount}`, { businessIntelligence, vendorIntelligence });
+        
+        // Add business intelligence to entry metadata
+        entry.receiptMetadata = {
+          ...entry.receiptMetadata,
+          businessIntelligence,
+          vendorIntelligence
+        };
+        
+        await addEntry(entry);
+        createdEntries.push({ category, amount, description });
+      }
+      
+      // Show success message
+      const categoryList = createdEntries.map(e => `• ${e.category}: $${e.amount.toFixed(2)}`).join('\n');
+      Alert.alert(
+        '✅ Multiple Entries Created',
+        `Successfully created ${createdEntries.length} expense entries:\n\n${categoryList}`,
+        [{ text: 'OK' }]
+      );
+      
+      setShowReceiptReview(false);
+      
+    } catch (error) {
+      console.error('❌ Failed to create multiple entries:', error);
+      Alert.alert(
+        'Error',
+        'Failed to create multiple entries. Please try again.',
+        [{ text: 'OK' }]
+      );
+    }
   };
 
   const openCustomSelectionModal = () => {
@@ -4772,3 +4856,157 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
 });
+
+// Helper function for seasonal indicator
+const getSeasonFromDate = (date: Date): string => {
+  const month = date.getMonth() + 1; // 1-12
+  
+  if (month >= 3 && month <= 5) return 'spring';
+  if (month >= 6 && month <= 8) return 'summer';
+  if (month >= 9 && month <= 11) return 'fall';
+  return 'winter';
+};
+
+// Helper functions for vendor intelligence extraction
+const extractVendorAddress = (ocrText: string): string | undefined => {
+  // Look for address patterns in OCR text - handle multi-line addresses
+  const addressPatterns = [
+    // Single line: "23630 I.H. 10 West, Boerne, TX 78006"
+    /(\d+\s+[^,\n]+,\s*[^,\n]+,\s*[A-Z][A-Z]\s+\d{5})/i,
+    // Single line: "23630 I.H. 10 West, TX 78006"  
+    /(\d+\s+[^,\n]+,\s*[A-Z][A-Z]\s+\d{5})/i,
+    // Multi-line: "23630 I.H. 10 West\nBoerne, TX 78006"
+    /(\d+\s+[^\n]+)\s*\n([^,\n]+,\s*[A-Z][A-Z]\s+\d{5})/i,
+    // Simple: "123 Main St TX 12345"
+    /(\d+\s+[^,\n]+\s+[A-Z][A-Z]\s+\d{5})/i,
+    // City, State format: "San Antonio, TX"
+    /([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*,\s*[A-Z][A-Z])/i,
+    // Store location format: "Store Name\nCity, State"
+    /^([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*,\s*[A-Z][A-Z])$/m
+  ];
+  
+  for (const pattern of addressPatterns) {
+    const match = ocrText.match(pattern);
+    if (match) {
+      if (match[2]) {
+        // Multi-line address - combine street and city/state/zip
+        return `${match[1].trim()}, ${match[2].trim()}`;
+      } else {
+        // Single line address
+        return match[1].trim();
+      }
+    }
+  }
+  return undefined;
+};
+
+const extractVendorPhone = (ocrText: string): string | undefined => {
+  const phonePatterns = [
+    /\((\d{3})\)\s*(\d{3})-(\d{4})/,  // "(830) 981-2258"
+    /(\d{3})-(\d{3})-(\d{4})/,        // "830-981-2258"
+    /(\d{3})\.(\d{3})\.(\d{4})/       // "830.981.2258"
+  ];
+  
+  for (const pattern of phonePatterns) {
+    const match = ocrText.match(pattern);
+    if (match) return match[0];
+  }
+  return undefined;
+};
+
+const extractVendorWebsite = (ocrText: string): string | undefined => {
+  const websitePatterns = [
+    /([a-zA-Z0-9.-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/,  // "boerne@struttys.com"
+    /(www\.[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/,            // "www.example.com"
+    /([a-zA-Z0-9.-]+\.(com|net|org|edu))/             // "example.com"
+  ];
+  
+  for (const pattern of websitePatterns) {
+    const match = ocrText.match(pattern);
+    if (match) return match[1];
+  }
+  return undefined;
+};
+
+const extractInvoiceNumber = (ocrText: string): string | undefined => {
+  const invoicePatterns = [
+    /Invoice[:\s]*(\w+)/i,
+    /Receipt[:\s]*(\w+)/i,
+    /Trans[:\s]*(\w+)/i
+  ];
+  
+  for (const pattern of invoicePatterns) {
+    const match = ocrText.match(pattern);
+    if (match) return match[1];
+  }
+  return undefined;
+};
+
+const extractTransactionTime = (ocrText: string): string | undefined => {
+  const timePatterns = [
+    /Time[:\s]*(\d{1,2}:\d{2}:\d{2}\s*[AP]M)/i,  // "Time: 03:10:13 PM"
+    /(\d{1,2}:\d{2}:\d{2}\s*[AP]M)/i,            // "03:10:13 PM"
+    /(\d{1,2}:\d{2}\s*[AP]M)/i,                  // "06:42 AM" (fuel receipt format)
+    /\d{2}\/\d{2}\/\d{2}\s+(\d{1,2}:\d{2}\s*[AP]M)/i // "12/07/23 06:42 AM"
+  ];
+  
+  for (const pattern of timePatterns) {
+    const match = ocrText.match(pattern);
+    if (match) return match[1];
+  }
+  return undefined;
+};
+
+const extractTaxAmount = (ocrText: string): number | undefined => {
+  const taxPatterns = [
+    /Tax[:\s]*\$?(\d+\.?\d*)/i,                    // "Tax: $1.50"
+    /Tax\s*\([\d.]+%\)[:\s]*\$?(\d+\.?\d*)/i      // "Tax (8.250%): $1.50"
+  ];
+  
+  for (const pattern of taxPatterns) {
+    const match = ocrText.match(pattern);
+    if (match) return parseFloat(match[1]);
+  }
+  return undefined;
+};
+
+const extractTaxRate = (ocrText: string): number | undefined => {
+  const taxRatePatterns = [
+    /Tax\s*\((\d+\.?\d*)%\)/i,      // "Tax (8.250%)"
+    /(\d+\.?\d*)%\s*tax/i           // "8.25% tax"
+  ];
+  
+  for (const pattern of taxRatePatterns) {
+    const match = ocrText.match(pattern);
+    if (match) return parseFloat(match[1]);
+  }
+  return undefined;
+};
+
+const extractEmployeeName = (ocrText: string): string | undefined => {
+  const employeePatterns = [
+    /Employee[:\s]*(\w+)/i,         // "Employee: TREY"
+    /Cashier[:\s]*(\w+)/i,          // "Cashier: TREY"
+    /Server[:\s]*(\w+)/i            // "Server: TREY"
+  ];
+  
+  for (const pattern of employeePatterns) {
+    const match = ocrText.match(pattern);
+    if (match) return match[1];
+  }
+  return undefined;
+};
+
+const extractCashierId = (ocrText: string): string | undefined => {
+  const cashierPatterns = [
+    /Drawer[:\s]*(\w+)/i,           // "Drawer: 01"
+    /Cashier\s*ID[:\s]*(\w+)/i,     // "Cashier ID: 01"
+    /Register[:\s]*(\w+)/i          // "Register: 01"
+  ];
+  
+  for (const pattern of cashierPatterns) {
+    const match = ocrText.match(pattern);
+    if (match) return match[1];
+  }
+  return undefined;
+};

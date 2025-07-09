@@ -51,24 +51,37 @@ MainApp.tsx (Router)
 ├── AnimalListScreen
 ├── AnimalDetailsScreen  
 ├── AnimalFormScreen
-├── WeightHistoryScreen (NEW)
-└── AddWeightScreen (NEW)
+├── WeightHistoryScreen
+├── AddWeightScreen
+├── JournalListScreen (NEW)
+└── JournalEntryScreen (NEW)
 ```
 
 ### **Key Services**
 - **SupabaseAnimalAdapter**: Backend CRUD operations
 - **WeightStore**: Weight tracking state management  
 - **ProfileStore**: User profile management
+- **JournalStore**: AET journal and photo management
+- **AETSkillMatcher**: AI-powered skill recommendations
+- **JournalPhotoService**: Privacy-first photo uploads
 - **StorageService**: Local data persistence
 
 ### **Data Models**
 - **Animal**: Core livestock data with camelCase frontend mapping
 - **Weight**: Weight tracking with multiple measurement types
+- **Journal**: AET-aligned entries with multi-animal feed tracking
 - **Profile**: Elite student profiles with subscription tiers
 
 ---
 
 ## ✅ Recently Completed
+
+### **Advanced Journal with AET Integration** 
+- ✅ **AET Skills Framework**: 8 categories, 40+ agricultural skills with career alignment
+- ✅ **Multi-Animal Feed Tracking**: Tab-based interface for tracking multiple animals
+- ✅ **AI Autofill System**: Context-aware title/description generation
+- ✅ **Photo Documentation**: Privacy-first photo capture with AI-optimized guidance
+- ✅ **Weather & Location**: Automatic detection with manual fallback options
 
 ### **Elite Weight Tracking System**
 - ✅ **WeightHistoryScreen**: Charts, analytics, growth trends
@@ -86,7 +99,9 @@ MainApp.tsx (Router)
 - ✅ **Supabase Authentication**: Full user profile system
 - ✅ **Database Migration**: Added missing animal fields  
 - ✅ **Field Mapping**: camelCase ↔ snake_case conversion
+- ✅ **Species Support**: All animal types (Cattle, Goats, Pigs, Sheep, Poultry)
 - ✅ **Error Handling**: Comprehensive user feedback
+- ✅ **Journal Integration Fix**: JournalStore now uses ServiceFactory for Supabase persistence
 
 ---
 
@@ -96,7 +111,8 @@ MainApp.tsx (Router)
 1. **Authentication**: Supabase login with Elite profiles
 2. **Animal Management**: Full CRUD with backend sync
 3. **Weight Tracking**: Professional analytics and data entry
-4. **Modern UI**: Mobile-optimized interface design
+4. **Journal System**: AET-integrated entries with Supabase persistence
+5. **Modern UI**: Mobile-optimized interface design
 
 ### **Elite Features Active**
 - ✅ Animal management (5 animal limit)
@@ -176,10 +192,12 @@ MainApp.tsx (Router)
 
 ## 🔗 Quick Links
 - **Progress Summary**: `/commands/progress-summary.md`
+- **Journal Enhancements**: `/commands/journal-system-enhancements-summary.md`
+- **Supabase Journal Fix**: `/commands/supabase-journal-integration-fix.md`
 - **Database Schema**: `/commands/add-missing-animal-fields.sql`
 - **Environment Config**: Check `/Users/francisco/Downloads/.env`
 
 ---
 
-*Last Updated: December 2024*  
+*Last Updated: July 2025*  
 *Next Review: After photo upload implementation*

@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { Journal, CreateJournalRequest } from '../models/Journal';
-import { storageService, STORAGE_KEYS } from '../services/StorageService';
+import { ServiceFactory } from '../services/adapters/ServiceFactory';
 
 interface JournalState {
   entries: Journal[];
@@ -15,7 +15,6 @@ interface JournalActions {
   deleteEntry: (id: string) => Promise<void>;
   selectEntry: (entry: Journal | null) => void;
   loadEntries: () => Promise<void>;
-  saveEntries: () => Promise<void>;
   clearEntries: () => void;
 }
 
@@ -28,57 +27,69 @@ export const useJournalStore = create<JournalStore>((set, get) => ({
   error: null,
 
   addEntry: async (request: CreateJournalRequest) => {
-    const newEntry: Journal = {
-      id: Date.now().toString(),
-      ...request,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    };
-
-    set((state) => ({
-      entries: [...state.entries, newEntry],
-      error: null,
-    }));
-    
     try {
-      await get().saveEntries();
+      console.log('📝 JournalStore: Adding new entry via ServiceFactory');
+      set({ isLoading: true, error: null });
+      
+      const journalService = ServiceFactory.getJournalService();
+      const createdEntry = await journalService.createJournalEntry(request);
+      
+      console.log('✅ JournalStore: Entry created successfully', createdEntry);
+      
+      set((state) => ({
+        entries: [...state.entries, createdEntry],
+        isLoading: false,
+        error: null,
+      }));
     } catch (error) {
-      console.error('Error saving journal entry:', error);
-      set({ error: 'Failed to save journal entry' });
-      throw error; // Re-throw to let the UI handle it
+      console.error('❌ JournalStore: Error adding journal entry:', error);
+      set({ error: 'Failed to save journal entry', isLoading: false });
+      throw error;
     }
   },
 
   updateEntry: async (id: string, updates: Partial<Journal>) => {
-    set((state) => ({
-      entries: state.entries.map((entry) =>
-        entry.id === id ? { ...entry, ...updates, updatedAt: new Date() } : entry
-      ),
-      error: null,
-    }));
-    
     try {
-      await get().saveEntries();
+      console.log('✏️ JournalStore: Updating entry via ServiceFactory', id);
+      set({ isLoading: true, error: null });
+      
+      const journalService = ServiceFactory.getJournalService();
+      const updatedEntry = await journalService.updateJournalEntry(id, updates);
+      
+      set((state) => ({
+        entries: state.entries.map((entry) =>
+          entry.id === id ? updatedEntry : entry
+        ),
+        isLoading: false,
+        error: null,
+      }));
     } catch (error) {
-      console.error('Error updating journal entry:', error);
-      set({ error: 'Failed to update journal entry' });
-      throw error; // Re-throw to let the UI handle it
+      console.error('❌ JournalStore: Error updating journal entry:', error);
+      set({ error: 'Failed to update journal entry', isLoading: false });
+      throw error;
     }
   },
 
   deleteEntry: async (id: string) => {
-    set((state) => ({
-      entries: state.entries.filter((entry) => entry.id !== id),
-      selectedEntry: state.selectedEntry?.id === id ? null : state.selectedEntry,
-      error: null,
-    }));
-    
     try {
-      await get().saveEntries();
+      console.log('🗑️ JournalStore: Deleting entry via ServiceFactory', id);
+      set({ isLoading: true, error: null });
+      
+      const journalService = ServiceFactory.getJournalService();
+      await journalService.deleteJournalEntry(id);
+      
+      set((state) => ({
+        entries: state.entries.filter((entry) => entry.id !== id),
+        selectedEntry: state.selectedEntry?.id === id ? null : state.selectedEntry,
+        isLoading: false,
+        error: null,
+      }));
+      
+      console.log('✅ JournalStore: Entry deleted successfully');
     } catch (error) {
-      console.error('Error deleting journal entry:', error);
-      set({ error: 'Failed to delete journal entry' });
-      throw error; // Re-throw to let the UI handle it
+      console.error('❌ JournalStore: Error deleting journal entry:', error);
+      set({ error: 'Failed to delete journal entry', isLoading: false });
+      throw error;
     }
   },
 
@@ -88,37 +99,23 @@ export const useJournalStore = create<JournalStore>((set, get) => ({
 
   loadEntries: async () => {
     try {
+      console.log('📚 JournalStore: Loading entries via ServiceFactory');
       set({ isLoading: true, error: null });
-      const savedEntries = await storageService.loadData<Journal[]>(STORAGE_KEYS.JOURNAL);
       
-      if (savedEntries) {
-        const entriesWithDates = savedEntries.map(entry => ({
-          ...entry,
-          date: new Date(entry.date),
-          createdAt: new Date(entry.createdAt),
-          updatedAt: new Date(entry.updatedAt),
-        }));
-        
-        set({ entries: entriesWithDates, isLoading: false });
-      } else {
-        set({ isLoading: false });
-      }
+      const journalService = ServiceFactory.getJournalService();
+      const entries = await journalService.getJournalEntries();
+      
+      console.log('✅ JournalStore: Loaded entries successfully', entries.length);
+      set({ entries, isLoading: false });
     } catch (error) {
+      console.error('❌ JournalStore: Error loading journal entries:', error);
       set({ error: 'Failed to load journal entries', isLoading: false });
     }
   },
 
-  saveEntries: async () => {
-    try {
-      const { entries } = get();
-      await storageService.saveData(STORAGE_KEYS.JOURNAL, entries);
-    } catch (error) {
-      set({ error: 'Failed to save journal entries' });
-    }
-  },
 
   clearEntries: () => {
+    console.log('🧹 JournalStore: Clearing entries');
     set({ entries: [], selectedEntry: null, error: null });
-    get().saveEntries();
   },
 }));

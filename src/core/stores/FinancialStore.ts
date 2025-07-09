@@ -20,10 +20,11 @@ interface FinancialStore {
   deleteBudget: (id: string) => Promise<void>;
   
   // Analytics
-  getFinancialSummary: (startDate?: Date, endDate?: Date) => FinancialSummary;
+  getFinancialSummary: (startDate?: Date, endDate?: Date, animals?: any[]) => FinancialSummary;
   getEntriesByCategory: (category: string) => FinancialEntry[];
   getEntriesByAnimal: (animalId: string) => FinancialEntry[];
   getFeedExpenses: () => FinancialEntry[];
+  getPredictedIncome: (animals?: any[]) => { amount: number; note: string; breakdown: any[] };
 }
 
 const STORAGE_KEY = '@financial_entries';
@@ -170,7 +171,53 @@ export const useFinancialStore = create<FinancialStore>((set, get) => ({
     }
   },
 
-  getFinancialSummary: (startDate, endDate) => {
+  getPredictedIncome: (animals = []) => {
+    // Calculate predicted income based on animals' predicted sale costs
+    const animalsWithPredictions = animals.filter(animal => 
+      animal.predictedSaleCost && 
+      animal.predictedSaleCost > 0
+      // Now includes all project types (Market, Breeding, Show, Dairy)
+    );
+    
+    const totalPredictedIncome = animalsWithPredictions.reduce((sum, animal) => 
+      sum + (animal.predictedSaleCost || 0), 0
+    );
+    
+    // Create breakdown by species for educational insights
+    const breakdown = animalsWithPredictions.reduce((acc, animal) => {
+      const species = animal.species;
+      if (!acc[species]) {
+        acc[species] = { count: 0, totalValue: 0, animals: [] };
+      }
+      acc[species].count++;
+      acc[species].totalValue += animal.predictedSaleCost;
+      acc[species].animals.push({
+        name: animal.name,
+        earTag: animal.earTag,
+        projectType: animal.projectType,
+        predictedValue: animal.predictedSaleCost,
+        acquisitionCost: animal.acquisitionCost,
+        potentialProfit: animal.predictedSaleCost - animal.acquisitionCost
+      });
+      return acc;
+    }, {} as Record<string, any>);
+    
+    // Educational note about break-even analysis for FFA SAE
+    const note = animalsWithPredictions.length > 0 
+      ? `*Based on predicted sale values for ${animalsWithPredictions.length} ${animalsWithPredictions.length === 1 ? 'animal' : 'animals'}. This projection helps calculate your break-even point and potential profit for your SAE project.`
+      : '*Set predicted sale costs for your animals to see projected income and break-even analysis.';
+    
+    return {
+      amount: totalPredictedIncome,
+      note,
+      breakdown: Object.entries(breakdown).map(([species, data]) => ({
+        species,
+        ...data
+      }))
+    };
+  },
+
+  getFinancialSummary: (startDate, endDate, animals = []) => {
     const { entries } = get();
     const now = new Date();
     const start = startDate || new Date(now.getFullYear(), 0, 1); // Default to start of year
@@ -180,9 +227,13 @@ export const useFinancialStore = create<FinancialStore>((set, get) => ({
       entry.date >= start && entry.date <= end
     );
     
-    const totalIncome = filteredEntries
+    const actualIncome = filteredEntries
       .filter(e => e.type === 'income')
       .reduce((sum, e) => sum + e.amount, 0);
+    
+    // Get predicted income from animal sale projections
+    const predictedIncome = get().getPredictedIncome(animals);
+    const totalIncome = actualIncome + predictedIncome.amount;
     
     const totalExpenses = filteredEntries
       .filter(e => e.type === 'expense')
@@ -270,6 +321,8 @@ export const useFinancialStore = create<FinancialStore>((set, get) => ({
     
     return {
       totalIncome,
+      actualIncome,
+      predictedIncome,
       totalExpenses,
       netProfit,
       feedCostPerAnimal: 0, // Would need animal count integration

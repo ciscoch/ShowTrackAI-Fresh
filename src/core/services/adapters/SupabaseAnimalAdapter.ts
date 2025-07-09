@@ -25,6 +25,7 @@ export class SupabaseAnimalAdapter implements IAnimalService {
       pickupDate: dbAnimal.pickup_date ? new Date(dbAnimal.pickup_date) : undefined,
       projectType: dbAnimal.project_type || 'Market',
       acquisitionCost: dbAnimal.acquisition_cost || 0,
+      predictedSaleCost: dbAnimal.predicted_sale_cost,
       weight: dbAnimal.current_weight,
       healthStatus: this.mapHealthStatus(dbAnimal.health_status),
       notes: dbAnimal.notes,
@@ -49,6 +50,7 @@ export class SupabaseAnimalAdapter implements IAnimalService {
     if (animal.pickupDate !== undefined) dbAnimal.pickup_date = animal.pickupDate;
     if (animal.projectType !== undefined) dbAnimal.project_type = animal.projectType;
     if (animal.acquisitionCost !== undefined) dbAnimal.acquisition_cost = animal.acquisitionCost;
+    if (animal.predictedSaleCost !== undefined) dbAnimal.predicted_sale_cost = animal.predictedSaleCost;
     if (animal.weight !== undefined) dbAnimal.current_weight = animal.weight;
     if (animal.healthStatus !== undefined) dbAnimal.health_status = this.mapHealthStatusToDb(animal.healthStatus);
     if (animal.notes !== undefined) dbAnimal.notes = animal.notes;

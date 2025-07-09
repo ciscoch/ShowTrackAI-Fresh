@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { View, Text, StyleSheet, TextInput, TouchableOpacity, ScrollView, Alert } from 'react-native';
 import { Animal, SPECIES_OPTIONS, BREED_OPTIONS, PROJECT_TYPES, SEX_OPTIONS } from '../../../core/models';
 import { useAnimalStore } from '../../../core/stores';
@@ -34,11 +34,14 @@ export const AnimalFormScreen: React.FC<AnimalFormScreenProps> = ({
     pickupDate: animal?.pickupDate || null,
     projectType: animal?.projectType || '',
     acquisitionCost: animal?.acquisitionCost?.toString() || '',
+    predictedSaleCost: animal?.predictedSaleCost?.toString() || '',
     weight: animal?.weight?.toString() || '',
     notes: animal?.notes || '',
   });
 
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [showErrorSummary, setShowErrorSummary] = useState(false);
+  const scrollViewRef = useRef<ScrollView>(null);
 
   const validateForm = (): boolean => {
     const newErrors: Record<string, string> = {};
@@ -65,6 +68,17 @@ export const AnimalFormScreen: React.FC<AnimalFormScreenProps> = ({
 
   const handleSave = async () => {
     if (!validateForm()) {
+      setShowErrorSummary(true);
+      // Scroll to top to show error summary
+      scrollViewRef.current?.scrollTo({ y: 0, animated: true });
+      
+      // Show error alert
+      const errorCount = Object.keys(errors).length;
+      Alert.alert(
+        '❌ Validation Error',
+        `Please fix ${errorCount} ${errorCount === 1 ? 'error' : 'errors'} before saving. Check the red highlighted fields above.`,
+        [{ text: 'OK' }]
+      );
       return;
     }
     
@@ -81,6 +95,7 @@ export const AnimalFormScreen: React.FC<AnimalFormScreenProps> = ({
         pickupDate: formData.pickupDate || undefined,
         projectType: formData.projectType as 'Market' | 'Breeding' | 'Show' | 'Dairy',
         acquisitionCost: Number(formData.acquisitionCost) || 0,
+        predictedSaleCost: formData.predictedSaleCost ? Number(formData.predictedSaleCost) : undefined,
         weight: formData.weight ? Number(formData.weight) : undefined,
         notes: formData.notes || undefined,
       };
@@ -119,6 +134,23 @@ export const AnimalFormScreen: React.FC<AnimalFormScreenProps> = ({
     value: type,
   }));
 
+  // Clear errors and error summary when user starts typing
+  const clearFieldError = (fieldName: string) => {
+    if (errors[fieldName]) {
+      setErrors(prev => {
+        const newErrors = { ...prev };
+        delete newErrors[fieldName];
+        return newErrors;
+      });
+      // Hide error summary if no errors remain
+      if (Object.keys(errors).length <= 1) {
+        setShowErrorSummary(false);
+      }
+    }
+  };
+
+  const hasErrors = Object.keys(errors).length > 0;
+
   return (
     <View style={styles.container}>
       <View style={styles.header}>
@@ -127,13 +159,30 @@ export const AnimalFormScreen: React.FC<AnimalFormScreenProps> = ({
         </Text>
       </View>
 
-      <ScrollView style={styles.form} contentContainerStyle={styles.formContent}>
+      <ScrollView ref={scrollViewRef} style={styles.form} contentContainerStyle={styles.formContent}>
+        {/* Error Summary */}
+        {showErrorSummary && Object.keys(errors).length > 0 && (
+          <View style={styles.errorSummary}>
+            <Text style={styles.errorSummaryTitle}>
+              ⚠️ Please fix the following {Object.keys(errors).length} {Object.keys(errors).length === 1 ? 'error' : 'errors'}:
+            </Text>
+            {Object.entries(errors).map(([field, message]) => (
+              <Text key={field} style={styles.errorSummaryItem}>
+                • {message}
+              </Text>
+            ))}
+          </View>
+        )}
+
         <View style={styles.inputGroup}>
           <Text style={styles.label}>Name *</Text>
           <TextInput
             style={[styles.input, errors.name && styles.inputError]}
             value={formData.name}
-            onChangeText={(text) => setFormData({ ...formData, name: text })}
+            onChangeText={(text) => {
+              setFormData({ ...formData, name: text });
+              clearFieldError('name');
+            }}
             placeholder="Enter animal name"
           />
           {errors.name && <Text style={styles.errorText}>{errors.name}</Text>}
@@ -144,7 +193,10 @@ export const AnimalFormScreen: React.FC<AnimalFormScreenProps> = ({
           <TextInput
             style={[styles.input, errors.earTag && styles.inputError]}
             value={formData.earTag}
-            onChangeText={(text) => setFormData({ ...formData, earTag: text })}
+            onChangeText={(text) => {
+              setFormData({ ...formData, earTag: text });
+              clearFieldError('earTag');
+            }}
             placeholder="Enter ear tag"
           />
           {errors.earTag && <Text style={styles.errorText}>{errors.earTag}</Text>}
@@ -155,7 +207,10 @@ export const AnimalFormScreen: React.FC<AnimalFormScreenProps> = ({
           <TextInput
             style={[styles.input, errors.penNumber && styles.inputError]}
             value={formData.penNumber}
-            onChangeText={(text) => setFormData({ ...formData, penNumber: text })}
+            onChangeText={(text) => {
+              setFormData({ ...formData, penNumber: text });
+              clearFieldError('penNumber');
+            }}
             placeholder="Enter pen number"
           />
           {errors.penNumber && <Text style={styles.errorText}>{errors.penNumber}</Text>}
@@ -164,7 +219,10 @@ export const AnimalFormScreen: React.FC<AnimalFormScreenProps> = ({
         <FormPicker
           label="Species"
           value={formData.species}
-          onValueChange={(value) => setFormData({ ...formData, species: value, breed: '' })}
+          onValueChange={(value) => {
+            setFormData({ ...formData, species: value, breed: '' });
+            clearFieldError('species');
+          }}
           options={speciesOptions}
           placeholder="Select species"
           error={errors.species}
@@ -243,6 +301,21 @@ export const AnimalFormScreen: React.FC<AnimalFormScreenProps> = ({
         </View>
 
         <View style={styles.inputGroup}>
+          <Text style={styles.label}>Predicted Sale Cost 📊</Text>
+          <TextInput
+            style={[styles.input, errors.predictedSaleCost && styles.inputError]}
+            value={formData.predictedSaleCost}
+            onChangeText={(text) => setFormData({ ...formData, predictedSaleCost: text })}
+            placeholder="0.00"
+            keyboardType="numeric"
+          />
+          <Text style={styles.helperText}>
+            💡 Used for break-even analysis and SAE financial planning
+          </Text>
+          {errors.predictedSaleCost && <Text style={styles.errorText}>{errors.predictedSaleCost}</Text>}
+        </View>
+
+        <View style={styles.inputGroup}>
           <Text style={styles.label}>Current Weight (lbs)</Text>
           <TextInput
             style={styles.input}
@@ -271,12 +344,20 @@ export const AnimalFormScreen: React.FC<AnimalFormScreenProps> = ({
           <Text style={[styles.buttonText, styles.cancelButtonText]}>Cancel</Text>
         </TouchableOpacity>
         <TouchableOpacity 
-          style={[styles.button, isLoading && styles.disabledButton]} 
+          style={[
+            styles.button, 
+            (isLoading || (hasErrors && showErrorSummary)) && styles.disabledButton
+          ]} 
           onPress={handleSave}
-          disabled={isLoading}
+          disabled={isLoading || (hasErrors && showErrorSummary)}
         >
           <Text style={styles.buttonText}>
-            {isLoading ? 'Saving...' : (animal ? 'Update' : 'Add Animal')}
+            {isLoading 
+              ? 'Saving...' 
+              : (hasErrors && showErrorSummary)
+                ? `Fix ${Object.keys(errors).length} Error${Object.keys(errors).length === 1 ? '' : 's'}`
+                : (animal ? 'Update Animal' : 'Add Animal')
+            }
           </Text>
         </TouchableOpacity>
       </View>
@@ -337,6 +418,23 @@ const styles = StyleSheet.create({
     color: '#e74c3c',
     marginTop: 4,
   },
+  helperText: {
+    fontSize: 12,
+    color: '#6B7280',
+    marginTop: 4,
+    fontStyle: 'italic',
+  },
+  optionalLabel: {
+    fontSize: 12,
+    color: '#9CA3AF',
+    fontWeight: '400',
+    fontStyle: 'italic',
+  },
+  inputDisabled: {
+    backgroundColor: '#F9FAFB',
+    color: '#9CA3AF',
+    borderColor: '#E5E7EB',
+  },
   actions: {
     flexDirection: 'row',
     gap: 12,
@@ -368,5 +466,25 @@ const styles = StyleSheet.create({
   },
   disabledButton: {
     opacity: 0.6,
+  },
+  errorSummary: {
+    backgroundColor: '#FEF2F2',
+    borderWidth: 1,
+    borderColor: '#FCA5A5',
+    borderRadius: 8,
+    padding: 16,
+    marginBottom: 20,
+  },
+  errorSummaryTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#DC2626',
+    marginBottom: 8,
+  },
+  errorSummaryItem: {
+    fontSize: 14,
+    color: '#DC2626',
+    marginBottom: 4,
+    paddingLeft: 8,
   },
 });

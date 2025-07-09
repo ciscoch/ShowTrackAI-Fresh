@@ -11,6 +11,7 @@ export interface Animal {
   pickupDate?: Date;
   projectType: 'Market' | 'Breeding' | 'Show' | 'Dairy';
   acquisitionCost: number;
+  predictedSaleCost?: number;
   weight?: number;
   healthStatus: 'Healthy' | 'Sick' | 'Injured' | 'Under Treatment';
   notes?: string;

@@ -929,7 +929,7 @@ export const FinancialTrackingScreen: React.FC<FinancialTrackingScreenProps> = (
           style={[styles.tab, activeTab === 'overview' && styles.activeTab]}
           onPress={() => setActiveTab('overview')}
         >
-          <Text style={[styles.tabText, activeTab === 'overview' && styles.activeTabText]}>
+          <Text style={[styles.tabText, activeTab === 'overview' && styles.activeTabText]} numberOfLines={1}>
             Overview
           </Text>
         </TouchableOpacity>
@@ -937,7 +937,7 @@ export const FinancialTrackingScreen: React.FC<FinancialTrackingScreenProps> = (
           style={[styles.tab, activeTab === 'entries' && styles.activeTab]}
           onPress={() => setActiveTab('entries')}
         >
-          <Text style={[styles.tabText, activeTab === 'entries' && styles.activeTabText]}>
+          <Text style={[styles.tabText, activeTab === 'entries' && styles.activeTabText]} numberOfLines={1}>
             Entries
           </Text>
         </TouchableOpacity>
@@ -945,7 +945,7 @@ export const FinancialTrackingScreen: React.FC<FinancialTrackingScreenProps> = (
           style={[styles.tab, activeTab === 'feed' && styles.activeTab]}
           onPress={() => setActiveTab('feed')}
         >
-          <Text style={[styles.tabText, activeTab === 'feed' && styles.activeTabText]}>
+          <Text style={[styles.tabText, activeTab === 'feed' && styles.activeTabText]} numberOfLines={2}>
             Feed{"\n"}Analytics
           </Text>
         </TouchableOpacity>
@@ -953,7 +953,7 @@ export const FinancialTrackingScreen: React.FC<FinancialTrackingScreenProps> = (
           style={[styles.tab, activeTab === 'aet' && styles.activeTab]}
           onPress={() => setActiveTab('aet')}
         >
-          <Text style={[styles.tabText, activeTab === 'aet' && styles.activeTabText]}>
+          <Text style={[styles.tabText, activeTab === 'aet' && styles.activeTabText]} numberOfLines={2}>
             AET{"\n"}Skills
           </Text>
         </TouchableOpacity>
@@ -1077,14 +1077,12 @@ const styles = StyleSheet.create({
     color: '#6B7280',
     fontWeight: '500',
     textAlign: 'center',
-    flexWrap: 'wrap',
     lineHeight: 16,
   },
   activeTabText: {
     color: '#FFFFFF',
     fontWeight: '600',
     textAlign: 'center',
-    flexWrap: 'wrap',
     lineHeight: 16,
   },
   content: {

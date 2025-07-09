@@ -271,7 +271,14 @@ export const isFeatureEnabled = (feature: keyof EnvironmentConfig['features']): 
 
 // Backend configuration helpers
 export const useSupabaseBackend = (): boolean => {
-  return config.useBackend && !!config.supabase.url && !!config.supabase.anonKey;
+  const result = config.useBackend && !!config.supabase.url && !!config.supabase.anonKey;
+  console.log('🔧 useSupabaseBackend check:', {
+    useBackend: config.useBackend,
+    hasUrl: !!config.supabase.url,
+    hasAnonKey: !!config.supabase.anonKey,
+    result
+  });
+  return result;
 };
 
 export const getApiUrl = (): string => {

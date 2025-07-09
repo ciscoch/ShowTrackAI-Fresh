@@ -14,12 +14,14 @@ import * as Location from 'expo-location';
 import { Journal, FeedTrackingData, FeedItem } from '../../../core/models/Journal';
 import { useJournalStore } from '../../../core/stores/JournalStore';
 import { useTimeTrackingStore } from '../../../core/stores/TimeTrackingStore';
+import { useAnimalStore } from '../../../core/stores/AnimalStore';
 import { aetSkillMatcher } from '../../../core/services/AETSkillMatcher';
 import type { AIActivitySuggestion } from '../../../core/services/AETSkillMatcher';
 import { FormPicker } from '../../../shared/components/FormPicker';
 import { DatePicker } from '../../../shared/components/DatePicker';
 import { TimeTracker } from '../../../shared/components/TimeTracker';
 import { FeedSelector } from '../../../shared/components/FeedSelector';
+import { PhotoCapture } from '../../../shared/components/PhotoCapture';
 
 interface JournalEntryScreenProps {
   entry?: Journal;
@@ -36,6 +38,7 @@ export const JournalEntryScreen: React.FC<JournalEntryScreenProps> = ({
 }) => {
   const { addEntry, updateEntry, entries, loadEntries } = useJournalStore();
   const { activeEntry, startTracking, stopTracking } = useTimeTrackingStore();
+  const { animals, loadAnimals } = useAnimalStore();
   const [loading, setLoading] = useState(false);
   
   const [formData, setFormData] = useState({
@@ -60,6 +63,12 @@ export const JournalEntryScreen: React.FC<JournalEntryScreenProps> = ({
     totalCost: 0,
     notes: ''
   });
+  
+  // Multi-animal feed tracking
+  const [animalFeedData, setAnimalFeedData] = useState<Map<string, FeedTrackingData>>(new Map());
+  const [selectedAnimalId, setSelectedAnimalId] = useState<string | undefined>(entry?.animalId);
+  const [activeAnimalTab, setActiveAnimalTab] = useState<string | null>(null);
+  
   const [aiSuggestions, setAiSuggestions] = useState<AIActivitySuggestion | null>(null);
   const [useLocationWeather, setUseLocationWeather] = useState(false);
   const [locationLoading, setLocationLoading] = useState(false);
@@ -77,13 +86,22 @@ export const JournalEntryScreen: React.FC<JournalEntryScreenProps> = ({
   const [selectedObjectives, setSelectedObjectives] = useState<string[]>(formData.objectives);
   const [detailedAETCategories, setDetailedAETCategories] = useState(aetSkillMatcher.getDetailedAETCategories());
   const [selectedAETCategories, setSelectedAETCategories] = useState<string[]>([]);
+  const [journalPhotos, setJournalPhotos] = useState<string[]>(entry?.photos || []);
   
   const scrollViewRef = useRef<ScrollView>(null);
 
-  // Load entries on mount
+  // Load entries and animals on mount
   useEffect(() => {
     loadEntries();
-  }, [loadEntries]);
+    loadAnimals();
+  }, [loadEntries, loadAnimals]);
+
+  // Monitor useLocationWeather to trigger location/weather fetching
+  useEffect(() => {
+    if (useLocationWeather) {
+      getLocationWeather();
+    }
+  }, [useLocationWeather]);
 
   const categories = [
     { label: 'Feeding & Nutrition', value: 'Feeding & Nutrition' },
@@ -168,15 +186,14 @@ export const JournalEntryScreen: React.FC<JournalEntryScreenProps> = ({
   };
 
   const applyAISuggestions = () => {
-    if (aiSuggestions) {
+    if (autofillSuggestions) {
       setFormData(prev => ({
         ...prev,
-        title: aiSuggestions.suggestedTitle,
-        description: aiSuggestions.suggestedDescription,
-        aetSkills: [...prev.aetSkills, ...aiSuggestions.suggestedAETSkills],
-        objectives: [...prev.objectives, ...aiSuggestions.suggestedObjectives]
+        title: autofillSuggestions.title,
+        description: autofillSuggestions.description
       }));
-      setSelectedObjectives(prev => [...prev, ...aiSuggestions.suggestedObjectives]);
+      setShowAutofillPrompt(false);
+      setAutofillSuggestions(null);
     }
   };
 
@@ -239,9 +256,81 @@ export const JournalEntryScreen: React.FC<JournalEntryScreenProps> = ({
     setFeedData(prev => ({ ...prev, notes }));
   };
 
+  // Multi-animal feed tracking helpers
+  const addAnimalToFeedTracking = (animalId: string) => {
+    if (!animalFeedData.has(animalId)) {
+      setAnimalFeedData(prev => {
+        const newMap = new Map(prev);
+        newMap.set(animalId, { feeds: [], totalCost: 0, notes: '' });
+        return newMap;
+      });
+      setActiveAnimalTab(animalId);
+    }
+  };
+
+  const updateAnimalFeedData = (animalId: string, feedData: FeedTrackingData) => {
+    setAnimalFeedData(prev => {
+      const newMap = new Map(prev);
+      newMap.set(animalId, feedData);
+      return newMap;
+    });
+  };
+
+  const removeAnimalFromFeedTracking = (animalId: string) => {
+    setAnimalFeedData(prev => {
+      const newMap = new Map(prev);
+      newMap.delete(animalId);
+      if (activeAnimalTab === animalId) {
+        const remainingKeys = Array.from(newMap.keys());
+        setActiveAnimalTab(remainingKeys.length > 0 ? remainingKeys[0] : null);
+      }
+      return newMap;
+    });
+  };
+
+  const getActiveFeedData = (): FeedTrackingData => {
+    if (activeAnimalTab && animalFeedData.has(activeAnimalTab)) {
+      return animalFeedData.get(activeAnimalTab)!;
+    }
+    return feedData;
+  };
+
+  const handleActiveAnimalFeedsChange = (feeds: FeedItem[]) => {
+    if (activeAnimalTab) {
+      const currentData = animalFeedData.get(activeAnimalTab) || { feeds: [], totalCost: 0, notes: '' };
+      updateAnimalFeedData(activeAnimalTab, { ...currentData, feeds });
+    } else {
+      handleFeedsChange(feeds);
+    }
+    setLastFeedOperation(Date.now());
+  };
+
+  const handleActiveAnimalNotesChange = (notes: string) => {
+    if (activeAnimalTab) {
+      const currentData = animalFeedData.get(activeAnimalTab) || { feeds: [], totalCost: 0, notes: '' };
+      updateAnimalFeedData(activeAnimalTab, { ...currentData, notes });
+    } else {
+      handleFeedNotesChange(notes);
+    }
+  };
+
   const requestLocationPermission = async (): Promise<boolean> => {
     try {
+      console.log('Requesting location permission...');
+      
+      // First check current permissions
+      const currentPermission = await Location.getForegroundPermissionsAsync();
+      console.log('Current permission status:', currentPermission.status);
+      
+      if (currentPermission.status === 'granted') {
+        setLocationPermission(currentPermission);
+        return true;
+      }
+      
+      // Request permission if not granted
       const { status } = await Location.requestForegroundPermissionsAsync();
+      console.log('Permission request result:', status);
+      
       const permissionResponse = await Location.getForegroundPermissionsAsync();
       setLocationPermission(permissionResponse);
       
@@ -249,13 +338,23 @@ export const JournalEntryScreen: React.FC<JournalEntryScreenProps> = ({
         Alert.alert(
           'Location Permission Required',
           'Please enable location permissions in your device settings to use automatic weather and location features.',
-          [{ text: 'OK' }]
+          [
+            { text: 'OK' },
+            { 
+              text: 'Open Settings', 
+              onPress: () => {
+                // On iOS, this will open the app settings
+                console.log('User requested to open settings');
+              }
+            }
+          ]
         );
         return false;
       }
       return true;
     } catch (error) {
       console.error('Permission request error:', error);
+      Alert.alert('Permission Error', 'Unable to request location permission. Please enable it manually in device settings.');
       return false;
     }
   };
@@ -263,15 +362,38 @@ export const JournalEntryScreen: React.FC<JournalEntryScreenProps> = ({
   const getCurrentLocation = async (): Promise<Location.LocationObject | null> => {
     try {
       setLocationLoading(true);
+      console.log('Getting current location...');
+      
       const location = await Location.getCurrentPositionAsync({
         accuracy: Location.Accuracy.Balanced,
-        timeInterval: 5000,
+        timeInterval: 10000,
+        maximumAge: 60000, // Accept cached location up to 1 minute old
       });
+      
+      console.log('Location obtained:', location.coords.latitude, location.coords.longitude);
       return location;
     } catch (error) {
       console.error('Location error:', error);
-      Alert.alert('Location Error', 'Unable to get current location. Please enter manually.');
-      return null;
+      
+      // Try with lower accuracy as fallback
+      try {
+        console.log('Trying with lower accuracy...');
+        const location = await Location.getCurrentPositionAsync({
+          accuracy: Location.Accuracy.Low,
+          timeInterval: 15000,
+          maximumAge: 300000, // Accept cached location up to 5 minutes old
+        });
+        console.log('Location obtained with lower accuracy:', location.coords.latitude, location.coords.longitude);
+        return location;
+      } catch (fallbackError) {
+        console.error('Fallback location error:', fallbackError);
+        Alert.alert(
+          'Location Error', 
+          'Unable to get current location. Please check that location services are enabled and try again, or enter location manually.',
+          [{ text: 'OK' }]
+        );
+        return null;
+      }
     } finally {
       setLocationLoading(false);
     }
@@ -364,11 +486,17 @@ export const JournalEntryScreen: React.FC<JournalEntryScreenProps> = ({
   };
 
   const getLocationWeather = async () => {
-    if (!useLocationWeather) return;
+    if (!useLocationWeather) {
+      console.log('useLocationWeather is false, skipping...');
+      return;
+    }
+    
+    console.log('Starting location and weather fetch...');
     
     // Request permission first
     const hasPermission = await requestLocationPermission();
     if (!hasPermission) {
+      console.log('Permission denied, disabling auto location');
       setUseLocationWeather(false);
       return;
     }
@@ -377,11 +505,13 @@ export const JournalEntryScreen: React.FC<JournalEntryScreenProps> = ({
       // Get current location
       const location = await getCurrentLocation();
       if (!location) {
+        console.log('Failed to get location, disabling auto location');
         setUseLocationWeather(false);
         return;
       }
       
       const { latitude, longitude } = location.coords;
+      console.log('Got coordinates, fetching location name and weather...');
       
       // Get location name and weather data in parallel
       const [locationName, weatherData] = await Promise.all([
@@ -389,12 +519,17 @@ export const JournalEntryScreen: React.FC<JournalEntryScreenProps> = ({
         getWeatherData(latitude, longitude)
       ]);
       
+      console.log('Location name:', locationName);
+      console.log('Weather data:', weatherData);
+      
       // Update form data
       setFormData(prev => ({
         ...prev,
         location: locationName,
         weather: weatherData
       }));
+      
+      console.log('Successfully updated location and weather');
       
     } catch (error) {
       console.error('Failed to get location weather:', error);
@@ -409,8 +544,13 @@ export const JournalEntryScreen: React.FC<JournalEntryScreenProps> = ({
     
     try {
       // Analyze all available context for intelligent suggestions
+      const allFeeds = animalFeedData.size > 0 
+        ? Array.from(animalFeedData.values()).flatMap(data => data.feeds)
+        : feedData.feeds;
+      
       const context = {
-        feeds: feedData.feeds,
+        feeds: allFeeds,
+        animalCount: animalFeedData.size > 0 ? animalFeedData.size : 0,
         location: formData.location,
         weather: formData.weather,
         date: formData.date,
@@ -441,7 +581,7 @@ export const JournalEntryScreen: React.FC<JournalEntryScreenProps> = ({
     // Analyze feeds for activity type
     const feedTypes = context.feeds.map((f: any) => f.product?.toLowerCase() || '');
     const feedBrands = context.feeds.map((f: any) => f.brand || '');
-    const totalCost = feedData.totalCost;
+    const totalCost = context.feeds.reduce((sum: number, feed: any) => sum + (feed.cost || 0), 0);
     
     // Analyze AET categories for skill focus
     const categoryNames = context.aetCategories.map((id: string) => 
@@ -463,10 +603,12 @@ export const JournalEntryScreen: React.FC<JournalEntryScreenProps> = ({
     if (feedTypes.length > 0) {
       // Feed-based activity
       const mainActivity = determineFeedActivity(feedTypes, feedBrands);
-      suggestedTitle = `${timeContext.period} ${mainActivity}`;
+      const animalContext = context.animalCount > 1 ? ` (${context.animalCount} Animals)` : '';
+      suggestedTitle = `${timeContext.period} ${mainActivity}${animalContext}`;
       
       suggestedDescription = generateFeedDescription({
         feeds: context.feeds,
+        animalCount: context.animalCount,
         location: context.location,
         weather: context.weather,
         timeContext,
@@ -546,9 +688,13 @@ export const JournalEntryScreen: React.FC<JournalEntryScreenProps> = ({
   };
 
   const generateFeedDescription = (params: any): string => {
-    const { feeds, location, weather, timeContext, categories, cost, isGoodWeather } = params;
+    const { feeds, animalCount, location, weather, timeContext, categories, cost, isGoodWeather } = params;
     
     let description = `Conducted ${timeContext.period.toLowerCase()} feeding operations `;
+    
+    if (animalCount > 1) {
+      description += `for ${animalCount} animals `;
+    }
     
     if (location) {
       description += `at ${location}. `;
@@ -644,6 +790,26 @@ export const JournalEntryScreen: React.FC<JournalEntryScreenProps> = ({
     description += `Documented observations and maintained detailed records for continuous improvement of farm operations and educational outcomes.`;
     
     return description;
+  };
+
+  const getPhotoContext = (): 'feeding' | 'health' | 'behavior' | 'facility' | 'equipment' | 'general' => {
+    // Determine photo context based on selected AET categories and form data
+    if (selectedAETCategories.includes('feeding_nutrition') || feedData.feeds.length > 0 || animalFeedData.size > 0) {
+      return 'feeding';
+    }
+    if (selectedAETCategories.includes('animal_health') || selectedAETCategories.includes('health_veterinary_care')) {
+      return 'health';
+    }
+    if (selectedAETCategories.includes('animal_behavior_management')) {
+      return 'behavior';
+    }
+    if (selectedAETCategories.includes('facilities_equipment') || selectedAETCategories.includes('equipment_maintenance')) {
+      return 'facility';
+    }
+    if (selectedAETCategories.includes('tool_equipment_operation')) {
+      return 'equipment';
+    }
+    return 'general';
   };
 
   const applyAutofillSuggestions = () => {
@@ -751,7 +917,10 @@ export const JournalEntryScreen: React.FC<JournalEntryScreenProps> = ({
 
     // Validate feed tracking only when Feeding & Nutrition is selected
     if (selectedAETCategories.includes('feeding_nutrition')) {
-      if (!feedData.feeds || feedData.feeds.length === 0) {
+      const hasGeneralFeeds = feedData.feeds && feedData.feeds.length > 0;
+      const hasAnimalFeeds = animalFeedData.size > 0 && Array.from(animalFeedData.values()).some(data => data.feeds.length > 0);
+      
+      if (!hasGeneralFeeds && !hasAnimalFeeds) {
         Alert.alert('Feed Tracking Required', 'Please add at least one feed. Feed tracking is required for Feeding & Nutrition activities.');
         return false;
       }
@@ -768,20 +937,113 @@ export const JournalEntryScreen: React.FC<JournalEntryScreenProps> = ({
     return true;
   };
 
-  const handleSave = async () => {
-    if (!validateForm()) return;
+  const handleCheckOutAndSave = async () => {
+    // Calculate duration from timer if running
+    if (isTracking && trackingStartTime) {
+      const calculatedDuration = Math.floor((Date.now() - trackingStartTime.getTime()) / 60000);
+      
+      // Update form data with calculated duration
+      const updatedFormData = { ...formData, duration: calculatedDuration };
+      setFormData(updatedFormData);
+      
+      // Validate with the calculated duration using temp validation
+      if (!updatedFormData.title.trim()) {
+        Alert.alert('Validation Error', 'Please enter a title for your journal entry.');
+        return;
+      }
+      
+      if (!updatedFormData.description.trim()) {
+        Alert.alert('Validation Error', 'Please enter a description of your activity.');
+        return;
+      }
 
-    // Stop time tracking if active
+      // Validate feed tracking only when Feeding & Nutrition is selected
+      if (selectedAETCategories.includes('feeding_nutrition')) {
+        const hasGeneralFeeds = feedData.feeds && feedData.feeds.length > 0;
+        const hasAnimalFeeds = animalFeedData.size > 0 && Array.from(animalFeedData.values()).some(data => data.feeds.length > 0);
+        
+        if (!hasGeneralFeeds && !hasAnimalFeeds) {
+          Alert.alert('Feed Tracking Required', 'Please add at least one feed. Feed tracking is required for Feeding & Nutrition activities.');
+          return;
+        }
+      }
+    } else {
+      // No timer running, use regular validation
+      if (!validateForm()) return;
+    }
+
+    // Stop time tracking and save
     if (isTracking && activeEntry) {
       handleStopTimeTracking();
     }
+    
+    // Proceed with save after stopping timer
+    await performSave();
+  };
+
+  const handleSave = async () => {
+    if (!validateForm()) return;
+
+    // Check if timer is running and prompt user
+    if (isTracking) {
+      Alert.alert(
+        'Timer Still Running',
+        'You have an active timer running. What would you like to do?',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { 
+            text: 'Save Without Stopping Timer', 
+            onPress: () => performSave(),
+            style: 'default'
+          },
+          { 
+            text: 'Check Out & Save', 
+            onPress: () => handleCheckOutAndSave(),
+            style: 'default'
+          }
+        ]
+      );
+      return;
+    }
+
+    // Save normally if no timer running
+    await performSave();
+  };
+
+  const performSave = async () => {
 
     setLoading(true);
     try {
       // Calculate total cost and prepare feed data (include if feeds are present)
       let finalFeedData = null;
+      let finalAnimalId = selectedAnimalId;
       
-      if (feedData.feeds.length > 0) {
+      if (animalFeedData.size > 0) {
+        // Consolidate multi-animal feed data
+        const allFeeds: FeedItem[] = [];
+        let totalCost = 0;
+        let consolidatedNotes = '';
+        
+        for (const [animalId, data] of animalFeedData.entries()) {
+          const animal = animals.find(a => a.id === animalId);
+          allFeeds.push(...data.feeds);
+          totalCost += data.feeds.reduce((sum, feed) => sum + (feed.cost || 0), 0);
+          
+          if (data.notes) {
+            consolidatedNotes += `${animal?.name || 'Unknown'}: ${data.notes}\n`;
+          }
+        }
+        
+        if (allFeeds.length > 0) {
+          finalFeedData = {
+            feeds: allFeeds,
+            totalCost,
+            notes: consolidatedNotes.trim()
+          };
+          // For multi-animal entries, don't set a specific animalId
+          finalAnimalId = undefined;
+        }
+      } else if (feedData.feeds.length > 0) {
         const totalCost = feedData.feeds.reduce((sum, feed) => sum + (feed.cost || 0), 0);
         finalFeedData = {
           ...feedData,
@@ -791,6 +1053,8 @@ export const JournalEntryScreen: React.FC<JournalEntryScreenProps> = ({
       
       const journalData: Omit<Journal, 'id' | 'createdAt' | 'updatedAt'> = {
         ...formData,
+        animalId: finalAnimalId,
+        photos: journalPhotos.length > 0 ? journalPhotos : undefined,
         feedData: finalFeedData, // Include feed data only when present
         userId: 'current-user', // Would get from auth context
       };
@@ -803,9 +1067,12 @@ export const JournalEntryScreen: React.FC<JournalEntryScreenProps> = ({
 
       const successMessage = finalFeedData
         ? (() => {
-            const feedSummary = finalFeedData.feeds.length === 1 
-              ? `${finalFeedData.feeds[0].amount} ${finalFeedData.feeds[0].unit} of ${finalFeedData.feeds[0].product}`
-              : `${finalFeedData.feeds.length} different feeds`;
+            const animalCount = animalFeedData.size;
+            const feedSummary = animalCount > 0 
+              ? `${finalFeedData.feeds.length} feeds for ${animalCount} animal${animalCount > 1 ? 's' : ''}`
+              : finalFeedData.feeds.length === 1 
+                ? `${finalFeedData.feeds[0].amount} ${finalFeedData.feeds[0].unit} of ${finalFeedData.feeds[0].product}`
+                : `${finalFeedData.feeds.length} different feeds`;
             return `Journal entry ${entry ? 'updated' : 'created'} successfully!\n\nFeed tracked: ${feedSummary}${finalFeedData.totalCost > 0 ? ` ($${finalFeedData.totalCost.toFixed(2)})` : ''}`;
           })()
         : `Journal entry ${entry ? 'updated' : 'created'} successfully!`;
@@ -1203,9 +1470,11 @@ export const JournalEntryScreen: React.FC<JournalEntryScreenProps> = ({
           </View>
         )}
 
+        {renderTimeTracker()}
+
         {renderAETSkills()}
 
-        {/* Feed Tracking - Required for Feeding & Nutrition, Optional for others */}
+        {/* Multi-Animal Feed Tracking - Required for Feeding & Nutrition, Optional for others */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>
@@ -1224,27 +1493,148 @@ export const JournalEntryScreen: React.FC<JournalEntryScreenProps> = ({
             }
           </Text>
           
-          <FeedSelector
-            feeds={feedData.feeds}
-            onFeedsChange={handleFeedsChange}
-            maxFeeds={3}
-          />
-          
-          {feedData.feeds.length > 0 && (
-            <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Feed Notes (Optional)</Text>
-              <TextInput
-                style={[styles.textInput, styles.textArea]}
-                value={feedData.notes}
-                onChangeText={handleFeedNotesChange}
-                placeholder="Notes about feeding, animal response, quality observations..."
-                multiline
-                numberOfLines={3}
+          {/* Animal Selection and Management */}
+          <View style={styles.inputGroup}>
+            <View style={styles.animalSelectorHeader}>
+              <Text style={styles.inputLabel}>Select Animal to Add Feed Data</Text>
+              <FormPicker
+                label=""
+                value=""
+                onValueChange={(animalId) => {
+                  if (animalId && animalId !== '') {
+                    addAnimalToFeedTracking(animalId);
+                  }
+                }}
+                options={[
+                  { label: 'Choose an animal...', value: '' },
+                  ...animals
+                    .filter(animal => !animalFeedData.has(animal.id))
+                    .map(animal => ({
+                      label: `${animal.name} (${animal.breed})`,
+                      value: animal.id
+                    }))
+                ]}
+                placeholder="Add animal for feed tracking"
               />
+            </View>
+          </View>
+
+          {/* Animal Tabs */}
+          {animalFeedData.size > 0 && (
+            <View style={styles.animalTabs}>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                {Array.from(animalFeedData.keys()).map(animalId => {
+                  const animal = animals.find(a => a.id === animalId);
+                  return (
+                    <TouchableOpacity
+                      key={animalId}
+                      style={[
+                        styles.animalTab,
+                        activeAnimalTab === animalId && styles.activeAnimalTab
+                      ]}
+                      onPress={() => setActiveAnimalTab(animalId)}
+                    >
+                      <Text style={[
+                        styles.animalTabText,
+                        activeAnimalTab === animalId && styles.activeAnimalTabText
+                      ]}>
+                        {animal?.name || 'Unknown'}
+                      </Text>
+                      <TouchableOpacity
+                        style={styles.removeAnimalButton}
+                        onPress={() => removeAnimalFromFeedTracking(animalId)}
+                      >
+                        <Text style={styles.removeAnimalButtonText}>×</Text>
+                      </TouchableOpacity>
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
+            </View>
+          )}
+
+          {/* General Feed Data (when no specific animals selected) */}
+          {animalFeedData.size === 0 && (
+            <>
+              <FeedSelector
+                feeds={feedData.feeds}
+                onFeedsChange={handleFeedsChange}
+                maxFeeds={3}
+              />
+              
+              {feedData.feeds.length > 0 && (
+                <View style={styles.inputGroup}>
+                  <Text style={styles.inputLabel}>Feed Notes (Optional)</Text>
+                  <TextInput
+                    style={[styles.textInput, styles.textArea]}
+                    value={feedData.notes}
+                    onChangeText={handleFeedNotesChange}
+                    placeholder="Notes about feeding, animal response, quality observations..."
+                    multiline
+                    numberOfLines={3}
+                  />
+                </View>
+              )}
+            </>
+          )}
+
+          {/* Animal-Specific Feed Data */}
+          {activeAnimalTab && (
+            <View style={styles.animalFeedSection}>
+              <Text style={styles.animalFeedTitle}>
+                Feed Data for {animals.find(a => a.id === activeAnimalTab)?.name}
+              </Text>
+              
+              <FeedSelector
+                feeds={getActiveFeedData().feeds}
+                onFeedsChange={handleActiveAnimalFeedsChange}
+                maxFeeds={3}
+              />
+              
+              {getActiveFeedData().feeds.length > 0 && (
+                <View style={styles.inputGroup}>
+                  <Text style={styles.inputLabel}>Feed Notes (Optional)</Text>
+                  <TextInput
+                    style={[styles.textInput, styles.textArea]}
+                    value={getActiveFeedData().notes || ''}
+                    onChangeText={handleActiveAnimalNotesChange}
+                    placeholder="Notes about feeding, animal response, quality observations..."
+                    multiline
+                    numberOfLines={3}
+                  />
+                </View>
+              )}
+            </View>
+          )}
+
+          {/* Feed Summary */}
+          {(animalFeedData.size > 0 || feedData.feeds.length > 0) && (
+            <View style={styles.feedSummary}>
+              <Text style={styles.feedSummaryTitle}>📊 Feed Summary</Text>
+              {animalFeedData.size > 0 ? (
+                Array.from(animalFeedData.entries()).map(([animalId, data]) => {
+                  const animal = animals.find(a => a.id === animalId);
+                  const totalCost = data.feeds.reduce((sum, feed) => sum + (feed.cost || 0), 0);
+                  return (
+                    <View key={animalId} style={styles.animalSummaryRow}>
+                      <Text style={styles.animalSummaryText}>
+                        {animal?.name}: {data.feeds.length} feeds
+                        {totalCost > 0 && ` ($${totalCost.toFixed(2)})`}
+                      </Text>
+                    </View>
+                  );
+                })
+              ) : (
+                <View style={styles.animalSummaryRow}>
+                  <Text style={styles.animalSummaryText}>
+                    General: {feedData.feeds.length} feeds
+                    {feedData.totalCost > 0 && ` ($${feedData.totalCost.toFixed(2)})`}
+                  </Text>
+                </View>
+              )}
             </View>
           )}
         </View>
-        {renderTimeTracker()}
         {renderLearningObjectives()}
         {renderReflectionSection()}
 
@@ -1272,7 +1662,7 @@ export const JournalEntryScreen: React.FC<JournalEntryScreenProps> = ({
                 <TouchableOpacity 
                   style={styles.autofillButton}
                   onPress={generateAutofillSuggestions}
-                  disabled={selectedAETCategories.length === 0 || (selectedAETCategories.includes('feeding_nutrition') && feedData.feeds.length === 0)}
+                  disabled={selectedAETCategories.includes('feeding_nutrition') && feedData.feeds.length === 0 && animalFeedData.size === 0}
                 >
                   <Text style={styles.autofillIcon}>✨</Text>
                   <Text style={styles.autofillButtonText}>AI Autofill</Text>
@@ -1336,7 +1726,7 @@ export const JournalEntryScreen: React.FC<JournalEntryScreenProps> = ({
                 </TouchableOpacity>
                 <TouchableOpacity 
                   style={styles.autofillUseButton}
-                  onPress={applyAutofillSuggestions}
+                  onPress={applyAISuggestions}
                 >
                   <Text style={styles.autofillUseText}>✨ Use AI Suggestions</Text>
                 </TouchableOpacity>
@@ -1364,9 +1754,7 @@ export const JournalEntryScreen: React.FC<JournalEntryScreenProps> = ({
                   (weatherLoading || locationLoading) && styles.autoDetectButtonLoading
                 ]}
                 onPress={() => {
-                  const newValue = !useLocationWeather;
-                  setUseLocationWeather(newValue);
-                  if (newValue) getLocationWeather();
+                  setUseLocationWeather(!useLocationWeather);
                 }}
                 disabled={weatherLoading || locationLoading}
               >
@@ -1438,15 +1826,44 @@ export const JournalEntryScreen: React.FC<JournalEntryScreenProps> = ({
             </View>
           </View>
         </View>
+
+        {/* Photo Documentation */}
+        <View style={styles.section}>
+          <PhotoCapture
+            onPhotosChange={setJournalPhotos}
+            existingPhotos={journalPhotos}
+            maxPhotos={4}
+            context={getPhotoContext()}
+            showGuidance={true}
+          />
+        </View>
       </ScrollView>
 
       <View style={styles.footer}>
+        {isTracking && (
+          <TouchableOpacity
+            style={[styles.footerCheckOutButton, loading && styles.saveButtonDisabled]}
+            onPress={handleCheckOutAndSave}
+            disabled={loading}
+          >
+            <Text style={styles.footerCheckOutButtonText}>
+              ⏹️ Check Out & Save
+            </Text>
+          </TouchableOpacity>
+        )}
         <TouchableOpacity
-          style={[styles.saveButton, loading && styles.saveButtonDisabled]}
+          style={[
+            styles.saveButton, 
+            loading && styles.saveButtonDisabled,
+            isTracking && styles.saveButtonSecondary
+          ]}
           onPress={handleSave}
           disabled={loading}
         >
-          <Text style={styles.saveButtonText}>
+          <Text style={[
+            styles.saveButtonText,
+            isTracking && styles.saveButtonTextSecondary
+          ]}>
             {loading ? 'Saving...' : entry ? 'Update Entry' : 'Save Entry'}
           </Text>
         </TouchableOpacity>
@@ -1466,6 +1883,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 16,
     paddingVertical: 16,
+    paddingTop: 60,
     backgroundColor: '#fff',
     borderBottomWidth: 1,
     borderBottomColor: '#eee',
@@ -2003,6 +2421,24 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
   },
+  footerCheckOutButton: {
+    backgroundColor: '#FF3B30',
+    paddingVertical: 16,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  footerCheckOutButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  saveButtonSecondary: {
+    backgroundColor: '#8E8E93',
+  },
+  saveButtonTextSecondary: {
+    color: '#fff',
+  },
   // New styles for enhanced features
   sectionHeader: {
     flexDirection: 'row',
@@ -2249,5 +2685,153 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
     color: '#FFFFFF',
+  },
+  // Autofill prompt specific styles
+  autofillDismissButton: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    width: 24,
+    height: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  autofillDismissText: {
+    fontSize: 16,
+    color: '#666',
+    fontWeight: '500',
+  },
+  autofillPreviewLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#007AFF',
+    marginTop: 12,
+    marginBottom: 4,
+  },
+  autofillPreviewText: {
+    fontSize: 14,
+    color: '#333',
+    lineHeight: 18,
+    marginBottom: 8,
+  },
+  autofillPromptActions: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 16,
+  },
+  autofillKeepManualButton: {
+    flex: 1,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    alignItems: 'center',
+    backgroundColor: '#F5F5F5',
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+  },
+  autofillKeepManualText: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#666',
+  },
+  autofillUseButton: {
+    flex: 1.5,
+    paddingVertical: 14,
+    paddingHorizontal: 20,
+    borderRadius: 10,
+    alignItems: 'center',
+    backgroundColor: '#007AFF',
+    borderWidth: 2,
+    borderColor: '#0051D5',
+    shadowColor: '#007AFF',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+    elevation: 6,
+  },
+  autofillUseText: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#FFFFFF',
+    textAlign: 'center',
+  },
+  // Multi-animal feed tracking styles
+  animalSelectorHeader: {
+    marginBottom: 12,
+  },
+  animalTabs: {
+    marginVertical: 12,
+  },
+  animalTab: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f8f9fa',
+    borderRadius: 20,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    marginRight: 8,
+    borderWidth: 1,
+    borderColor: '#dee2e6',
+  },
+  activeAnimalTab: {
+    backgroundColor: '#007AFF',
+    borderColor: '#007AFF',
+  },
+  animalTabText: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#495057',
+    marginRight: 6,
+  },
+  activeAnimalTabText: {
+    color: '#fff',
+  },
+  removeAnimalButton: {
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    backgroundColor: 'rgba(255, 255, 255, 0.3)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  removeAnimalButtonText: {
+    fontSize: 12,
+    fontWeight: 'bold',
+    color: '#666',
+  },
+  animalFeedSection: {
+    marginTop: 16,
+    padding: 12,
+    backgroundColor: '#f8f9fa',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#dee2e6',
+  },
+  animalFeedTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: 12,
+  },
+  feedSummary: {
+    marginTop: 16,
+    padding: 12,
+    backgroundColor: '#e3f2fd',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#bbdefb',
+  },
+  feedSummaryTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#1976d2',
+    marginBottom: 8,
+  },
+  animalSummaryRow: {
+    marginBottom: 4,
+  },
+  animalSummaryText: {
+    fontSize: 13,
+    color: '#1976d2',
   },
 });

@@ -14,14 +14,14 @@ import { aetSkillMatcher } from '../../../core/services/AETSkillMatcher';
 
 interface JournalListScreenProps {
   onAddEntry: () => void;
-  onEditEntry: (entry: Journal) => void;
+  onViewEntry: (entry: Journal) => void;
   onViewAnalytics: () => void;
   onBack?: () => void;
 }
 
 export const JournalListScreen: React.FC<JournalListScreenProps> = ({
   onAddEntry,
-  onEditEntry,
+  onViewEntry,
   onViewAnalytics,
   onBack,
 }) => {
@@ -89,7 +89,7 @@ export const JournalListScreen: React.FC<JournalListScreenProps> = ({
   const renderEntry = ({ item }: { item: Journal }) => (
     <TouchableOpacity
       style={styles.entryCard}
-      onPress={() => onEditEntry(item)}
+      onPress={() => onViewEntry(item)}
       onLongPress={() => handleDeleteEntry(item)}
     >
       <View style={styles.entryHeader}>
@@ -261,6 +261,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 16,
     paddingVertical: 16,
+    paddingTop: 60,
     backgroundColor: '#fff',
     borderBottomWidth: 1,
     borderBottomColor: '#eee',

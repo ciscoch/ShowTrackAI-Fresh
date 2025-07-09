@@ -140,6 +140,93 @@ export const EliteDashboard: React.FC<EliteDashboardProps> = ({
           </View>
         </View>
 
+        {/* Elite Student Features - Moved up */}
+        <View style={styles.featuresSection}>
+          {/* Elite Premium Features */}
+          <View style={styles.featuresSubsection}>
+            <Text style={styles.subsectionTitle}>⭐ Elite Premium Features</Text>
+            <View style={styles.featuresGrid}>
+              <TouchableOpacity 
+                style={styles.premiumFeatureCard}
+                onPress={onNavigateToAnimals}
+              >
+                <Text style={styles.featureIcon}>🐄</Text>
+                <Text style={styles.featureTitle}>Unlimited Animals</Text>
+                <Text style={styles.featureSubtitle}>No limits on your herd</Text>
+                <View style={styles.premiumBadge}>
+                  <Text style={styles.premiumText}>ELITE</Text>
+                </View>
+              </TouchableOpacity>
+
+              <TouchableOpacity 
+                style={styles.premiumFeatureCard}
+                onPress={onNavigateToAI}
+              >
+                <Text style={styles.featureIcon}>🤖</Text>
+                <Text style={styles.featureTitle}>AI Predictions</Text>
+                <Text style={styles.featureSubtitle}>91.6% accuracy rate</Text>
+                <View style={styles.premiumBadge}>
+                  <Text style={styles.premiumText}>ELITE</Text>
+                </View>
+              </TouchableOpacity>
+
+              <TouchableOpacity 
+                style={styles.premiumFeatureCard}
+                onPress={onNavigateToAnalytics}
+              >
+                <Text style={styles.featureIcon}>📊</Text>
+                <Text style={styles.featureTitle}>Advanced Analytics</Text>
+                <Text style={styles.featureSubtitle}>Deep insights & trends</Text>
+                <View style={styles.premiumBadge}>
+                  <Text style={styles.premiumText}>ELITE</Text>
+                </View>
+              </TouchableOpacity>
+
+              <TouchableOpacity 
+                style={styles.premiumFeatureCard}
+                onPress={onNavigateToExport}
+              >
+                <Text style={styles.featureIcon}>📤</Text>
+                <Text style={styles.featureTitle}>All Export Formats</Text>
+                <Text style={styles.featureSubtitle}>PDF, Excel, Schedule F</Text>
+                <View style={styles.premiumBadge}>
+                  <Text style={styles.premiumText}>ELITE</Text>
+                </View>
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          {/* Additional Student Features */}
+          <View style={styles.featuresSubsection}>
+            <Text style={styles.subsectionTitle}>📖 Additional Student Features</Text>
+            <View style={styles.featuresGrid}>
+              <TouchableOpacity style={styles.featureCard}>
+                <Text style={styles.featureIcon}>🎓</Text>
+                <Text style={styles.featureTitle}>FFA Integration</Text>
+                <Text style={styles.featureSubtitle}>SAE project tracking</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity 
+                style={styles.featureCard}
+                onPress={onNavigateToFinancial}
+              >
+                <Text style={styles.featureIcon}>💰</Text>
+                <Text style={styles.featureTitle}>Financial Tracking</Text>
+                <Text style={styles.featureSubtitle}>Expenses & income</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity 
+                style={styles.featureCard}
+                onPress={onNavigateToMedical}
+              >
+                <Text style={styles.featureIcon}>🏥</Text>
+                <Text style={styles.featureTitle}>Medical Records</Text>
+                <Text style={styles.featureSubtitle}>Health tracking & vet records</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+
         {/* Performance Overview */}
         <View style={styles.statsCard}>
           <Text style={styles.statsTitle}>📈 Your Performance</Text>
@@ -304,103 +391,29 @@ export const EliteDashboard: React.FC<EliteDashboardProps> = ({
           </TouchableOpacity>
         </View>
 
-        {/* Premium Features */}
-        <View style={styles.featuresSection}>
-          <Text style={styles.sectionTitle}>🎓 Elite Student Features</Text>
-          
-          <View style={styles.featuresGrid}>
-            <TouchableOpacity 
-              style={styles.premiumFeatureCard}
-              onPress={onNavigateToAnimals}
-            >
-              <Text style={styles.featureIcon}>🐄</Text>
-              <Text style={styles.featureTitle}>Unlimited Animals</Text>
-              <Text style={styles.featureSubtitle}>No limits on your herd</Text>
-              <View style={styles.premiumBadge}>
-                <Text style={styles.premiumText}>ELITE</Text>
-              </View>
-            </TouchableOpacity>
-
-            <TouchableOpacity 
-              style={styles.premiumFeatureCard}
-              onPress={onNavigateToAI}
-            >
-              <Text style={styles.featureIcon}>🤖</Text>
-              <Text style={styles.featureTitle}>AI Predictions</Text>
-              <Text style={styles.featureSubtitle}>91.6% accuracy rate</Text>
-              <View style={styles.premiumBadge}>
-                <Text style={styles.premiumText}>ELITE</Text>
-              </View>
-            </TouchableOpacity>
-
-            <TouchableOpacity 
-              style={styles.premiumFeatureCard}
-              onPress={onNavigateToAnalytics}
-            >
-              <Text style={styles.featureIcon}>📊</Text>
-              <Text style={styles.featureTitle}>Advanced Analytics</Text>
-              <Text style={styles.featureSubtitle}>Deep insights & trends</Text>
-              <View style={styles.premiumBadge}>
-                <Text style={styles.premiumText}>ELITE</Text>
-              </View>
-            </TouchableOpacity>
-
-            <TouchableOpacity 
-              style={styles.premiumFeatureCard}
-              onPress={onNavigateToExport}
-            >
-              <Text style={styles.featureIcon}>📤</Text>
-              <Text style={styles.featureTitle}>All Export Formats</Text>
-              <Text style={styles.featureSubtitle}>PDF, Excel, Schedule F</Text>
-              <View style={styles.premiumBadge}>
-                <Text style={styles.premiumText}>ELITE</Text>
-              </View>
-            </TouchableOpacity>
-          </View>
-        </View>
-
-        {/* Standard Features */}
+        {/* Student Project Management - Top Priority */}
         <View style={styles.featuresSection}>
           <Text style={styles.sectionTitle}>📚 Student Project Management</Text>
-          
           <View style={styles.featuresGrid}>
             <TouchableOpacity 
-              style={styles.featureCard}
+              style={styles.highlightFeatureCard}
               onPress={onNavigateToJournal}
             >
               <Text style={styles.featureIcon}>📝</Text>
               <Text style={styles.featureTitle}>Advanced Journal</Text>
               <Text style={styles.featureSubtitle}>AET skill tracking</Text>
+              <View style={styles.featuredBadge}>
+                <Text style={styles.featuredText}>FEATURED</Text>
+              </View>
             </TouchableOpacity>
 
-            <TouchableOpacity style={styles.featureCard}>
+            <TouchableOpacity style={styles.highlightFeatureCard}>
               <Text style={styles.featureIcon}>📸</Text>
               <Text style={styles.featureTitle}>Unlimited Photos</Text>
               <Text style={styles.featureSubtitle}>Smart organization</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity style={styles.featureCard}>
-              <Text style={styles.featureIcon}>🎓</Text>
-              <Text style={styles.featureTitle}>FFA Integration</Text>
-              <Text style={styles.featureSubtitle}>SAE project tracking</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity 
-              style={styles.featureCard}
-              onPress={onNavigateToFinancial}
-            >
-              <Text style={styles.featureIcon}>💰</Text>
-              <Text style={styles.featureTitle}>Financial Tracking</Text>
-              <Text style={styles.featureSubtitle}>Expenses & income</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity 
-              style={styles.featureCard}
-              onPress={onNavigateToMedical}
-            >
-              <Text style={styles.featureIcon}>🏥</Text>
-              <Text style={styles.featureTitle}>Medical Records</Text>
-              <Text style={styles.featureSubtitle}>Health tracking & vet records</Text>
+              <View style={styles.featuredBadge}>
+                <Text style={styles.featuredText}>FEATURED</Text>
+              </View>
             </TouchableOpacity>
           </View>
         </View>
@@ -527,7 +540,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: '#007AFF',
     paddingHorizontal: 20,
-    paddingTop: 20,
+    paddingTop: 60,
     paddingBottom: 20,
     borderBottomLeftRadius: 24,
     borderBottomRightRadius: 24,
@@ -665,7 +678,17 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '600',
     color: '#333',
-    marginBottom: 16,
+    marginBottom: 20,
+  },
+  featuresSubsection: {
+    marginBottom: 20,
+  },
+  subsectionTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#444',
+    marginBottom: 12,
+    paddingLeft: 4,
   },
   featuresGrid: {
     flexDirection: 'row',
@@ -730,6 +753,36 @@ const styles = StyleSheet.create({
     borderRadius: 4,
   },
   premiumText: {
+    fontSize: 8,
+    color: '#fff',
+    fontWeight: 'bold',
+  },
+  highlightFeatureCard: {
+    flex: 1,
+    minWidth: '45%',
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 16,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.15,
+    shadowRadius: 6,
+    elevation: 4,
+    borderWidth: 2,
+    borderColor: '#28a745',
+    position: 'relative',
+  },
+  featuredBadge: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    backgroundColor: '#28a745',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  featuredText: {
     fontSize: 8,
     color: '#fff',
     fontWeight: 'bold',

@@ -15,11 +15,12 @@ export class SupabaseAnimalAdapter implements IAnimalService {
     return {
       id: dbAnimal.id,
       name: dbAnimal.name,
-      tagNumber: dbAnimal.tag_number || dbAnimal.ear_tag || '',
+      earTag: dbAnimal.ear_tag || '',
       penNumber: dbAnimal.pen_number || 'Pen-1',
       species: this.mapSpecies(dbAnimal.species),
       breed: dbAnimal.breed || '',
       breeder: dbAnimal.breeder || '',
+      sex: this.mapSex(dbAnimal.sex),
       birthDate: dbAnimal.birth_date ? new Date(dbAnimal.birth_date) : undefined,
       pickupDate: dbAnimal.pickup_date ? new Date(dbAnimal.pickup_date) : undefined,
       projectType: dbAnimal.project_type || 'Market',
@@ -38,11 +39,12 @@ export class SupabaseAnimalAdapter implements IAnimalService {
     const dbAnimal: any = {};
     
     if (animal.name !== undefined) dbAnimal.name = animal.name;
-    if (animal.tagNumber !== undefined) dbAnimal.tag_number = animal.tagNumber;
+    if (animal.earTag !== undefined) dbAnimal.ear_tag = animal.earTag;
     if (animal.penNumber !== undefined) dbAnimal.pen_number = animal.penNumber;
-    if (animal.species !== undefined) dbAnimal.species = animal.species.toLowerCase();
+    if (animal.species !== undefined) dbAnimal.species = this.mapSpeciesToDb(animal.species);
     if (animal.breed !== undefined) dbAnimal.breed = animal.breed;
     if (animal.breeder !== undefined) dbAnimal.breeder = animal.breeder;
+    if (animal.sex !== undefined) dbAnimal.sex = this.mapSexToDb(animal.sex);
     if (animal.birthDate !== undefined) dbAnimal.birth_date = animal.birthDate;
     if (animal.pickupDate !== undefined) dbAnimal.pickup_date = animal.pickupDate;
     if (animal.projectType !== undefined) dbAnimal.project_type = animal.projectType;
@@ -57,13 +59,27 @@ export class SupabaseAnimalAdapter implements IAnimalService {
   private mapSpecies(dbSpecies: string): Animal['species'] {
     const speciesMap: { [key: string]: Animal['species'] } = {
       'cattle': 'Cattle',
-      'sheep': 'Sheep',
+      'sheep': 'Sheep', 
       'swine': 'Pig',
       'goats': 'Goat',
+      'poultry': 'Poultry',
+      'other': 'Cattle', // Map other to Cattle as default
+      // Legacy mappings for safety
       'pig': 'Pig',
       'goat': 'Goat',
     };
     return speciesMap[dbSpecies?.toLowerCase()] || 'Cattle';
+  }
+
+  private mapSpeciesToDb(species: Animal['species']): string {
+    const speciesMap: { [key: string]: string } = {
+      'Cattle': 'cattle',
+      'Sheep': 'sheep',
+      'Pig': 'swine',
+      'Goat': 'goats', // Database expects 'goats' (plural) not 'goat'
+      'Poultry': 'poultry',
+    };
+    return speciesMap[species] || 'cattle';
   }
 
   private mapHealthStatus(dbStatus: string): Animal['healthStatus'] {
@@ -84,6 +100,24 @@ export class SupabaseAnimalAdapter implements IAnimalService {
       'Under Treatment': 'minor_concern',
     };
     return statusMap[status] || 'healthy';
+  }
+
+  private mapSex(dbSex: string): Animal['sex'] {
+    const sexMap: { [key: string]: Animal['sex'] } = {
+      'male': 'Male',
+      'female': 'Female',
+      'M': 'Male',
+      'F': 'Female',
+    };
+    return sexMap[dbSex] || 'Male';
+  }
+
+  private mapSexToDb(sex: Animal['sex']): string {
+    const sexMap: { [key: string]: string } = {
+      'Male': 'male',
+      'Female': 'female',
+    };
+    return sexMap[sex] || 'male';
   }
 
   async getAnimals(): Promise<Animal[]> {

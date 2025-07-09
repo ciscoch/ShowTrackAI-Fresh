@@ -1,11 +1,12 @@
 export interface Animal {
   id: string;
   name: string;
-  tagNumber: string;
+  earTag: string;
   penNumber: string;
-  species: 'Cattle' | 'Goat' | 'Pig' | 'Sheep';
+  species: 'Cattle' | 'Goat' | 'Pig' | 'Sheep' | 'Poultry';
   breed: string;
   breeder: string;
+  sex: 'Male' | 'Female';
   birthDate?: Date;
   pickupDate?: Date;
   projectType: 'Market' | 'Breeding' | 'Show' | 'Dairy';
@@ -20,7 +21,7 @@ export interface Animal {
 
 export interface CreateAnimalRequest extends Omit<Animal, 'id' | 'createdAt' | 'updatedAt' | 'healthStatus'> {}
 
-export const SPECIES_OPTIONS = ['Cattle', 'Goat', 'Pig', 'Sheep'] as const;
+export const SPECIES_OPTIONS = ['Cattle', 'Goat', 'Pig', 'Sheep', 'Poultry'] as const;
 
 export const BREED_OPTIONS = {
   Cattle: [
@@ -75,7 +76,27 @@ export const BREED_OPTIONS = {
     'Corriedale',
     'Crossbred',
     'Other'
+  ],
+  Poultry: [
+    'Rhode Island Red',
+    'Leghorn',
+    'Plymouth Rock',
+    'New Hampshire',
+    'Buff Orpington',
+    'Australorp',
+    'Wyandotte',
+    'Sussex',
+    'Marans',
+    'Brahma',
+    'Silkie',
+    'Easter Egger',
+    'Cornish Cross',
+    'Freedom Ranger',
+    'Crossbred',
+    'Other'
   ]
 };
 
 export const PROJECT_TYPES = ['Market', 'Breeding', 'Show', 'Dairy'] as const;
+
+export const SEX_OPTIONS = ['Male', 'Female'] as const;

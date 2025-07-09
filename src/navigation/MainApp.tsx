@@ -12,7 +12,10 @@ import { AnimalFormScreen } from '../features/animals/screens/AnimalFormScreen';
 import { AnimalDetailsScreen } from '../features/animals/screens/AnimalDetailsScreen';
 import { WeightHistoryScreen } from '../features/animals/screens/WeightHistoryScreen';
 import { AddWeightScreen } from '../features/animals/screens/AddWeightScreen';
+import { JournalListScreen, JournalEntryScreen, JournalDetailScreen } from '../features/journal/screens';
+import { FinancialTrackingScreen } from '../features/financial/screens/FinancialTrackingScreen';
 import { Animal } from '../core/models/Animal';
+import { Journal } from '../core/models/Journal';
 import { useProfileStore } from '../core/stores/ProfileStore';
 
 interface MainAppProps {
@@ -20,13 +23,14 @@ interface MainAppProps {
   profile?: any;
 }
 
-type AppScreen = 'dashboard' | 'animalList' | 'animalForm' | 'animalDetails' | 'weightHistory' | 'addWeight';
+type AppScreen = 'dashboard' | 'animalList' | 'animalForm' | 'animalDetails' | 'weightHistory' | 'addWeight' | 'journalList' | 'journalEntry' | 'journalDetail' | 'financial';
 
 const MainApp: React.FC<MainAppProps> = ({ user, profile }) => {
   const { signOut } = useAuth();
   const { createProfile, switchProfile, currentProfile, getAllProfiles } = useProfileStore();
   const [currentScreen, setCurrentScreen] = useState<AppScreen>('dashboard');
   const [selectedAnimal, setSelectedAnimal] = useState<Animal | undefined>();
+  const [selectedJournal, setSelectedJournal] = useState<Journal | undefined>();
 
   // Create a profile for the authenticated user if one doesn't exist
   useEffect(() => {
@@ -144,6 +148,55 @@ const MainApp: React.FC<MainAppProps> = ({ user, profile }) => {
     setCurrentScreen('weightHistory');
   };
 
+  const handleNavigateToJournal = () => {
+    setCurrentScreen('journalList');
+  };
+
+  const handleAddJournalEntry = () => {
+    setSelectedJournal(undefined);
+    setCurrentScreen('journalEntry');
+  };
+
+  const handleViewJournalEntry = (journal: Journal) => {
+    setSelectedJournal(journal);
+    setCurrentScreen('journalDetail');
+  };
+
+  const handleEditJournalEntry = (journal: Journal) => {
+    setSelectedJournal(journal);
+    setCurrentScreen('journalEntry');
+  };
+
+  const handleBackFromJournal = () => {
+    setCurrentScreen('dashboard');
+    setSelectedJournal(undefined);
+  };
+
+  const handleBackToJournalList = () => {
+    setCurrentScreen('journalList');
+    setSelectedJournal(undefined);
+  };
+
+  const handleBackFromJournalDetail = () => {
+    setCurrentScreen('journalList');
+    setSelectedJournal(undefined);
+  };
+
+  const handleDeleteJournalEntry = (journal: Journal) => {
+    // After deletion, return to journal list
+    setCurrentScreen('journalList');
+    setSelectedJournal(undefined);
+  };
+
+  const handleSaveJournal = () => {
+    setCurrentScreen('journalList');
+    setSelectedJournal(undefined);
+  };
+
+  const handleBackFromFinancial = () => {
+    setCurrentScreen('dashboard');
+  };
+
   const renderCurrentScreen = () => {
     switch (currentScreen) {
       case 'dashboard':
@@ -155,8 +208,8 @@ const MainApp: React.FC<MainAppProps> = ({ user, profile }) => {
             onNavigateToAnalytics={() => handlePlaceholderAction('Analytics')}
             onNavigateToAI={() => handlePlaceholderAction('AI Features')}
             onNavigateToExport={() => handlePlaceholderAction('Export')}
-            onNavigateToJournal={() => handlePlaceholderAction('Journal')}
-            onNavigateToFinancial={() => handlePlaceholderAction('Financial')}
+            onNavigateToJournal={handleNavigateToJournal}
+            onNavigateToFinancial={() => setCurrentScreen('financial')}
             onNavigateToMedical={() => handlePlaceholderAction('Medical')}
             onNavigateToCalendar={() => handlePlaceholderAction('Calendar')}
             onAddAnimal={handleAddAnimal}
@@ -217,6 +270,43 @@ const MainApp: React.FC<MainAppProps> = ({ user, profile }) => {
           />
         ) : null;
 
+      case 'journalList':
+        return (
+          <JournalListScreen
+            onAddEntry={handleAddJournalEntry}
+            onViewEntry={handleViewJournalEntry}
+            onViewAnalytics={() => handlePlaceholderAction('Journal Analytics')}
+            onBack={handleBackFromJournal}
+          />
+        );
+
+      case 'journalEntry':
+        return (
+          <JournalEntryScreen
+            entry={selectedJournal}
+            onSave={handleSaveJournal}
+            onCancel={handleBackToJournalList}
+            onBack={handleBackToJournalList}
+          />
+        );
+
+      case 'journalDetail':
+        return selectedJournal ? (
+          <JournalDetailScreen
+            entry={selectedJournal}
+            onBack={handleBackFromJournalDetail}
+            onEdit={handleEditJournalEntry}
+            onDelete={handleDeleteJournalEntry}
+          />
+        ) : null;
+
+      case 'financial':
+        return (
+          <FinancialTrackingScreen
+            onBack={handleBackFromFinancial}
+          />
+        );
+
       default:
         return (
           <EliteDashboard
@@ -226,8 +316,8 @@ const MainApp: React.FC<MainAppProps> = ({ user, profile }) => {
             onNavigateToAnalytics={() => handlePlaceholderAction('Analytics')}
             onNavigateToAI={() => handlePlaceholderAction('AI Features')}
             onNavigateToExport={() => handlePlaceholderAction('Export')}
-            onNavigateToJournal={() => handlePlaceholderAction('Journal')}
-            onNavigateToFinancial={() => handlePlaceholderAction('Financial')}
+            onNavigateToJournal={handleNavigateToJournal}
+            onNavigateToFinancial={() => setCurrentScreen('financial')}
             onNavigateToMedical={() => handlePlaceholderAction('Medical')}
             onNavigateToCalendar={() => handlePlaceholderAction('Calendar')}
             onAddAnimal={handleAddAnimal}

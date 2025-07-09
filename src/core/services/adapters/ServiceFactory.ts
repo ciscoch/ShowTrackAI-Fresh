@@ -16,8 +16,8 @@ import { SupabaseAnimalAdapter } from './SupabaseAnimalAdapter';
 import { SupabaseProfileAdapter } from './SupabaseProfileAdapter';
 import { SupabaseHealthAdapter } from './SupabaseHealthAdapter';
 import { SupabaseAuthAdapter } from './SupabaseAuthAdapter';
-// import { SupabaseJournalAdapter } from './SupabaseJournalAdapter';
-// import { SupabaseFinancialAdapter } from './SupabaseFinancialAdapter';
+import { SupabaseJournalAdapter } from './SupabaseJournalAdapter';
+import { SupabaseFinancialAdapter } from './SupabaseFinancialAdapter';
 
 // Import local storage adapters
 import { LocalStorageAdapter } from './LocalStorageAdapter';
@@ -29,8 +29,6 @@ import { LocalFinancialAdapter } from './LocalFinancialAdapter';
 import { LocalAuthAdapter } from './LocalAuthAdapter';
 
 // Placeholder classes for missing adapters
-class SupabaseJournalAdapter { [key: string]: any; }
-class SupabaseFinancialAdapter { [key: string]: any; }
 class SupabaseWeightAdapter { [key: string]: any; }
 class LocalWeightAdapter { [key: string]: any; }
 
@@ -127,9 +125,14 @@ export class ServiceFactory {
   static getJournalService(): IJournalService {
     const key = 'journal';
     if (!this.instances.has(key)) {
-      const service = useSupabaseBackend()
+      const isBackend = useSupabaseBackend();
+      console.log('🏭 ServiceFactory: Creating journal service, useSupabaseBackend:', isBackend);
+      
+      const service = isBackend
         ? new SupabaseJournalAdapter()
         : new LocalJournalAdapter();
+        
+      console.log('📝 Journal service created:', service.constructor.name);
       this.instances.set(key, service);
     }
     return this.instances.get(key);
@@ -141,9 +144,14 @@ export class ServiceFactory {
   static getFinancialService(): IFinancialService {
     const key = 'financial';
     if (!this.instances.has(key)) {
-      const service = useSupabaseBackend()
+      const isBackend = useSupabaseBackend();
+      console.log('🏭 ServiceFactory: Creating financial service, useSupabaseBackend:', isBackend);
+      
+      const service = isBackend
         ? new SupabaseFinancialAdapter()
         : new LocalFinancialAdapter();
+        
+      console.log('💰 Financial service created:', service.constructor.name);
       this.instances.set(key, service);
     }
     return this.instances.get(key);

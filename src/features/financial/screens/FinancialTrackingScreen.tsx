@@ -208,74 +208,164 @@ export const FinancialTrackingScreen: React.FC<FinancialTrackingScreenProps> = (
 
   const renderOverviewTab = () => (
     <ScrollView showsVerticalScrollIndicator={false}>
-      {/* Summary Cards */}
-      <View style={styles.summaryContainer}>
-        <View style={[styles.summaryCard, styles.incomeCard]}>
-          <Text style={styles.summaryLabel}>Total Income</Text>
-          <Text style={styles.summaryValue}>${summary.totalIncome.toFixed(2)}</Text>
+      {/* Hero Summary Section */}
+      <View style={styles.heroSection}>
+        <View style={styles.heroBackground}>
+          <Text style={styles.heroTitle}>Your Financial Overview</Text>
+          <Text style={styles.heroSubtitle}>Track your agricultural business performance</Text>
         </View>
         
-        <View style={[styles.summaryCard, styles.expenseCard]}>
-          <Text style={styles.summaryLabel}>Total Expenses</Text>
-          <Text style={styles.summaryValue}>${summary.totalExpenses.toFixed(2)}</Text>
-        </View>
-        
-        <View style={[styles.summaryCard, summary.netProfit >= 0 ? styles.profitCard : styles.lossCard]}>
-          <Text style={styles.summaryLabel}>Net {summary.netProfit >= 0 ? 'Profit' : 'Loss'}</Text>
-          <Text style={styles.summaryValue}>${Math.abs(summary.netProfit).toFixed(2)}</Text>
-          <Text style={styles.profitMargin}>
-            {summary.profitMargin.toFixed(1)}% margin
-          </Text>
+        {/* Main KPI Cards */}
+        <View style={styles.kpiGrid}>
+          <View style={[styles.kpiCard, styles.incomeKpiCard]}>
+            <View style={styles.kpiIconContainer}>
+              <Text style={styles.kpiIcon}>💰</Text>
+            </View>
+            <View style={styles.kpiContent}>
+              <Text style={styles.kpiLabel}>Total Income</Text>
+              <Text style={styles.kpiValue}>${summary.totalIncome.toFixed(2)}</Text>
+              <Text style={styles.kpiTrend}>↗️ +12.3% this month</Text>
+            </View>
+          </View>
+          
+          <View style={[styles.kpiCard, styles.expenseKpiCard]}>
+            <View style={styles.kpiIconContainer}>
+              <Text style={styles.kpiIcon}>📊</Text>
+            </View>
+            <View style={styles.kpiContent}>
+              <Text style={styles.kpiLabel}>Total Expenses</Text>
+              <Text style={styles.kpiValue}>${summary.totalExpenses.toFixed(2)}</Text>
+              <Text style={styles.kpiTrend}>↘️ -5.7% this month</Text>
+            </View>
+          </View>
+          
+          <View style={[styles.kpiCard, styles.netProfitKpiCard, summary.netProfit >= 0 ? styles.profitPositive : styles.profitNegative]}>
+            <View style={styles.kpiIconContainer}>
+              <Text style={styles.kpiIcon}>{summary.netProfit >= 0 ? '📈' : '📉'}</Text>
+            </View>
+            <View style={styles.kpiContent}>
+              <Text style={styles.kpiLabel}>Net {summary.netProfit >= 0 ? 'Profit' : 'Loss'}</Text>
+              <Text style={styles.kpiValue}>${Math.abs(summary.netProfit).toFixed(2)}</Text>
+              <Text style={styles.kpiMargin}>
+                {summary.profitMargin.toFixed(1)}% margin
+              </Text>
+            </View>
+          </View>
         </View>
       </View>
 
-      {/* Monthly Trend Chart */}
-      <View style={styles.chartSection}>
-        <Text style={styles.sectionTitle}>📊 Monthly Trend</Text>
-        <View style={styles.trendChart}>
+      {/* Enhanced Monthly Trend Chart */}
+      <View style={styles.modernChartSection}>
+        <View style={styles.chartHeader}>
+          <Text style={styles.modernSectionTitle}>📊 Monthly Trend</Text>
+          <View style={styles.chartLegend}>
+            <View style={styles.legendItem}>
+              <View style={[styles.legendDot, { backgroundColor: '#4CAF50' }]} />
+              <Text style={styles.legendText}>Income</Text>
+            </View>
+            <View style={styles.legendItem}>
+              <View style={[styles.legendDot, { backgroundColor: '#FF5722' }]} />
+              <Text style={styles.legendText}>Expenses</Text>
+            </View>
+          </View>
+        </View>
+        
+        <View style={styles.modernTrendChart}>
           {summary.monthlyTrend.slice(-6).map((month, index) => (
-            <View key={index} style={styles.monthColumn}>
-              <Text style={styles.monthLabel}>{month.month.slice(0, 3)}</Text>
-              <View style={styles.barContainer}>
+            <View key={index} style={styles.modernMonthColumn}>
+              <View style={styles.modernBarContainer}>
                 <View 
                   style={[
-                    styles.incomeBar, 
+                    styles.modernIncomeBar, 
                     { height: `${(month.income / Math.max(...summary.monthlyTrend.map(m => m.income))) * 100}%` }
                   ]} 
                 />
                 <View 
                   style={[
-                    styles.expenseBar, 
+                    styles.modernExpenseBar, 
                     { height: `${(month.expenses / Math.max(...summary.monthlyTrend.map(m => m.expenses))) * 100}%` }
                   ]} 
                 />
               </View>
-              <Text style={styles.monthProfit}>
-                {month.profit >= 0 ? '+' : ''}{month.profit.toFixed(0)}
+              <Text style={styles.modernMonthLabel}>{month.month.slice(0, 3)}</Text>
+              <Text style={[styles.modernMonthProfit, month.profit >= 0 ? styles.positiveProfit : styles.negativeProfit]}>
+                {month.profit >= 0 ? '+' : ''}${month.profit.toFixed(0)}
               </Text>
             </View>
           ))}
         </View>
       </View>
 
-      {/* Top Expense Categories */}
-      <View style={styles.categorySection}>
-        <Text style={styles.sectionTitle}>💸 Top Expenses</Text>
+      {/* Enhanced Top Expenses */}
+      <View style={styles.modernCategorySection}>
+        <View style={styles.categoryHeader}>
+          <Text style={styles.modernSectionTitle}>💸 Top Expenses</Text>
+          <TouchableOpacity style={styles.viewAllButton}>
+            <Text style={styles.viewAllText}>View All</Text>
+          </TouchableOpacity>
+        </View>
+        
         {summary.topExpenseCategories.map((cat, index) => {
           const category = EXPENSE_CATEGORIES.find(c => c.id === cat.category);
           return (
-            <View key={index} style={styles.categoryItem}>
-              <View style={styles.categoryInfo}>
-                <Text style={styles.categoryIcon}>{category?.icon || '💰'}</Text>
-                <Text style={styles.categoryName}>{category?.name || cat.category}</Text>
+            <View key={index} style={styles.modernCategoryItem}>
+              <View style={styles.categoryIconWrapper}>
+                <Text style={styles.modernCategoryIcon}>{category?.icon || '💰'}</Text>
               </View>
-              <View style={styles.categoryAmount}>
-                <Text style={styles.amountText}>${cat.amount.toFixed(2)}</Text>
-                <Text style={styles.percentageText}>{cat.percentage.toFixed(1)}%</Text>
+              <View style={styles.modernCategoryInfo}>
+                <Text style={styles.modernCategoryName}>{category?.name || cat.category}</Text>
+                <View style={styles.categoryProgressBar}>
+                  <View 
+                    style={[
+                      styles.categoryProgress, 
+                      { width: `${cat.percentage}%` }
+                    ]} 
+                  />
+                </View>
+              </View>
+              <View style={styles.modernCategoryAmount}>
+                <Text style={styles.modernAmountText}>${cat.amount.toFixed(2)}</Text>
+                <Text style={styles.modernPercentageText}>{cat.percentage.toFixed(1)}%</Text>
               </View>
             </View>
           );
         })}
+      </View>
+      
+      {/* Quick Actions Section */}
+      <View style={styles.quickActionsSection}>
+        <Text style={styles.modernSectionTitle}>⚡ Quick Actions</Text>
+        <View style={styles.quickActionsGrid}>
+          <TouchableOpacity style={styles.quickActionCard} onPress={() => {
+            setFormData(prev => ({ ...prev, type: 'expense' }));
+            setShowAddModal(true);
+          }}>
+            <Text style={styles.quickActionIcon}>📝</Text>
+            <Text style={styles.quickActionTitle}>Add Expense</Text>
+            <Text style={styles.quickActionSubtitle}>Track spending</Text>
+          </TouchableOpacity>
+          
+          <TouchableOpacity style={styles.quickActionCard} onPress={() => {
+            setFormData(prev => ({ ...prev, type: 'income' }));
+            setShowAddModal(true);
+          }}>
+            <Text style={styles.quickActionIcon}>💰</Text>
+            <Text style={styles.quickActionTitle}>Add Income</Text>
+            <Text style={styles.quickActionSubtitle}>Record earnings</Text>
+          </TouchableOpacity>
+          
+          <TouchableOpacity style={styles.quickActionCard}>
+            <Text style={styles.quickActionIcon}>📊</Text>
+            <Text style={styles.quickActionTitle}>View Report</Text>
+            <Text style={styles.quickActionSubtitle}>Monthly summary</Text>
+          </TouchableOpacity>
+          
+          <TouchableOpacity style={styles.quickActionCard}>
+            <Text style={styles.quickActionIcon}>🎯</Text>
+            <Text style={styles.quickActionTitle}>Set Budget</Text>
+            <Text style={styles.quickActionSubtitle}>Plan expenses</Text>
+          </TouchableOpacity>
+        </View>
       </View>
     </ScrollView>
   );
@@ -820,7 +910,7 @@ export const FinancialTrackingScreen: React.FC<FinancialTrackingScreenProps> = (
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={onBack} style={styles.backButton}>
-          <Text style={styles.backButtonText}>← Back</Text>
+          <Text style={styles.backButtonText}>←</Text>
         </TouchableOpacity>
         <Text style={styles.headerTitle}>💰 Financial Tracking</Text>
         <TouchableOpacity 
@@ -910,224 +1000,398 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    backgroundColor: '#fff',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    backgroundColor: '#FFFFFF',
     borderBottomWidth: 1,
-    borderBottomColor: '#eee',
-    minHeight: 60,
+    borderBottomColor: '#F3F4F6',
+    minHeight: 70,
   },
   backButton: {
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    flex: 0,
-    minWidth: 60,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#F8F9FA',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   backButtonText: {
-    color: '#007AFF',
-    fontSize: 16,
+    color: '#4A90E2',
+    fontSize: 18,
     fontWeight: '500',
   },
   headerTitle: {
     fontSize: 20,
-    fontWeight: 'bold',
-    color: '#333',
+    fontWeight: '700',
+    color: '#1F2937',
     flex: 1,
     textAlign: 'center',
   },
   addButton: {
-    backgroundColor: '#007AFF',
+    backgroundColor: '#4A90E2',
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 8,
-    paddingVertical: 6,
-    borderRadius: 14,
-    shadowColor: '#007AFF',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 20,
+    shadowColor: '#4A90E2',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
     elevation: 4,
-    flex: 0,
-    minWidth: 55,
-    maxWidth: 65,
-    justifyContent: 'center',
   },
   addButtonIcon: {
-    color: '#fff',
+    color: '#FFFFFF',
     fontSize: 16,
     fontWeight: 'bold',
-    marginRight: 3,
+    marginRight: 6,
   },
   addButtonText: {
-    color: '#fff',
+    color: '#FFFFFF',
     fontWeight: '600',
-    fontSize: 13,
+    fontSize: 14,
   },
   tabContainer: {
     flexDirection: 'row',
-    backgroundColor: '#fff',
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 20,
+    paddingVertical: 8,
     borderBottomWidth: 1,
-    borderBottomColor: '#eee',
+    borderBottomColor: '#F3F4F6',
   },
   tab: {
     flex: 1,
     paddingVertical: 12,
+    paddingHorizontal: 16,
     alignItems: 'center',
+    borderRadius: 12,
+    marginHorizontal: 4,
   },
   activeTab: {
-    borderBottomWidth: 2,
-    borderBottomColor: '#007AFF',
+    backgroundColor: '#4A90E2',
   },
   tabText: {
     fontSize: 14,
-    color: '#666',
+    color: '#6B7280',
     fontWeight: '500',
   },
   activeTabText: {
-    color: '#007AFF',
+    color: '#FFFFFF',
     fontWeight: '600',
   },
   content: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: '#F8F9FA',
   },
-  summaryContainer: {
-    padding: 16,
-    gap: 12,
+  // Modern Hero Section
+  heroSection: {
+    backgroundColor: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+    marginBottom: 24,
   },
-  summaryCard: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+  heroBackground: {
+    backgroundColor: '#4A90E2',
+    paddingHorizontal: 20,
+    paddingTop: 24,
+    paddingBottom: 20,
+    borderBottomLeftRadius: 24,
+    borderBottomRightRadius: 24,
   },
-  incomeCard: {
-    borderLeftWidth: 4,
-    borderLeftColor: '#4CAF50',
-  },
-  expenseCard: {
-    borderLeftWidth: 4,
-    borderLeftColor: '#f44336',
-  },
-  profitCard: {
-    borderLeftWidth: 4,
-    borderLeftColor: '#4CAF50',
-  },
-  lossCard: {
-    borderLeftWidth: 4,
-    borderLeftColor: '#f44336',
-  },
-  summaryLabel: {
-    fontSize: 14,
-    color: '#666',
-    marginBottom: 8,
-  },
-  summaryValue: {
+  heroTitle: {
     fontSize: 24,
-    fontWeight: 'bold',
-    color: '#333',
+    fontWeight: '700',
+    color: '#FFFFFF',
+    textAlign: 'center',
+    marginBottom: 4,
   },
-  profitMargin: {
+  heroSubtitle: {
+    fontSize: 16,
+    color: '#E3F2FD',
+    textAlign: 'center',
+    fontWeight: '400',
+  },
+  
+  // Modern KPI Cards
+  kpiGrid: {
+    paddingHorizontal: 20,
+    marginTop: -40,
+    gap: 16,
+  },
+  kpiCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    elevation: 4,
+  },
+  kpiIconContainer: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: '#F8F9FA',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 16,
+  },
+  kpiIcon: {
+    fontSize: 24,
+  },
+  kpiContent: {
+    flex: 1,
+  },
+  kpiLabel: {
+    fontSize: 14,
+    color: '#6B7280',
+    fontWeight: '500',
+    marginBottom: 4,
+  },
+  kpiValue: {
+    fontSize: 28,
+    fontWeight: '700',
+    color: '#1F2937',
+    marginBottom: 4,
+  },
+  kpiTrend: {
     fontSize: 12,
-    color: '#666',
-    marginTop: 4,
+    color: '#10B981',
+    fontWeight: '500',
   },
-  chartSection: {
-    backgroundColor: '#fff',
-    margin: 16,
-    padding: 16,
-    borderRadius: 12,
+  kpiMargin: {
+    fontSize: 12,
+    color: '#6B7280',
+    fontWeight: '500',
+  },
+  incomeKpiCard: {
+    borderLeftWidth: 4,
+    borderLeftColor: '#10B981',
+  },
+  expenseKpiCard: {
+    borderLeftWidth: 4,
+    borderLeftColor: '#F59E0B',
+  },
+  netProfitKpiCard: {
+    borderLeftWidth: 4,
+  },
+  profitPositive: {
+    borderLeftColor: '#10B981',
+  },
+  profitNegative: {
+    borderLeftColor: '#EF4444',
+  },
+  // Modern Chart Section
+  modernChartSection: {
+    backgroundColor: '#FFFFFF',
+    marginHorizontal: 20,
+    marginBottom: 24,
+    borderRadius: 16,
+    padding: 20,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
     elevation: 3,
   },
-  sectionTitle: {
+  chartHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  modernSectionTitle: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#333',
-    marginBottom: 16,
+    color: '#1F2937',
   },
-  trendChart: {
+  chartLegend: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    height: 200,
+    gap: 16,
   },
-  monthColumn: {
-    flex: 1,
+  legendItem: {
+    flexDirection: 'row',
     alignItems: 'center',
+    gap: 6,
   },
-  monthLabel: {
+  legendDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  legendText: {
     fontSize: 12,
-    color: '#666',
-    marginBottom: 8,
+    color: '#6B7280',
+    fontWeight: '500',
   },
-  barContainer: {
-    flex: 1,
-    width: '80%',
-    justifyContent: 'flex-end',
-    gap: 4,
-  },
-  incomeBar: {
-    backgroundColor: '#4CAF50',
-    borderRadius: 4,
-  },
-  expenseBar: {
-    backgroundColor: '#f44336',
-    borderRadius: 4,
-  },
-  monthProfit: {
-    fontSize: 10,
-    color: '#666',
-    marginTop: 8,
-  },
-  categorySection: {
-    backgroundColor: '#fff',
-    margin: 16,
-    padding: 16,
-    borderRadius: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  categoryItem: {
+  modernTrendChart: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
-  },
-  categoryInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  categoryIcon: {
-    fontSize: 24,
-  },
-  categoryName: {
-    fontSize: 16,
-    color: '#333',
-  },
-  categoryAmount: {
+    height: 180,
     alignItems: 'flex-end',
   },
-  amountText: {
+  modernMonthColumn: {
+    flex: 1,
+    alignItems: 'center',
+    gap: 8,
+  },
+  modernBarContainer: {
+    width: '80%',
+    height: 120,
+    justifyContent: 'flex-end',
+    flexDirection: 'row',
+    gap: 3,
+  },
+  modernIncomeBar: {
+    backgroundColor: '#10B981',
+    borderRadius: 6,
+    width: 12,
+    minHeight: 8,
+  },
+  modernExpenseBar: {
+    backgroundColor: '#F59E0B',
+    borderRadius: 6,
+    width: 12,
+    minHeight: 8,
+  },
+  modernMonthLabel: {
+    fontSize: 12,
+    color: '#6B7280',
+    fontWeight: '500',
+  },
+  modernMonthProfit: {
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  positiveProfit: {
+    color: '#10B981',
+  },
+  negativeProfit: {
+    color: '#EF4444',
+  },
+  // Modern Category Section
+  modernCategorySection: {
+    backgroundColor: '#FFFFFF',
+    marginHorizontal: 20,
+    marginBottom: 24,
+    borderRadius: 16,
+    padding: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  categoryHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  viewAllButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+    backgroundColor: '#F3F4F6',
+  },
+  viewAllText: {
+    fontSize: 12,
+    color: '#4A90E2',
+    fontWeight: '500',
+  },
+  modernCategoryItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F3F4F6',
+  },
+  categoryIconWrapper: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#F8F9FA',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  modernCategoryIcon: {
+    fontSize: 20,
+  },
+  modernCategoryInfo: {
+    flex: 1,
+    marginRight: 12,
+  },
+  modernCategoryName: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#1F2937',
+    marginBottom: 4,
+  },
+  categoryProgressBar: {
+    height: 4,
+    backgroundColor: '#F3F4F6',
+    borderRadius: 2,
+    overflow: 'hidden',
+  },
+  categoryProgress: {
+    height: '100%',
+    backgroundColor: '#4A90E2',
+    borderRadius: 2,
+  },
+  modernCategoryAmount: {
+    alignItems: 'flex-end',
+  },
+  modernAmountText: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#333',
+    color: '#1F2937',
+    marginBottom: 2,
   },
-  percentageText: {
+  modernPercentageText: {
     fontSize: 12,
-    color: '#666',
+    color: '#6B7280',
+    fontWeight: '500',
+  },
+  
+  // Quick Actions Section
+  quickActionsSection: {
+    marginHorizontal: 20,
+    marginBottom: 24,
+  },
+  quickActionsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+    marginTop: 12,
+  },
+  quickActionCard: {
+    backgroundColor: '#FFFFFF',
+    width: '48%',
+    padding: 16,
+    borderRadius: 16,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 6,
+    elevation: 2,
+  },
+  quickActionIcon: {
+    fontSize: 32,
+    marginBottom: 8,
+  },
+  quickActionTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#1F2937',
+    marginBottom: 4,
+  },
+  quickActionSubtitle: {
+    fontSize: 12,
+    color: '#6B7280',
+    textAlign: 'center',
   },
   emptyState: {
     flex: 1,
@@ -1528,25 +1792,25 @@ const styles = StyleSheet.create({
   },
   fab: {
     position: 'absolute',
-    bottom: 80,
+    bottom: 30,
     right: 20,
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: '#28a745',
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: '#4A90E2',
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
+    shadowColor: '#4A90E2',
+    shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 8,
+    shadowRadius: 12,
+    elevation: 10,
     zIndex: 1000,
   },
   fabIcon: {
-    color: '#fff',
-    fontSize: 24,
-    fontWeight: 'bold',
+    color: '#FFFFFF',
+    fontSize: 28,
+    fontWeight: '700',
   },
   // Kid-Friendly Feed Analytics Styles
   kidDashboardCard: {

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, TextInput, TouchableOpacity, ScrollView, Alert } from 'react-native';
-import { Animal, SPECIES_OPTIONS, BREED_OPTIONS, PROJECT_TYPES } from '../../../core/models';
+import { Animal, SPECIES_OPTIONS, BREED_OPTIONS, PROJECT_TYPES, SEX_OPTIONS } from '../../../core/models';
 import { useAnimalStore } from '../../../core/stores';
 import { FormPicker } from '../../../shared/components/FormPicker';
 import { DatePicker } from '../../../shared/components/DatePicker';
@@ -24,11 +24,12 @@ export const AnimalFormScreen: React.FC<AnimalFormScreenProps> = ({
   
   const [formData, setFormData] = useState({
     name: animal?.name || '',
-    tagNumber: animal?.tagNumber || '',
+    earTag: animal?.earTag || '',
     penNumber: animal?.penNumber || '',
     species: animal?.species || '',
     breed: animal?.breed || '',
     breeder: animal?.breeder || '',
+    sex: animal?.sex || '',
     birthDate: animal?.birthDate || null,
     pickupDate: animal?.pickupDate || null,
     projectType: animal?.projectType || '',
@@ -43,10 +44,11 @@ export const AnimalFormScreen: React.FC<AnimalFormScreenProps> = ({
     const newErrors: Record<string, string> = {};
 
     if (!formData.name.trim()) newErrors.name = 'Name is required';
-    if (!formData.tagNumber.trim()) newErrors.tagNumber = 'Tag number is required';
+    if (!formData.earTag.trim()) newErrors.earTag = 'Ear tag is required';
     if (!formData.penNumber.trim()) newErrors.penNumber = 'Pen number is required';
     if (!formData.species) newErrors.species = 'Species is required';
     if (!formData.breed) newErrors.breed = 'Breed is required';
+    if (!formData.sex) newErrors.sex = 'Sex is required';
     if (!formData.breeder.trim()) newErrors.breeder = 'Breeder is required';
     if (!formData.birthDate) newErrors.birthDate = 'Birth date is required';
     if (!formData.pickupDate) newErrors.pickupDate = 'Pick-up date is required';
@@ -69,11 +71,12 @@ export const AnimalFormScreen: React.FC<AnimalFormScreenProps> = ({
     try {
       const animalData = {
         name: formData.name,
-        tagNumber: formData.tagNumber,
+        earTag: formData.earTag,
         penNumber: formData.penNumber,
         species: formData.species as 'Cattle' | 'Goat' | 'Pig' | 'Sheep',
         breed: formData.breed,
         breeder: formData.breeder,
+        sex: formData.sex as 'Male' | 'Female',
         birthDate: formData.birthDate || undefined,
         pickupDate: formData.pickupDate || undefined,
         projectType: formData.projectType as 'Market' | 'Breeding' | 'Show' | 'Dairy',
@@ -137,14 +140,14 @@ export const AnimalFormScreen: React.FC<AnimalFormScreenProps> = ({
         </View>
 
         <View style={styles.inputGroup}>
-          <Text style={styles.label}>Tag Number *</Text>
+          <Text style={styles.label}>Ear Tag *</Text>
           <TextInput
-            style={[styles.input, errors.tagNumber && styles.inputError]}
-            value={formData.tagNumber}
-            onChangeText={(text) => setFormData({ ...formData, tagNumber: text })}
-            placeholder="Enter tag number"
+            style={[styles.input, errors.earTag && styles.inputError]}
+            value={formData.earTag}
+            onChangeText={(text) => setFormData({ ...formData, earTag: text })}
+            placeholder="Enter ear tag"
           />
-          {errors.tagNumber && <Text style={styles.errorText}>{errors.tagNumber}</Text>}
+          {errors.earTag && <Text style={styles.errorText}>{errors.earTag}</Text>}
         </View>
 
         <View style={styles.inputGroup}>
@@ -175,6 +178,16 @@ export const AnimalFormScreen: React.FC<AnimalFormScreenProps> = ({
           options={breedOptions}
           placeholder={formData.species ? "Select breed" : "Select species first"}
           error={errors.breed}
+          required
+        />
+
+        <FormPicker
+          label="Sex"
+          value={formData.sex}
+          onValueChange={(value) => setFormData({ ...formData, sex: value })}
+          options={SEX_OPTIONS.map(sex => ({ label: sex, value: sex }))}
+          placeholder="Select sex"
+          error={errors.sex}
           required
         />
 

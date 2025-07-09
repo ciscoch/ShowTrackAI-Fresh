@@ -168,15 +168,21 @@ export const AnimalListScreen: React.FC<AnimalListScreenProps> = ({
           <Text style={styles.animalName}>{item.name}</Text>
           <View style={styles.identificationContainer}>
             <View style={styles.tagContainer}>
-              <Text style={styles.tagLabel}>Tag:</Text>
+              <Text style={styles.tagLabel}>Ear Tag:</Text>
               <View style={styles.tagNumber}>
-                <Text style={styles.tagText}>{item.tagNumber}</Text>
+                <Text style={styles.tagText}>{item.earTag}</Text>
               </View>
             </View>
             <View style={styles.penContainer}>
               <Text style={styles.penLabel}>Pen:</Text>
               <View style={styles.penNumber}>
                 <Text style={styles.penText}>{item.penNumber}</Text>
+              </View>
+            </View>
+            <View style={styles.sexContainer}>
+              <Text style={styles.sexLabel}>Sex:</Text>
+              <View style={styles.sexBadge}>
+                <Text style={styles.sexText}>{item.sex}</Text>
               </View>
             </View>
           </View>
@@ -593,6 +599,27 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
   penText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: 'bold',
+  },
+  sexContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  sexLabel: {
+    fontSize: 14,
+    color: '#666',
+    fontWeight: '500',
+  },
+  sexBadge: {
+    backgroundColor: '#6c757d',
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  sexText: {
     color: '#fff',
     fontSize: 12,
     fontWeight: 'bold',

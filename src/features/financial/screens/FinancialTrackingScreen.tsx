@@ -946,7 +946,7 @@ export const FinancialTrackingScreen: React.FC<FinancialTrackingScreenProps> = (
           onPress={() => setActiveTab('feed')}
         >
           <Text style={[styles.tabText, activeTab === 'feed' && styles.activeTabText]}>
-            Feed Analytics
+            Feed{"\n"}Analytics
           </Text>
         </TouchableOpacity>
         <TouchableOpacity 
@@ -954,7 +954,7 @@ export const FinancialTrackingScreen: React.FC<FinancialTrackingScreenProps> = (
           onPress={() => setActiveTab('aet')}
         >
           <Text style={[styles.tabText, activeTab === 'aet' && styles.activeTabText]}>
-            AET Skills
+            AET{"\n"}Skills
           </Text>
         </TouchableOpacity>
       </View>
@@ -1062,22 +1062,30 @@ const styles = StyleSheet.create({
   tab: {
     flex: 1,
     paddingVertical: 12,
-    paddingHorizontal: 16,
+    paddingHorizontal: 8,
     alignItems: 'center',
+    justifyContent: 'center',
     borderRadius: 12,
-    marginHorizontal: 4,
+    marginHorizontal: 2,
+    minHeight: 44,
   },
   activeTab: {
     backgroundColor: '#4A90E2',
   },
   tabText: {
-    fontSize: 14,
+    fontSize: 13,
     color: '#6B7280',
     fontWeight: '500',
+    textAlign: 'center',
+    flexWrap: 'wrap',
+    lineHeight: 16,
   },
   activeTabText: {
     color: '#FFFFFF',
     fontWeight: '600',
+    textAlign: 'center',
+    flexWrap: 'wrap',
+    lineHeight: 16,
   },
   content: {
     flex: 1,

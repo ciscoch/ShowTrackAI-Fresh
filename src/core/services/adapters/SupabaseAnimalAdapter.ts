@@ -347,4 +347,164 @@ export class SupabaseAnimalAdapter implements IAnimalService {
       throw error;
     }
   }
+
+  // =========================================================================
+  // GENERIC CRUD METHODS FOR FFA SERVICES
+  // =========================================================================
+
+  /**
+   * Generic create method for any table
+   */
+  async create(tableName: string, data: any): Promise<any> {
+    try {
+      const user = await getCurrentUser();
+      if (user && tableName !== 'ffa_motivational_content') {
+        // Add user_id for user-specific tables
+        data.user_id = user.id;
+      }
+
+      // Handle special timestamp columns for different tables
+      if (tableName === 'ffa_analytics_events') {
+        // Analytics events table uses 'timestamp' instead of 'created_at'
+        if (!data.timestamp) {
+          data.timestamp = new Date().toISOString();
+        }
+      } else {
+        // Most tables use created_at/updated_at
+        data.created_at = new Date().toISOString();
+        data.updated_at = new Date().toISOString();
+      }
+
+      const { data: result, error } = await this.supabase
+        .from(tableName)
+        .insert(data)
+        .select()
+        .single();
+
+      if (error) {
+        throw new Error(`Failed to create record in ${tableName}: ${error.message}`);
+      }
+
+      return result;
+    } catch (error) {
+      console.error(`SupabaseAnimalAdapter.create error for ${tableName}:`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Generic query method for any table
+   */
+  async query(tableName: string, options: {
+    filters?: any;
+    orderBy?: { [key: string]: 'asc' | 'desc' };
+    limit?: number;
+    offset?: number;
+  } = {}): Promise<any[]> {
+    try {
+      let query = this.supabase.from(tableName).select('*');
+
+      // Apply filters
+      if (options.filters) {
+        Object.entries(options.filters).forEach(([key, value]) => {
+          query = query.eq(key, value);
+        });
+      }
+
+      // Apply ordering
+      if (options.orderBy) {
+        Object.entries(options.orderBy).forEach(([column, direction]) => {
+          query = query.order(column, { ascending: direction === 'asc' });
+        });
+      }
+
+      // Apply pagination
+      if (options.limit) {
+        query = query.limit(options.limit);
+      }
+      if (options.offset) {
+        query = query.range(options.offset, options.offset + (options.limit || 100) - 1);
+      }
+
+      const { data, error } = await query;
+
+      if (error) {
+        throw new Error(`Failed to query ${tableName}: ${error.message}`);
+      }
+
+      return data || [];
+    } catch (error) {
+      console.error(`SupabaseAnimalAdapter.query error for ${tableName}:`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Generic update method for any table
+   */
+  async update(tableName: string, id: string, updates: any): Promise<any> {
+    try {
+      updates.updated_at = new Date().toISOString();
+
+      const { data, error } = await this.supabase
+        .from(tableName)
+        .update(updates)
+        .eq('id', id)
+        .select()
+        .single();
+
+      if (error) {
+        throw new Error(`Failed to update record in ${tableName}: ${error.message}`);
+      }
+
+      return data;
+    } catch (error) {
+      console.error(`SupabaseAnimalAdapter.update error for ${tableName}:`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Generic get by ID method for any table
+   */
+  async getById(tableName: string, id: string): Promise<any> {
+    try {
+      const { data, error } = await this.supabase
+        .from(tableName)
+        .select('*')
+        .eq('id', id)
+        .single();
+
+      if (error) {
+        if (error.code === 'PGRST116') {
+          return null; // Record not found
+        }
+        throw new Error(`Failed to get record from ${tableName}: ${error.message}`);
+      }
+
+      return data;
+    } catch (error) {
+      console.error(`SupabaseAnimalAdapter.getById error for ${tableName}:`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Generic delete method for any table
+   */
+  async delete(tableName: string, id: string): Promise<void> {
+    try {
+      const { error } = await this.supabase
+        .from(tableName)
+        .delete()
+        .eq('id', id);
+
+      if (error) {
+        throw new Error(`Failed to delete record from ${tableName}: ${error.message}`);
+      }
+    } catch (error) {
+      console.error(`SupabaseAnimalAdapter.delete error for ${tableName}:`, error);
+      throw error;
+    }
+  }
 }

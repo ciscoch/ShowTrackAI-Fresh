@@ -14,6 +14,16 @@ import { WeightHistoryScreen } from '../features/animals/screens/WeightHistorySc
 import { AddWeightScreen } from '../features/animals/screens/AddWeightScreen';
 import { JournalListScreen, JournalEntryScreen, JournalDetailScreen } from '../features/journal/screens';
 import { FinancialTrackingScreen } from '../features/financial/screens/FinancialTrackingScreen';
+import { 
+  EnhancedFFADashboard,
+  FFADegreeProgressScreen,
+  SAEProjectManagementScreen,
+  CompetitionTrackingScreen,
+  ParentDashboard,
+  ParentLinkingScreen,
+  StudentLinkingScreen,
+  EvidenceSubmissionScreen
+} from '../features/ffa/screens';
 import { Animal } from '../core/models/Animal';
 import { Journal } from '../core/models/Journal';
 import { useProfileStore } from '../core/stores/ProfileStore';
@@ -23,7 +33,7 @@ interface MainAppProps {
   profile?: any;
 }
 
-type AppScreen = 'dashboard' | 'animalList' | 'animalForm' | 'animalDetails' | 'weightHistory' | 'addWeight' | 'journalList' | 'journalEntry' | 'journalDetail' | 'financial';
+type AppScreen = 'dashboard' | 'animalList' | 'animalForm' | 'animalDetails' | 'weightHistory' | 'addWeight' | 'journalList' | 'journalEntry' | 'journalDetail' | 'financial' | 'ffaDashboard' | 'ffaDegreeProgress' | 'ffaSAEProjects' | 'ffaCompetitions' | 'parentDashboard' | 'parentLinking' | 'studentLinking' | 'evidenceSubmission';
 
 const MainApp: React.FC<MainAppProps> = ({ user, profile }) => {
   const { signOut } = useAuth();
@@ -31,6 +41,12 @@ const MainApp: React.FC<MainAppProps> = ({ user, profile }) => {
   const [currentScreen, setCurrentScreen] = useState<AppScreen>('dashboard');
   const [selectedAnimal, setSelectedAnimal] = useState<Animal | undefined>();
   const [selectedJournal, setSelectedJournal] = useState<Journal | undefined>();
+  const [selectedStudentId, setSelectedStudentId] = useState<string | undefined>();
+  const [evidenceSubmissionContext, setEvidenceSubmissionContext] = useState<{
+    degreeLevel: any;
+    requirementKey: string;
+    requirement: any;
+  } | undefined>();
 
   // Create a profile for the authenticated user if one doesn't exist
   useEffect(() => {
@@ -197,6 +213,52 @@ const MainApp: React.FC<MainAppProps> = ({ user, profile }) => {
     setCurrentScreen('dashboard');
   };
 
+  // FFA Navigation Handlers
+  const handleNavigateToFFA = () => {
+    setCurrentScreen('ffaDashboard');
+  };
+
+  const handleNavigateToFFADegreeProgress = () => {
+    setCurrentScreen('ffaDegreeProgress');
+  };
+
+  const handleNavigateToFFASAEProjects = () => {
+    setCurrentScreen('ffaSAEProjects');
+  };
+
+  const handleNavigateToFFACompetitions = () => {
+    setCurrentScreen('ffaCompetitions');
+  };
+
+  const handleBackFromFFA = () => {
+    setCurrentScreen('dashboard');
+  };
+
+  // Parent Oversight Navigation Handlers
+  const handleNavigateToParentLinking = () => {
+    setCurrentScreen('parentLinking');
+  };
+
+  const handleNavigateToStudentLinking = () => {
+    setCurrentScreen('studentLinking');
+  };
+
+  const handleNavigateToEvidenceSubmission = (degreeLevel: any, requirementKey: string, requirement: any) => {
+    setEvidenceSubmissionContext({ degreeLevel, requirementKey, requirement });
+    setCurrentScreen('evidenceSubmission');
+  };
+
+  const handleNavigateToParentDashboard = (studentId: string) => {
+    setSelectedStudentId(studentId);
+    setCurrentScreen('parentDashboard');
+  };
+
+  const handleBackFromParentOversight = () => {
+    setCurrentScreen('ffaDegreeProgress');
+    setSelectedStudentId(undefined);
+    setEvidenceSubmissionContext(undefined);
+  };
+
   const renderCurrentScreen = () => {
     switch (currentScreen) {
       case 'dashboard':
@@ -215,6 +277,7 @@ const MainApp: React.FC<MainAppProps> = ({ user, profile }) => {
             onAddAnimal={handleAddAnimal}
             onTakePhoto={handleTakePhoto}
             onNavigateToVetConnect={() => handlePlaceholderAction('VetConnect')}
+            onNavigateToFFA={handleNavigateToFFA}
           />
         );
 
@@ -307,6 +370,78 @@ const MainApp: React.FC<MainAppProps> = ({ user, profile }) => {
           />
         );
 
+      case 'ffaDashboard':
+        return (
+          <EnhancedFFADashboard
+            onNavigateToProgress={handleNavigateToFFADegreeProgress}
+            onNavigateToSAE={handleNavigateToFFASAEProjects}
+            onNavigateToCompetitions={handleNavigateToFFACompetitions}
+            onNavigateToAnalytics={() => handlePlaceholderAction('FFA Analytics')}
+            onBack={handleBackFromFFA}
+          />
+        );
+
+      case 'ffaDegreeProgress':
+        return (
+          <FFADegreeProgressScreen
+            onBack={() => setCurrentScreen('ffaDashboard')}
+            onNavigateToSAE={handleNavigateToFFASAEProjects}
+            onNavigateToCompetitions={handleNavigateToFFACompetitions}
+            onNavigateToEvidenceSubmission={handleNavigateToEvidenceSubmission}
+            onNavigateToParentLinking={handleNavigateToStudentLinking}
+          />
+        );
+
+      case 'ffaSAEProjects':
+        return (
+          <SAEProjectManagementScreen
+            onBack={() => setCurrentScreen('ffaDashboard')}
+            onNavigateToFinancial={() => setCurrentScreen('financial')}
+          />
+        );
+
+      case 'ffaCompetitions':
+        return (
+          <CompetitionTrackingScreen
+            onBack={() => setCurrentScreen('ffaDashboard')}
+            onNavigateToPrep={() => handlePlaceholderAction('Competition Prep')}
+          />
+        );
+
+      case 'parentDashboard':
+        return selectedStudentId ? (
+          <ParentDashboard
+            onBack={handleBackFromParentOversight}
+            studentId={selectedStudentId}
+          />
+        ) : null;
+
+      case 'parentLinking':
+        return (
+          <ParentLinkingScreen
+            onBack={handleBackFromParentOversight}
+            onLinkingSuccess={handleNavigateToParentDashboard}
+          />
+        );
+
+      case 'studentLinking':
+        return (
+          <StudentLinkingScreen
+            onBack={handleBackFromParentOversight}
+          />
+        );
+
+      case 'evidenceSubmission':
+        return evidenceSubmissionContext ? (
+          <EvidenceSubmissionScreen
+            onBack={handleBackFromParentOversight}
+            degreeLevel={evidenceSubmissionContext.degreeLevel}
+            requirementKey={evidenceSubmissionContext.requirementKey}
+            requirementTitle={evidenceSubmissionContext.requirement.title || 'FFA Requirement'}
+            requirementDescription={evidenceSubmissionContext.requirement.description || 'Complete this requirement for your FFA degree.'}
+          />
+        ) : null;
+
       default:
         return (
           <EliteDashboard
@@ -323,6 +458,7 @@ const MainApp: React.FC<MainAppProps> = ({ user, profile }) => {
             onAddAnimal={handleAddAnimal}
             onTakePhoto={handleTakePhoto}
             onNavigateToVetConnect={() => handlePlaceholderAction('VetConnect')}
+            onNavigateToFFA={handleNavigateToFFA}
           />
         );
     }

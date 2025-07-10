@@ -250,6 +250,25 @@ export class ServiceFactory {
   }
   
   /**
+   * Get generic Supabase adapter for direct database access
+   * Used by FFA services and other advanced features
+   */
+  static getSupabaseAdapter(): any {
+    if (!useSupabaseBackend()) {
+      console.warn('⚠️ Supabase adapter requested but backend is not enabled');
+      return null;
+    }
+    
+    const key = 'supabase_adapter';
+    if (!this.instances.has(key)) {
+      // Return the SupabaseAnimalAdapter as it has generic CRUD methods
+      const adapter = new SupabaseAnimalAdapter();
+      this.instances.set(key, adapter);
+    }
+    return this.instances.get(key);
+  }
+
+  /**
    * Test connectivity to backend services
    */
   static async testConnectivity(): Promise<{

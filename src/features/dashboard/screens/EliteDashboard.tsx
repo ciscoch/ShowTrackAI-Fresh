@@ -26,6 +26,7 @@ interface EliteDashboardProps {
   onTakePhoto?: () => void;
   onAddEvent?: () => void;
   onNavigateToVetConnect?: () => void;
+  onNavigateToFFA?: () => void;
 }
 
 export const EliteDashboard: React.FC<EliteDashboardProps> = ({
@@ -43,6 +44,7 @@ export const EliteDashboard: React.FC<EliteDashboardProps> = ({
   onTakePhoto,
   onAddEvent,
   onNavigateToVetConnect,
+  onNavigateToFFA,
 }) => {
   const { currentProfile } = useProfileStore();
   const [showQRGenerator, setShowQRGenerator] = useState(false);
@@ -200,7 +202,10 @@ export const EliteDashboard: React.FC<EliteDashboardProps> = ({
           <View style={styles.featuresSubsection}>
             <Text style={styles.subsectionTitle}>📖 Additional Student Features</Text>
             <View style={styles.featuresGrid}>
-              <TouchableOpacity style={styles.featureCard}>
+              <TouchableOpacity 
+                style={styles.featureCard}
+                onPress={onNavigateToFFA}
+              >
                 <Text style={styles.featureIcon}>🎓</Text>
                 <Text style={styles.featureTitle}>FFA Integration</Text>
                 <Text style={styles.featureSubtitle}>SAE project tracking</Text>

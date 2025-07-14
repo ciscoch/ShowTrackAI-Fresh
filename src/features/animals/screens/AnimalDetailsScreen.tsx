@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, SafeAreaView } from 'react-native';
 import { Animal } from '../../../core/models/Animal';
+import { useAnalytics } from '../../../core/hooks/useAnalytics';
 
 interface AnimalDetailsScreenProps {
   animal: Animal;
@@ -15,6 +16,11 @@ export const AnimalDetailsScreen: React.FC<AnimalDetailsScreenProps> = ({
   onBack,
   onViewWeightHistory,
 }) => {
+  // Analytics
+  const { trackAnimalEvent, trackFeatureUsage, trackCustomEvent } = useAnalytics({
+    autoTrackScreenView: true,
+    screenName: 'AnimalDetailsScreen',
+  });
   const getAnimalEmoji = (species: string): string => {
     switch (species.toLowerCase()) {
       case 'cattle': case 'cow': case 'bull': return '🐄';
@@ -48,6 +54,48 @@ export const AnimalDetailsScreen: React.FC<AnimalDetailsScreenProps> = ({
     return new Date(date).toLocaleDateString();
   };
 
+  // Analytics wrapper functions
+  const handleEditAnimal = () => {
+    trackAnimalEvent('edit_initiated', animal);
+    onEdit();
+  };
+
+  const handleViewWeightHistory = () => {
+    trackFeatureUsage('weight_tracking', {
+      action: 'view_history',
+      animal_species: animal.species,
+      has_current_weight: !!animal.weight,
+    });
+    onViewWeightHistory?.();
+  };
+
+  const handlePhotoGallery = () => {
+    trackFeatureUsage('photo_management', {
+      action: 'view_gallery_initiated',
+      animal_species: animal.species,
+      has_photos: false, // placeholder
+    });
+    // TODO: Implement photo gallery navigation
+  };
+
+  const handleAIWeightPrediction = () => {
+    trackFeatureUsage('ai_tools', {
+      action: 'weight_prediction_initiated',
+      animal_species: animal.species,
+      current_weight: animal.weight ? 'available' : 'not_available',
+    });
+    // TODO: Implement AI weight prediction navigation
+  };
+
+  const handleHealthRecords = () => {
+    trackFeatureUsage('health_records', {
+      action: 'view_records_initiated',
+      animal_species: animal.species,
+      health_status: animal.healthStatus,
+    });
+    // TODO: Implement health records navigation
+  };
+
   const DetailRow: React.FC<{ icon: string; label: string; value: string | number; color?: string }> = ({
     icon,
     label,
@@ -75,7 +123,7 @@ export const AnimalDetailsScreen: React.FC<AnimalDetailsScreenProps> = ({
         <View style={styles.titleContainer}>
           <Text style={styles.title}>Animal Details</Text>
         </View>
-        <TouchableOpacity style={styles.editButton} onPress={onEdit}>
+        <TouchableOpacity style={styles.editButton} onPress={handleEditAnimal}>
           <Text style={styles.editButtonText}>Edit</Text>
         </TouchableOpacity>
       </View>
@@ -176,7 +224,7 @@ export const AnimalDetailsScreen: React.FC<AnimalDetailsScreenProps> = ({
         <View style={styles.eliteSection}>
           <Text style={styles.eliteSectionTitle}>⭐ Elite Features</Text>
           
-          <TouchableOpacity style={styles.eliteFeatureCard}>
+          <TouchableOpacity style={styles.eliteFeatureCard} onPress={handlePhotoGallery}>
             <View style={styles.eliteFeatureIcon}>
               <Text style={styles.eliteFeatureEmoji}>📸</Text>
             </View>
@@ -189,7 +237,7 @@ export const AnimalDetailsScreen: React.FC<AnimalDetailsScreenProps> = ({
 
           <TouchableOpacity 
             style={styles.eliteFeatureCard}
-            onPress={onViewWeightHistory}
+            onPress={handleViewWeightHistory}
           >
             <View style={styles.eliteFeatureIcon}>
               <Text style={styles.eliteFeatureEmoji}>📊</Text>
@@ -201,7 +249,7 @@ export const AnimalDetailsScreen: React.FC<AnimalDetailsScreenProps> = ({
             <Text style={styles.eliteFeatureArrow}>→</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.eliteFeatureCard}>
+          <TouchableOpacity style={styles.eliteFeatureCard} onPress={handleAIWeightPrediction}>
             <View style={styles.eliteFeatureIcon}>
               <Text style={styles.eliteFeatureEmoji}>🤖</Text>
             </View>
@@ -212,7 +260,7 @@ export const AnimalDetailsScreen: React.FC<AnimalDetailsScreenProps> = ({
             <Text style={styles.eliteFeatureArrow}>→</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.eliteFeatureCard}>
+          <TouchableOpacity style={styles.eliteFeatureCard} onPress={handleHealthRecords}>
             <View style={styles.eliteFeatureIcon}>
               <Text style={styles.eliteFeatureEmoji}>🏥</Text>
             </View>

@@ -11,6 +11,7 @@ import { Journal } from '../../../core/models/Journal';
 import { useJournalStore } from '../../../core/stores/JournalStore';
 import { useTimeTrackingStore } from '../../../core/stores/TimeTrackingStore';
 import { aetSkillMatcher } from '../../../core/services/AETSkillMatcher';
+import { useAnalytics } from '../../../core/hooks/useAnalytics';
 
 interface JournalListScreenProps {
   onAddEntry: () => void;
@@ -29,6 +30,12 @@ export const JournalListScreen: React.FC<JournalListScreenProps> = ({
   const { activeEntry, stopTracking } = useTimeTrackingStore();
   const [skillSummary, setSkillSummary] = useState<any>(null);
 
+  // Analytics
+  const { trackJournalEvent, trackAETEvent, trackError } = useAnalytics({
+    autoTrackScreenView: true,
+    screenName: 'JournalListScreen',
+  });
+
   useEffect(() => {
     loadEntries();
   }, [loadEntries]);
@@ -42,16 +49,69 @@ export const JournalListScreen: React.FC<JournalListScreenProps> = ({
     }
   }, [entries]);
 
+  // Analytics wrapper functions
+  const handleAddEntry = () => {
+    trackJournalEvent('entry_creation_initiated', {
+      total_entries: entries.length,
+      total_skills_tracked: skillSummary?.totalSkills || 0,
+    });
+    onAddEntry();
+  };
+
+  const handleViewEntry = (entry: Journal) => {
+    trackJournalEvent('entry_viewed', {
+      category: entry.category,
+      has_photos: entry.photos.length > 0,
+      word_count: entry.description.split(' ').length,
+      aet_skills_identified: entry.aetSkills.length,
+      duration_minutes: entry.duration,
+    });
+    onViewEntry(entry);
+  };
+
+  const handleViewAnalytics = () => {
+    trackJournalEvent('analytics_viewed', {
+      total_entries: entries.length,
+      total_skills_tracked: skillSummary?.totalSkills || 0,
+      most_common_category: skillSummary?.topCategory || 'unknown',
+    });
+    onViewAnalytics();
+  };
+
   const handleDeleteEntry = (entry: Journal) => {
     Alert.alert(
       'Delete Journal Entry',
       `Are you sure you want to delete "${entry.title}"?`,
       [
-        { text: 'Cancel', style: 'cancel' },
+        { 
+          text: 'Cancel', 
+          style: 'cancel',
+          onPress: () => trackJournalEvent('delete_cancelled', {
+            category: entry.category,
+            aet_skills_identified: entry.aetSkills.length,
+          })
+        },
         {
           text: 'Delete',
           style: 'destructive',
-          onPress: () => deleteEntry(entry.id),
+          onPress: async () => {
+            try {
+              await deleteEntry(entry.id);
+              trackJournalEvent('entry_deleted', {
+                category: entry.category,
+                has_photos: entry.photos.length > 0,
+                word_count: entry.description.split(' ').length,
+                aet_skills_identified: entry.aetSkills.length,
+                duration_minutes: entry.duration,
+              });
+            } catch (error) {
+              trackError(error as Error, {
+                feature: 'journal_management',
+                userAction: 'delete_entry',
+                entryId: entry.id,
+              });
+            }
+          },
         },
       ]
     );
@@ -89,7 +149,7 @@ export const JournalListScreen: React.FC<JournalListScreenProps> = ({
   const renderEntry = ({ item }: { item: Journal }) => (
     <TouchableOpacity
       style={styles.entryCard}
-      onPress={() => onViewEntry(item)}
+      onPress={() => handleViewEntry(item)}
       onLongPress={() => handleDeleteEntry(item)}
     >
       <View style={styles.entryHeader}>
@@ -188,7 +248,7 @@ export const JournalListScreen: React.FC<JournalListScreenProps> = ({
           </View>
         </View>
         
-        <TouchableOpacity style={styles.analyticsButton} onPress={onViewAnalytics}>
+        <TouchableOpacity style={styles.analyticsButton} onPress={handleViewAnalytics}>
           <Text style={styles.analyticsButtonText}>📊 View Detailed Analytics</Text>
         </TouchableOpacity>
       </View>
@@ -201,7 +261,7 @@ export const JournalListScreen: React.FC<JournalListScreenProps> = ({
       <Text style={styles.emptySubtitle}>
         Track your daily activities and develop AET skills for career readiness
       </Text>
-      <TouchableOpacity style={styles.emptyButton} onPress={onAddEntry}>
+      <TouchableOpacity style={styles.emptyButton} onPress={handleAddEntry}>
         <Text style={styles.emptyButtonText}>Create First Entry</Text>
       </TouchableOpacity>
     </View>
@@ -221,7 +281,7 @@ export const JournalListScreen: React.FC<JournalListScreenProps> = ({
           <Text style={styles.title}>📝 Activity Journal</Text>
         </View>
         <View style={styles.headerRight}>
-          <TouchableOpacity style={styles.addButton} onPress={onAddEntry}>
+          <TouchableOpacity style={styles.addButton} onPress={handleAddEntry}>
             <Text style={styles.addButtonText}>+ New Entry</Text>
           </TouchableOpacity>
         </View>

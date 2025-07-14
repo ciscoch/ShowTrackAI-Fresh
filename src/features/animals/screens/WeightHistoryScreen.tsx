@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { Animal, Weight } from '../../../core/models';
 import { useWeightStore } from '../../../core/stores/WeightStore';
+import { useAnalytics } from '../../../core/hooks/useAnalytics';
 // Chart component will be created inline for now
 
 interface WeightHistoryScreenProps {
@@ -27,6 +28,12 @@ export const WeightHistoryScreen: React.FC<WeightHistoryScreenProps> = ({
   const { weights, getWeightsByAnimal, loadWeights, deleteWeight } = useWeightStore();
   const [selectedPeriod, setSelectedPeriod] = useState<'week' | 'month' | 'quarter' | 'year'>('month');
   const [selectedTab, setSelectedTab] = useState<'chart' | 'data'>('chart');
+
+  // Analytics
+  const { trackWeightEvent, trackFeatureUsage, trackError } = useAnalytics({
+    autoTrackScreenView: true,
+    screenName: 'WeightHistoryScreen',
+  });
 
   const screenWidth = Dimensions.get('window').width;
 
@@ -145,16 +152,69 @@ export const WeightHistoryScreen: React.FC<WeightHistoryScreenProps> = ({
     }
   };
 
+  // Analytics wrapper functions
+  const handleAddWeight = () => {
+    trackWeightEvent('add_weight_initiated', {
+      measurement_type: 'various',
+      weight_value: 'pending',
+      has_bcs: false,
+    });
+    onAddWeight();
+  };
+
+  const handleTabChange = (tab: 'chart' | 'data') => {
+    trackFeatureUsage('weight_tracking', {
+      action: 'tab_changed',
+      tab_selected: tab,
+      records_count: animalWeights.length,
+    });
+    setSelectedTab(tab);
+  };
+
+  const handlePeriodChange = (period: 'week' | 'month' | 'quarter' | 'year') => {
+    trackFeatureUsage('weight_tracking', {
+      action: 'period_filter_changed',
+      period_selected: period,
+      records_in_period: filteredWeights.length,
+    });
+    setSelectedPeriod(period);
+  };
+
   const handleDeleteWeight = (weightId: string) => {
+    const weightToDelete = animalWeights.find(w => w.id === weightId);
+    
     Alert.alert(
       'Delete Weight Record',
       'Are you sure you want to delete this weight record?',
       [
-        { text: 'Cancel', style: 'cancel' },
+        { 
+          text: 'Cancel', 
+          style: 'cancel',
+          onPress: () => trackWeightEvent('delete_cancelled', {
+            measurement_type: weightToDelete?.measurementType || 'unknown',
+            weight_value: 'recorded',
+            has_bcs: !!weightToDelete?.bodyConditionScore,
+          })
+        },
         {
           text: 'Delete',
           style: 'destructive',
-          onPress: () => deleteWeight(weightId),
+          onPress: async () => {
+            try {
+              await deleteWeight(weightId);
+              trackWeightEvent('delete_completed', {
+                measurement_type: weightToDelete?.measurementType || 'unknown',
+                weight_value: 'recorded',
+                has_bcs: !!weightToDelete?.bodyConditionScore,
+              });
+            } catch (error) {
+              trackError(error as Error, {
+                feature: 'weight_tracking',
+                userAction: 'delete_weight',
+                weightId,
+              });
+            }
+          },
         },
       ]
     );
@@ -283,7 +343,7 @@ export const WeightHistoryScreen: React.FC<WeightHistoryScreenProps> = ({
           <Text style={styles.title}>Weight History</Text>
           <Text style={styles.subtitle}>{animal.name}</Text>
         </View>
-        <TouchableOpacity style={styles.addButton} onPress={onAddWeight}>
+        <TouchableOpacity style={styles.addButton} onPress={handleAddWeight}>
           <Text style={styles.addButtonText}>+ Add</Text>
         </TouchableOpacity>
       </View>
@@ -336,7 +396,7 @@ export const WeightHistoryScreen: React.FC<WeightHistoryScreenProps> = ({
         <View style={styles.tabContainer}>
           <TouchableOpacity
             style={[styles.tab, selectedTab === 'chart' && styles.activeTab]}
-            onPress={() => setSelectedTab('chart')}
+            onPress={() => handleTabChange('chart')}
           >
             <Text style={[styles.tabText, selectedTab === 'chart' && styles.activeTabText]}>
               Chart
@@ -344,7 +404,7 @@ export const WeightHistoryScreen: React.FC<WeightHistoryScreenProps> = ({
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.tab, selectedTab === 'data' && styles.activeTab]}
-            onPress={() => setSelectedTab('data')}
+            onPress={() => handleTabChange('data')}
           >
             <Text style={[styles.tabText, selectedTab === 'data' && styles.activeTabText]}>
               Data
@@ -363,7 +423,7 @@ export const WeightHistoryScreen: React.FC<WeightHistoryScreenProps> = ({
                     styles.periodButton,
                     selectedPeriod === period && styles.activePeriod,
                   ]}
-                  onPress={() => setSelectedPeriod(period as any)}
+                  onPress={() => handlePeriodChange(period as any)}
                 >
                   <Text
                     style={[

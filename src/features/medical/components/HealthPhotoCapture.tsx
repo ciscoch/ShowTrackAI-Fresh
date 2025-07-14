@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Image, Alert, ScrollView } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
+import { useAuth } from '../../../core/contexts/AuthContext';
 import { HealthPhoto } from '../../../core/models/HealthRecord';
 
 interface HealthPhotoCaptureProps {
@@ -14,6 +15,7 @@ export const HealthPhotoCapture: React.FC<HealthPhotoCaptureProps> = ({
   onPhotosChange,
   maxPhotos = 5,
 }) => {
+  const { user } = useAuth();
   const [isCapturing, setIsCapturing] = useState(false);
 
   const photoTypes = [
@@ -79,7 +81,7 @@ export const HealthPhotoCapture: React.FC<HealthPhotoCaptureProps> = ({
         description: undefined,
         qualityScore: 0.8 + (Math.random() * 0.2), // Simulated quality score
         capturedAt: new Date(),
-        userId: 'current-user', // Would come from auth context
+        userId: user?.id || 'unknown-user',
       };
 
       // Update photos array

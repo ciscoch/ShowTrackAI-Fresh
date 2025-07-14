@@ -5,3 +5,4 @@ export * from './RewardPointsService';
 export * from './ParentOversightService';
 export * from './UserRoleService';
 export * from './NotificationService';
+export * from './AnalyticsService';

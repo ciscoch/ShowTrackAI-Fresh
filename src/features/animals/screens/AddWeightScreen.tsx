@@ -14,6 +14,7 @@ import { Animal, CreateWeightRequest } from '../../../core/models';
 import { useWeightStore } from '../../../core/stores/WeightStore';
 import { FormPicker } from '../../../shared/components/FormPicker';
 import { DatePicker } from '../../../shared/components/DatePicker';
+import { useAnalytics } from '../../../core/hooks/useAnalytics';
 
 interface AddWeightScreenProps {
   animal: Animal;
@@ -46,6 +47,12 @@ export const AddWeightScreen: React.FC<AddWeightScreenProps> = ({
   onCancel,
 }) => {
   const { addWeight } = useWeightStore();
+  
+  // Analytics
+  const { trackWeightEvent, trackError } = useAnalytics({
+    autoTrackScreenView: true,
+    screenName: 'AddWeightScreen',
+  });
   
   const [formData, setFormData] = useState({
     weight: '',
@@ -96,6 +103,11 @@ export const AddWeightScreen: React.FC<AddWeightScreenProps> = ({
 
   const handleSave = async () => {
     if (!validateForm()) {
+      trackWeightEvent('validation_failed', {
+        measurementType: formData.measurementType,
+        weight_value: formData.weight ? 'provided' : 'missing',
+        has_bcs: !!formData.bodyConditionScore,
+      });
       return;
     }
 
@@ -114,15 +126,42 @@ export const AddWeightScreen: React.FC<AddWeightScreenProps> = ({
 
       await addWeight(weightData);
       
+      // Track successful weight addition
+      trackWeightEvent('weight_added', {
+        measurementType: formData.measurementType,
+        weight_value: 'recorded',
+        has_bcs: !!formData.bodyConditionScore,
+        has_confidence: !!formData.confidence,
+        has_notes: !!formData.notes,
+      });
+      
       Alert.alert('Success', 'Weight record added successfully!', [
         { text: 'OK', onPress: onSave }
       ]);
     } catch (error) {
       console.error('Error saving weight:', error);
+      
+      // Track weight save error
+      trackError(error as Error, {
+        feature: 'weight_tracking',
+        userAction: 'save_weight',
+        measurementType: formData.measurementType,
+        animalId: animal.id,
+      });
+      
       Alert.alert('Error', 'Failed to save weight record. Please try again.');
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleCancel = () => {
+    trackWeightEvent('entry_cancelled', {
+      measurementType: formData.measurementType,
+      weight_value: formData.weight ? 'provided' : 'empty',
+      has_bcs: !!formData.bodyConditionScore,
+    });
+    onCancel();
   };
 
   const getWeightUnit = (): string => {
@@ -151,7 +190,7 @@ export const AddWeightScreen: React.FC<AddWeightScreenProps> = ({
     <SafeAreaView style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity style={styles.cancelButton} onPress={onCancel}>
+        <TouchableOpacity style={styles.cancelButton} onPress={handleCancel}>
           <Text style={styles.cancelButtonText}>Cancel</Text>
         </TouchableOpacity>
         <View style={styles.titleContainer}>

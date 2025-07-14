@@ -6,6 +6,7 @@ import { useProfileStore } from '../../../core/stores/ProfileStore';
 import { educatorStudentService } from '../../../core/services/EducatorStudentService';
 import { useAuth } from '../../../core/contexts/AuthContext';
 import { useSupabaseBackend } from '../../../core/hooks/useSupabaseBackend';
+import { useAnalytics } from '../../../core/hooks/useAnalytics';
 
 interface AnimalListScreenProps {
   onAddAnimal?: () => void;
@@ -30,6 +31,12 @@ export const AnimalListScreen: React.FC<AnimalListScreenProps> = ({
   const { isEnabled: useBackend } = useSupabaseBackend();
   const [filteredAnimals, setFilteredAnimals] = useState<Animal[]>([]);
   const [isLoadingFiltered, setIsLoadingFiltered] = useState(false);
+  
+  // Analytics
+  const { trackScreen, trackAnimalEvent, trackError } = useAnalytics({
+    autoTrackScreenView: true,
+    screenName: 'AnimalListScreen',
+  });
 
   useEffect(() => {
     if (useBackend && !user) {
@@ -85,16 +92,50 @@ export const AnimalListScreen: React.FC<AnimalListScreenProps> = ({
     }
   };
 
+  // Analytics wrapper functions
+  const handleViewAnimal = (animal: Animal) => {
+    trackAnimalEvent('view_details', animal);
+    onViewAnimal(animal);
+  };
+
+  const handleEditAnimal = (animal: Animal) => {
+    trackAnimalEvent('edit_initiated', animal);
+    onEditAnimal?.(animal);
+  };
+
+  const handleAddAnimal = () => {
+    trackAnimalEvent('add_initiated');
+    onAddAnimal?.();
+  };
+
   const handleDeleteAnimal = (animal: Animal) => {
+    // Track analytics before showing alert
+    trackAnimalEvent('delete_initiated', animal);
+    
     Alert.alert(
       'Delete Animal',
       `Are you sure you want to delete ${animal.name}?`,
       [
-        { text: 'Cancel', style: 'cancel' },
+        { 
+          text: 'Cancel', 
+          style: 'cancel',
+          onPress: () => trackAnimalEvent('delete_cancelled', animal)
+        },
         { 
           text: 'Delete', 
           style: 'destructive',
-          onPress: () => deleteAnimal(animal.id)
+          onPress: async () => {
+            try {
+              await deleteAnimal(animal.id);
+              trackAnimalEvent('delete_completed', animal);
+            } catch (error) {
+              trackError(error as Error, {
+                feature: 'animal_management',
+                userAction: 'delete_animal',
+                animalId: animal.id,
+              });
+            }
+          }
         }
       ]
     );
@@ -118,12 +159,12 @@ export const AnimalListScreen: React.FC<AnimalListScreenProps> = ({
     switch (species.toLowerCase()) {
       case 'cattle': case 'cow': case 'bull': return '#8B4513';
       case 'goat': return '#A0522D';
-      case 'sheep': return '#F5F5DC';
-      case 'pig': case 'swine': return '#FFC0CB';
+      case 'sheep': return '#9CA3AF'; // Changed from beige to better gray
+      case 'pig': case 'swine': return '#EC4899'; // Changed from light pink to stronger pink
       case 'horse': return '#654321';
-      case 'chicken': case 'poultry': return '#FFD700';
+      case 'chicken': case 'poultry': return '#F59E0B'; // Changed from light yellow to amber
       case 'duck': return '#4682B4';
-      case 'rabbit': return '#DEB887';
+      case 'rabbit': return '#92400E'; // Changed from light tan to brown
       default: return '#6B7280';
     }
   };
@@ -142,7 +183,7 @@ export const AnimalListScreen: React.FC<AnimalListScreenProps> = ({
           <View style={styles.cardActions}>
             <TouchableOpacity 
               style={styles.actionButton}
-              onPress={() => onEditAnimal?.(item)}
+              onPress={() => handleEditAnimal(item)}
               activeOpacity={0.7}
             >
               <Text style={styles.actionIcon}>✏️</Text>
@@ -161,8 +202,8 @@ export const AnimalListScreen: React.FC<AnimalListScreenProps> = ({
       {/* Main touchable area for animal details */}
       <TouchableOpacity 
         style={styles.cardMainContent}
-        onPress={() => onViewAnimal(item)}
-        activeOpacity={0.7}
+        onPress={() => handleViewAnimal(item)}
+        activeOpacity={0.8}
       >
         <View style={styles.animalMainInfo}>
           <Text style={styles.animalName}>{item.name}</Text>
@@ -225,7 +266,7 @@ export const AnimalListScreen: React.FC<AnimalListScreenProps> = ({
       <View style={styles.quickActionBar}>
         <TouchableOpacity 
           style={styles.quickAction}
-          onPress={() => onViewAnimal(item)}
+          onPress={() => handleViewAnimal(item)}
           activeOpacity={0.7}
         >
           <Text style={styles.quickActionIcon}>👁️</Text>
@@ -237,7 +278,7 @@ export const AnimalListScreen: React.FC<AnimalListScreenProps> = ({
             <View style={styles.quickActionDivider} />
             <TouchableOpacity 
               style={styles.quickAction}
-              onPress={() => onEditAnimal?.(item)}
+              onPress={() => handleEditAnimal(item)}
               activeOpacity={0.7}
             >
               <Text style={styles.quickActionIcon}>✏️</Text>
@@ -273,7 +314,7 @@ export const AnimalListScreen: React.FC<AnimalListScreenProps> = ({
         }
       </Text>
       {!isReadOnly && onAddAnimal && (
-        <TouchableOpacity style={styles.primaryButton} onPress={onAddAnimal}>
+        <TouchableOpacity style={styles.primaryButton} onPress={handleAddAnimal}>
           <Text style={styles.addIcon}>+</Text>
           <Text style={styles.primaryButtonText}>Add Your First Animal</Text>
         </TouchableOpacity>
@@ -298,15 +339,12 @@ export const AnimalListScreen: React.FC<AnimalListScreenProps> = ({
           </TouchableOpacity>
         )}
         <View style={styles.titleContainer}>
-          <Text style={styles.title}>
+          <Text style={styles.title} numberOfLines={1}>
             {isReadOnly ? 'Student Animals' : 'My Animals'}
-            {useBackend && user && (
-              <Text style={styles.authIndicator}> (Authenticated)</Text>
-            )}
           </Text>
         </View>
         {!isReadOnly && onAddAnimal ? (
-          <TouchableOpacity style={styles.addButton} onPress={onAddAnimal}>
+          <TouchableOpacity style={styles.addButton} onPress={handleAddAnimal}>
             <Text style={styles.addButtonText}>+ Add Animal</Text>
           </TouchableOpacity>
         ) : (
@@ -368,8 +406,7 @@ export const AnimalListScreen: React.FC<AnimalListScreenProps> = ({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-    backgroundColor: '#f8f9fa',
+    backgroundColor: '#f5f7fa',
   },
   header: {
     flexDirection: 'row',
@@ -378,22 +415,24 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingVertical: 16,
     paddingTop: 20,
-    backgroundColor: '#007AFF',
-    borderBottomLeftRadius: 20,
-    borderBottomRightRadius: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 8,
-    elevation: 8,
+    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+    backgroundColor: '#667eea',
+    borderBottomLeftRadius: 24,
+    borderBottomRightRadius: 24,
+    shadowColor: '#667eea',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.25,
+    shadowRadius: 16,
+    elevation: 12,
   },
   backButton: {
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    borderRadius: 12,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 16,
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    backdropFilter: 'blur(10px)',
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.3)',
+    borderColor: 'rgba(255, 255, 255, 0.2)',
   },
   backButtonText: {
     fontSize: 16,
@@ -403,49 +442,51 @@ const styles = StyleSheet.create({
   titleContainer: {
     flex: 1,
     alignItems: 'center',
+    paddingHorizontal: 16,
   },
   title: {
     fontSize: 20,
-    fontWeight: 'bold',
+    fontWeight: '700',
     color: '#fff',
-  },
-  authIndicator: {
-    fontSize: 12,
-    fontWeight: 'normal',
-    color: 'rgba(255, 255, 255, 0.8)',
+    letterSpacing: 0.3,
+    textAlign: 'center',
   },
   headerSpacer: {
     width: 100,
   },
   addButton: {
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    backdropFilter: 'blur(10px)',
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.3)',
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    borderRadius: 12,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
+    paddingVertical: 10,
+    paddingHorizontal: 18,
+    borderRadius: 16,
   },
   addButtonText: {
     color: '#fff',
-    fontWeight: '600',
+    fontWeight: '700',
     fontSize: 14,
+    letterSpacing: 0.3,
   },
   content: {
     flex: 1,
-    paddingTop: 20,
+    paddingTop: 24,
   },
   statsBar: {
     flexDirection: 'row',
     backgroundColor: '#fff',
     marginHorizontal: 20,
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 4,
+    borderRadius: 20,
+    padding: 20,
+    marginBottom: 24,
+    shadowColor: '#667eea',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.12,
+    shadowRadius: 12,
+    elevation: 6,
+    borderWidth: 1,
+    borderColor: 'rgba(102, 126, 234, 0.15)',
   },
   statItem: {
     flex: 1,
@@ -461,45 +502,47 @@ const styles = StyleSheet.create({
     marginBottom: 2,
   },
   statValue: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#007AFF',
+    fontSize: 20,
+    fontWeight: '800',
+    color: '#667eea',
   },
   statDivider: {
     width: 1,
-    backgroundColor: '#e9ecef',
-    marginHorizontal: 16,
+    backgroundColor: 'rgba(102, 126, 234, 0.15)',
+    marginHorizontal: 20,
   },
   separator: {
-    height: 12,
+    height: 16,
   },
   listContainer: {
     paddingHorizontal: 20,
-    paddingBottom: 20,
+    paddingBottom: 32,
     flexGrow: 1,
   },
   animalCard: {
     backgroundColor: '#fff',
-    borderRadius: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.12,
-    shadowRadius: 12,
-    elevation: 6,
+    borderRadius: 24,
+    shadowColor: '#667eea',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.15,
+    shadowRadius: 16,
+    elevation: 8,
     borderWidth: 1,
-    borderColor: '#f0f0f0',
+    borderColor: 'rgba(102, 126, 234, 0.12)',
     overflow: 'hidden',
+    transform: [{ translateY: 0 }],
   },
   cardHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
-    padding: 20,
-    paddingBottom: 12,
+    padding: 24,
+    paddingBottom: 16,
+    backgroundColor: 'rgba(102, 126, 234, 0.02)',
   },
   cardMainContent: {
-    paddingHorizontal: 20,
-    paddingBottom: 16,
+    paddingHorizontal: 24,
+    paddingBottom: 20,
   },
   animalIconContainer: {
     flexDirection: 'row',
@@ -507,37 +550,43 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   animalEmoji: {
-    fontSize: 32,
+    fontSize: 36,
   },
   speciesBadge: {
-    paddingHorizontal: 12,
-    paddingVertical: 4,
-    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    borderRadius: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
   speciesText: {
     color: '#fff',
     fontSize: 12,
-    fontWeight: '600',
+    fontWeight: '700',
     textTransform: 'capitalize',
+    letterSpacing: 0.5,
   },
   cardActions: {
     flexDirection: 'row',
     gap: 8,
   },
   actionButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
     backgroundColor: '#f8f9fa',
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#e9ecef',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
+    borderColor: 'rgba(102, 126, 234, 0.1)',
+    shadowColor: '#667eea',
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 2,
+    shadowRadius: 6,
+    elevation: 3,
   },
   deleteAction: {
     backgroundColor: '#fff5f5',
@@ -550,10 +599,11 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   animalName: {
-    fontSize: 24,
-    fontWeight: 'bold',
+    fontSize: 26,
+    fontWeight: '800',
     color: '#1a202c',
-    marginBottom: 8,
+    marginBottom: 12,
+    letterSpacing: 0.3,
   },
   identificationContainer: {
     flexDirection: 'row',
@@ -572,15 +622,21 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   tagNumber: {
-    backgroundColor: '#007AFF',
-    paddingHorizontal: 12,
-    paddingVertical: 4,
-    borderRadius: 8,
+    backgroundColor: '#667eea',
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    borderRadius: 12,
+    shadowColor: '#667eea',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 3,
   },
   tagText: {
     color: '#fff',
     fontSize: 12,
-    fontWeight: 'bold',
+    fontWeight: '700',
+    letterSpacing: 0.5,
   },
   penContainer: {
     flexDirection: 'row',
@@ -593,15 +649,21 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   penNumber: {
-    backgroundColor: '#28a745',
-    paddingHorizontal: 12,
-    paddingVertical: 4,
-    borderRadius: 8,
+    backgroundColor: '#10b981',
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    borderRadius: 12,
+    shadowColor: '#10b981',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 3,
   },
   penText: {
     color: '#fff',
     fontSize: 12,
-    fontWeight: 'bold',
+    fontWeight: '700',
+    letterSpacing: 0.5,
   },
   sexContainer: {
     flexDirection: 'row',
@@ -614,15 +676,21 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   sexBadge: {
-    backgroundColor: '#6c757d',
-    paddingHorizontal: 12,
-    paddingVertical: 4,
-    borderRadius: 8,
+    backgroundColor: '#64748b',
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    borderRadius: 12,
+    shadowColor: '#64748b',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 3,
   },
   sexText: {
     color: '#fff',
     fontSize: 12,
-    fontWeight: 'bold',
+    fontWeight: '700',
+    letterSpacing: 0.5,
   },
   animalDetails: {
     gap: 8,
@@ -651,9 +719,9 @@ const styles = StyleSheet.create({
   },
   cardFooter: {
     borderTopWidth: 1,
-    borderTopColor: '#f8f9fa',
-    paddingTop: 12,
-    backgroundColor: '#f8f9fa',
+    borderTopColor: 'rgba(102, 126, 234, 0.08)',
+    paddingTop: 16,
+    backgroundColor: 'rgba(102, 126, 234, 0.02)',
   },
   viewDetailsButton: {
     flexDirection: 'row',
@@ -676,29 +744,29 @@ const styles = StyleSheet.create({
   quickActionBar: {
     flexDirection: 'row',
     borderTopWidth: 1,
-    borderTopColor: '#e9ecef',
-    backgroundColor: '#f8f9fa',
+    borderTopColor: 'rgba(102, 126, 234, 0.08)',
+    backgroundColor: 'rgba(102, 126, 234, 0.02)',
   },
   quickAction: {
     flex: 1,
-    paddingVertical: 12,
+    paddingVertical: 16,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 4,
+    gap: 6,
   },
   quickActionDivider: {
     width: 1,
-    backgroundColor: '#e9ecef',
+    backgroundColor: 'rgba(102, 126, 234, 0.1)',
   },
   quickActionIcon: {
-    fontSize: 16,
+    fontSize: 18,
   },
   quickActionText: {
-    fontSize: 10,
-    color: '#666',
-    fontWeight: '600',
+    fontSize: 11,
+    color: '#667eea',
+    fontWeight: '700',
     textTransform: 'uppercase',
-    letterSpacing: 0.5,
+    letterSpacing: 0.8,
   },
   emptyState: {
     flex: 1,
@@ -718,40 +786,42 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: '50%',
     left: '50%',
-    width: 80,
-    height: 80,
-    backgroundColor: 'rgba(0, 122, 255, 0.1)',
-    borderRadius: 40,
-    transform: [{ translateX: -40 }, { translateY: -40 }],
+    width: 90,
+    height: 90,
+    backgroundColor: 'rgba(102, 126, 234, 0.08)',
+    borderRadius: 45,
+    transform: [{ translateX: -45 }, { translateY: -45 }],
   },
   emptyTitle: {
-    fontSize: 28,
-    fontWeight: 'bold',
+    fontSize: 30,
+    fontWeight: '800',
     color: '#1a202c',
-    marginBottom: 12,
+    marginBottom: 16,
     textAlign: 'center',
+    letterSpacing: 0.3,
   },
   emptySubtitle: {
-    fontSize: 16,
-    color: '#666',
+    fontSize: 17,
+    color: '#64748b',
     textAlign: 'center',
-    marginBottom: 32,
-    lineHeight: 24,
+    marginBottom: 36,
+    lineHeight: 26,
+    paddingHorizontal: 8,
   },
   primaryButton: {
-    backgroundColor: '#007AFF',
-    paddingVertical: 16,
-    paddingHorizontal: 32,
-    borderRadius: 16,
+    backgroundColor: '#667eea',
+    paddingVertical: 18,
+    paddingHorizontal: 36,
+    borderRadius: 20,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-    shadowColor: '#007AFF',
-    shadowOffset: { width: 0, height: 4 },
+    gap: 10,
+    shadowColor: '#667eea',
+    shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 6,
-    marginBottom: 24,
+    shadowRadius: 12,
+    elevation: 8,
+    marginBottom: 28,
   },
   addIcon: {
     color: '#fff',
@@ -760,27 +830,29 @@ const styles = StyleSheet.create({
   },
   primaryButtonText: {
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: '700',
     color: '#fff',
+    letterSpacing: 0.3,
   },
   helpTip: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#fff3cd',
-    borderColor: '#ffeaa7',
+    backgroundColor: 'rgba(102, 126, 234, 0.05)',
+    borderColor: 'rgba(102, 126, 234, 0.1)',
     borderWidth: 1,
-    borderRadius: 12,
-    padding: 12,
-    gap: 8,
+    borderRadius: 16,
+    padding: 16,
+    gap: 12,
   },
   helpTipIcon: {
     fontSize: 16,
   },
   helpTipText: {
-    fontSize: 12,
-    color: '#856404',
+    fontSize: 13,
+    color: '#64748b',
     flex: 1,
-    lineHeight: 16,
+    lineHeight: 18,
+    fontWeight: '500',
   },
   errorContainer: {
     backgroundColor: '#fff5f5',

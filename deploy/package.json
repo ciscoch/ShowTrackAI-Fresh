@@ -1,0 +1,33 @@
+{
+  "name": "showtrack-ai-ffa-parent-oversight-deployment",
+  "version": "1.0.0",
+  "description": "Deployment configuration for FFA Parent Oversight System",
+  "private": true,
+  "scripts": {
+    "deploy:db": "node scripts/deploy-database.js",
+    "deploy:env": "node scripts/setup-environment.js",
+    "deploy:verify": "node scripts/verify-deployment.js",
+    "deploy:full": "npm run deploy:db && npm run deploy:env && npm run deploy:verify",
+    "rollback": "node scripts/rollback-deployment.js",
+    "health-check": "node scripts/health-check.js",
+    "migrate": "node scripts/migrate-data.js",
+    "backup": "node scripts/backup-database.js",
+    "restore": "node scripts/restore-database.js"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.38.4",
+    "dotenv": "^16.3.1",
+    "chalk": "^4.1.2",
+    "ora": "^5.4.1",
+    "inquirer": "^8.2.6",
+    "node-fetch": "^2.7.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.8.0",
+    "typescript": "^5.2.2"
+  },
+  "engines": {
+    "node": ">=16.0.0",
+    "npm": ">=8.0.0"
+  }
+}

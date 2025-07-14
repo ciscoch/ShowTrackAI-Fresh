@@ -10,6 +10,7 @@ import {
   Alert,
   Switch,
 } from 'react-native';
+import { useAuth } from '../../../core/contexts/AuthContext';
 import { useHealthRecordStore } from '../../../core/stores/HealthRecordStore';
 import { useAnimalStore } from '../../../core/stores/AnimalStore';
 import { DatePicker } from '../../../shared/components/DatePicker';
@@ -37,6 +38,7 @@ export const AddHealthRecordModal: React.FC<AddHealthRecordModalProps> = ({
   onNavigateToAddAnimal,
   editingRecord,
 }) => {
+  const { user } = useAuth();
   const { addHealthRecord, updateHealthRecord } = useHealthRecordStore();
   const { animals } = useAnimalStore();
 
@@ -217,7 +219,7 @@ export const AddHealthRecordModal: React.FC<AddHealthRecordModalProps> = ({
         // Create new record
         const healthRecord: Omit<HealthRecord, 'id' | 'createdAt' | 'updatedAt'> = {
         animalId: formData.animalId,
-        recordedBy: 'current-user',
+        recordedBy: user?.id || 'unknown-user',
         recordedDate: formData.recordedDate,
         observationType: formData.observationType,
         temperature: formData.temperature ? parseFloat(formData.temperature) : undefined,
@@ -242,7 +244,7 @@ export const AddHealthRecordModal: React.FC<AddHealthRecordModalProps> = ({
           (formData.unknownConditionPriority === 'urgent' || formData.unknownConditionPriority === 'emergency'),
         followUpRequired: formData.followUpRequired,
         followUpDate: formData.followUpRequired ? formData.followUpDate : undefined,
-        userId: 'current-user',
+        userId: user?.id || 'unknown-user',
       };
 
         const savedRecord = await addHealthRecord(healthRecord);

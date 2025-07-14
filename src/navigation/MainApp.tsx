@@ -5,7 +5,9 @@
 
 import React, { useState, useEffect } from 'react';
 import { View, Alert } from 'react-native';
+import { PostHogProvider } from 'posthog-react-native';
 import { useAuth } from '../core/contexts/AuthContext';
+import { analyticsService } from '../core/services/AnalyticsService';
 import { EliteDashboard } from '../features/dashboard/screens/EliteDashboard';
 import { AnimalListScreen } from '../features/animals/screens/AnimalListScreen';
 import { AnimalFormScreen } from '../features/animals/screens/AnimalFormScreen';
@@ -14,6 +16,7 @@ import { WeightHistoryScreen } from '../features/animals/screens/WeightHistorySc
 import { AddWeightScreen } from '../features/animals/screens/AddWeightScreen';
 import { JournalListScreen, JournalEntryScreen, JournalDetailScreen } from '../features/journal/screens';
 import { FinancialTrackingScreen } from '../features/financial/screens/FinancialTrackingScreen';
+import { MedicalRecordsScreen } from '../features/medical/screens/MedicalRecordsScreen';
 import { 
   EnhancedFFADashboard,
   FFADegreeProgressScreen,
@@ -24,8 +27,10 @@ import {
   StudentLinkingScreen,
   EvidenceSubmissionScreen
 } from '../features/ffa/screens';
+import { CalendarScreen, EventFormScreen } from '../features/calendar/screens';
 import { Animal } from '../core/models/Animal';
 import { Journal } from '../core/models/Journal';
+import { Event } from '../core/models/Event';
 import { useProfileStore } from '../core/stores/ProfileStore';
 
 interface MainAppProps {
@@ -33,7 +38,7 @@ interface MainAppProps {
   profile?: any;
 }
 
-type AppScreen = 'dashboard' | 'animalList' | 'animalForm' | 'animalDetails' | 'weightHistory' | 'addWeight' | 'journalList' | 'journalEntry' | 'journalDetail' | 'financial' | 'ffaDashboard' | 'ffaDegreeProgress' | 'ffaSAEProjects' | 'ffaCompetitions' | 'parentDashboard' | 'parentLinking' | 'studentLinking' | 'evidenceSubmission';
+type AppScreen = 'dashboard' | 'animalList' | 'animalForm' | 'animalDetails' | 'weightHistory' | 'addWeight' | 'journalList' | 'journalEntry' | 'journalDetail' | 'financial' | 'medical' | 'ffaDashboard' | 'ffaDegreeProgress' | 'ffaSAEProjects' | 'ffaCompetitions' | 'parentDashboard' | 'parentLinking' | 'studentLinking' | 'evidenceSubmission' | 'calendar' | 'eventForm';
 
 const MainApp: React.FC<MainAppProps> = ({ user, profile }) => {
   const { signOut } = useAuth();
@@ -41,12 +46,39 @@ const MainApp: React.FC<MainAppProps> = ({ user, profile }) => {
   const [currentScreen, setCurrentScreen] = useState<AppScreen>('dashboard');
   const [selectedAnimal, setSelectedAnimal] = useState<Animal | undefined>();
   const [selectedJournal, setSelectedJournal] = useState<Journal | undefined>();
+  const [selectedEvent, setSelectedEvent] = useState<Event | undefined>();
   const [selectedStudentId, setSelectedStudentId] = useState<string | undefined>();
   const [evidenceSubmissionContext, setEvidenceSubmissionContext] = useState<{
     degreeLevel: any;
     requirementKey: string;
     requirement: any;
   } | undefined>();
+
+  // Initialize analytics on component mount
+  useEffect(() => {
+    const initializeAnalytics = async () => {
+      try {
+        await analyticsService.initialize();
+        
+        // Set user consent (in production, this should be based on user preference)
+        analyticsService.setUserConsent(true);
+        
+        // Identify user if authenticated
+        if (user && profile) {
+          analyticsService.identifyUser(user.id, {
+            userRole: 'student', // or determine from profile
+            subscriptionTier: currentProfile?.subscriptionTier || 'free',
+            gradeLevel: currentProfile?.grade,
+            ffaChapter: currentProfile?.chapter,
+          });
+        }
+      } catch (error) {
+        console.error('Failed to initialize analytics:', error);
+      }
+    };
+
+    initializeAnalytics();
+  }, []);
 
   // Create a profile for the authenticated user if one doesn't exist
   useEffect(() => {
@@ -70,6 +102,14 @@ const MainApp: React.FC<MainAppProps> = ({ user, profile }) => {
           isDemo: false,
         }).then((newProfile) => {
           console.log('Created profile for authenticated user:', newProfile.name);
+          
+          // Update analytics with new profile
+          analyticsService.setUserProperties({
+            userRole: 'student',
+            subscriptionTier: 'elite',
+            gradeLevel: '12',
+            ffaChapter: 'Elite Chapter',
+          });
         }).catch((error) => {
           console.error('Failed to create profile:', error);
         });
@@ -88,8 +128,21 @@ const MainApp: React.FC<MainAppProps> = ({ user, profile }) => {
           style: 'destructive',
           onPress: async () => {
             try {
+              // Track sign out event
+              analyticsService.trackFeatureUsage('authentication', {
+                action: 'sign_out',
+                user_role: currentProfile?.type,
+              });
+              
+              // Reset analytics state
+              analyticsService.reset();
+              
               await signOut();
             } catch (error) {
+              analyticsService.trackError(error as Error, {
+                feature: 'authentication',
+                userAction: 'sign_out',
+              });
               Alert.alert('Error', 'Failed to sign out');
             }
           },
@@ -213,6 +266,14 @@ const MainApp: React.FC<MainAppProps> = ({ user, profile }) => {
     setCurrentScreen('dashboard');
   };
 
+  const handleNavigateToMedical = () => {
+    setCurrentScreen('medical');
+  };
+
+  const handleBackFromMedical = () => {
+    setCurrentScreen('dashboard');
+  };
+
   // FFA Navigation Handlers
   const handleNavigateToFFA = () => {
     setCurrentScreen('ffaDashboard');
@@ -259,6 +320,36 @@ const MainApp: React.FC<MainAppProps> = ({ user, profile }) => {
     setEvidenceSubmissionContext(undefined);
   };
 
+  // Calendar Navigation Handlers
+  const handleNavigateToCalendar = () => {
+    setCurrentScreen('calendar');
+  };
+
+  const handleAddEvent = () => {
+    setSelectedEvent(undefined);
+    setCurrentScreen('eventForm');
+  };
+
+  const handleEditEvent = (event: Event) => {
+    setSelectedEvent(event);
+    setCurrentScreen('eventForm');
+  };
+
+  const handleBackFromCalendar = () => {
+    setCurrentScreen('dashboard');
+    setSelectedEvent(undefined);
+  };
+
+  const handleBackFromEventForm = () => {
+    setCurrentScreen('calendar');
+    setSelectedEvent(undefined);
+  };
+
+  const handleSaveEvent = () => {
+    setCurrentScreen('calendar');
+    setSelectedEvent(undefined);
+  };
+
   const renderCurrentScreen = () => {
     switch (currentScreen) {
       case 'dashboard':
@@ -272,8 +363,8 @@ const MainApp: React.FC<MainAppProps> = ({ user, profile }) => {
             onNavigateToExport={() => handlePlaceholderAction('Export')}
             onNavigateToJournal={handleNavigateToJournal}
             onNavigateToFinancial={() => setCurrentScreen('financial')}
-            onNavigateToMedical={() => handlePlaceholderAction('Medical')}
-            onNavigateToCalendar={() => handlePlaceholderAction('Calendar')}
+            onNavigateToMedical={handleNavigateToMedical}
+            onNavigateToCalendar={handleNavigateToCalendar}
             onAddAnimal={handleAddAnimal}
             onTakePhoto={handleTakePhoto}
             onNavigateToVetConnect={() => handlePlaceholderAction('VetConnect')}
@@ -370,6 +461,14 @@ const MainApp: React.FC<MainAppProps> = ({ user, profile }) => {
           />
         );
 
+      case 'medical':
+        return (
+          <MedicalRecordsScreen
+            onBack={handleBackFromMedical}
+            onNavigateToAddAnimal={handleAddAnimal}
+          />
+        );
+
       case 'ffaDashboard':
         return (
           <EnhancedFFADashboard
@@ -442,6 +541,24 @@ const MainApp: React.FC<MainAppProps> = ({ user, profile }) => {
           />
         ) : null;
 
+      case 'calendar':
+        return (
+          <CalendarScreen
+            onBack={handleBackFromCalendar}
+            onAddEvent={handleAddEvent}
+            onEditEvent={handleEditEvent}
+          />
+        );
+
+      case 'eventForm':
+        return (
+          <EventFormScreen
+            event={selectedEvent}
+            onSave={handleSaveEvent}
+            onCancel={handleBackFromEventForm}
+          />
+        );
+
       default:
         return (
           <EliteDashboard
@@ -453,8 +570,8 @@ const MainApp: React.FC<MainAppProps> = ({ user, profile }) => {
             onNavigateToExport={() => handlePlaceholderAction('Export')}
             onNavigateToJournal={handleNavigateToJournal}
             onNavigateToFinancial={() => setCurrentScreen('financial')}
-            onNavigateToMedical={() => handlePlaceholderAction('Medical')}
-            onNavigateToCalendar={() => handlePlaceholderAction('Calendar')}
+            onNavigateToMedical={handleNavigateToMedical}
+            onNavigateToCalendar={handleNavigateToCalendar}
             onAddAnimal={handleAddAnimal}
             onTakePhoto={handleTakePhoto}
             onNavigateToVetConnect={() => handlePlaceholderAction('VetConnect')}
@@ -464,7 +581,16 @@ const MainApp: React.FC<MainAppProps> = ({ user, profile }) => {
     }
   };
 
-  return <View style={{ flex: 1 }}>{renderCurrentScreen()}</View>;
+  return (
+    <PostHogProvider
+      apiKey={process.env.EXPO_PUBLIC_POSTHOG_API_KEY || ''}
+      options={{
+        host: process.env.EXPO_PUBLIC_POSTHOG_HOST || 'https://us.i.posthog.com',
+      }}
+    >
+      <View style={{ flex: 1 }}>{renderCurrentScreen()}</View>
+    </PostHogProvider>
+  );
 };
 
 export default MainApp;

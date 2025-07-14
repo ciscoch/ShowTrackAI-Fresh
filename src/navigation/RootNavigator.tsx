@@ -8,23 +8,22 @@ import { View, ActivityIndicator, StyleSheet } from 'react-native';
 import { useAuth } from '../core/contexts/AuthContext';
 import { useSupabaseBackend } from '../core/hooks/useSupabaseBackend';
 import AuthScreen from '../features/auth/screens/AuthScreen';
+import MainAppComponent from './MainApp';
+import { ProfileChooserScreen } from '../features/profile/screens/ProfileChooserScreen';
 
 // Import your existing main app component
-// This is a placeholder - replace with your actual main app component
 interface MainAppProps {
   user?: any;
   profile?: any;
 }
 
 const MainApp: React.FC<MainAppProps> = ({ user, profile }) => {
-  const AuthenticatedMainApp = require('./MainApp').default;
-  const ProfileChooserScreen = require('../features/profile/screens/ProfileChooserScreen').ProfileChooserScreen;
   
   // If user is authenticated (has user object), show authenticated main app
   if (user) {
     console.log('Authenticated user:', user);
     console.log('User profile:', profile);
-    return <AuthenticatedMainApp user={user} profile={profile} />;
+    return <MainAppComponent user={user} profile={profile} />;
   }
   
   // Otherwise show the local profile chooser (for local storage mode)

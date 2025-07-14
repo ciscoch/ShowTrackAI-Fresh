@@ -13,6 +13,7 @@ import {
   Image,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
+import { useAuth } from '../../../core/contexts/AuthContext';
 import { useFinancialStore } from '../../../core/stores/FinancialStore';
 import { useJournalStore } from '../../../core/stores/JournalStore';
 import { useAnimalStore } from '../../../core/stores/AnimalStore';
@@ -33,6 +34,7 @@ interface FinancialTrackingScreenProps {
 }
 
 export const FinancialTrackingScreen: React.FC<FinancialTrackingScreenProps> = ({ onBack }) => {
+  const { user } = useAuth();
   const { 
     entries, 
     loadEntries, 
@@ -675,7 +677,7 @@ export const FinancialTrackingScreen: React.FC<FinancialTrackingScreenProps> = (
       
       const processingRequest = {
         imageUrl: imageUri,
-        userId: 'current-user', // Replace with actual user ID
+        userId: user?.id || 'unknown-user',
         processingOptions: {
           extractFeedWeights: true,
           categorizeLineItems: true,
@@ -762,7 +764,7 @@ export const FinancialTrackingScreen: React.FC<FinancialTrackingScreenProps> = (
           date: suggestedExpense.date,
           description: suggestedExpense.description,
           animalId: suggestedExpense.animalId,
-          userId: 'current-user',
+          userId: user?.id || 'unknown-user',
           attachments: suggestedExpense.receiptPhoto ? [suggestedExpense.receiptPhoto] : undefined,
           tags: suggestedExpense.notes ? [suggestedExpense.notes] : undefined,
           vendor: suggestedExpense.vendor,
@@ -865,7 +867,7 @@ export const FinancialTrackingScreen: React.FC<FinancialTrackingScreenProps> = (
         vendorLocation: formData.vendorLocation,
         receiptItems,
         receiptMetadata,
-        userId: 'current-user',
+        userId: user?.id || 'unknown-user',
       };
 
       console.log('📝 Entry data to save:', entryData);
@@ -1437,7 +1439,7 @@ export const FinancialTrackingScreen: React.FC<FinancialTrackingScreenProps> = (
                               description: `Feed for ${entry.title}`,
                               tags: entry.feedData.feeds.map(f => `brand:${f.brand}`),
                               feedId: entry.id,
-                              userId: 'current-user'
+                              userId: user?.id || 'unknown-user'
                             });
                             Alert.alert('Success', 'Financial entry created');
                           }

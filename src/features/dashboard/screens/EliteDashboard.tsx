@@ -6,10 +6,13 @@ import {
   TouchableOpacity,
   ScrollView,
 } from 'react-native';
+import { usePostHog } from 'posthog-react-native';
 import { useProfileStore } from '../../../core/stores/ProfileStore';
 import { QRCodeGenerator } from '../../qrcode/components/QRCodeGenerator';
 import { calendarService } from '../../../core/services/CalendarService';
 import { Event } from '../../../core/models/Event';
+import { runCompletePostHogTest } from '../../../core/utils/posthogTest';
+import { usePostHogFeatureFlags } from '../../../core/hooks/usePostHogFeatureFlags';
 
 interface EliteDashboardProps {
   onSwitchProfile: () => void;
@@ -47,6 +50,15 @@ export const EliteDashboard: React.FC<EliteDashboardProps> = ({
   onNavigateToFFA,
 }) => {
   const { currentProfile } = useProfileStore();
+  const posthog = usePostHog();
+  const { 
+    newDashboardLayout, 
+    aiWeightPrediction, 
+    eliteFeatures, 
+    betaCalendar,
+    isLoading: flagsLoading 
+  } = usePostHogFeatureFlags();
+  
   const [showQRGenerator, setShowQRGenerator] = useState(false);
   const [upcomingEvents, setUpcomingEvents] = useState<Event[]>([]);
   const [countyShow, setCountyShow] = useState<Event | null>(null);
@@ -57,6 +69,18 @@ export const EliteDashboard: React.FC<EliteDashboardProps> = ({
       loadCalendarData();
     }
   }, [currentProfile]);
+
+  // PostHog Integration Test (Development Only)
+  useEffect(() => {
+    if (process.env.EXPO_PUBLIC_DEBUG_MODE === 'true' && posthog) {
+      // Run PostHog test only once when dashboard loads
+      const timer = setTimeout(() => {
+        runCompletePostHogTest(posthog);
+      }, 2000); // Wait 2 seconds for PostHog to initialize
+      
+      return () => clearTimeout(timer);
+    }
+  }, [posthog]);
 
   const loadCalendarData = async () => {
     if (!currentProfile) return;

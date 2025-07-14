@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { ServiceFactory } from '../services/adapters/ServiceFactory';
 import { 
   HealthRecord, 
   Treatment, 
@@ -86,68 +87,84 @@ export const useHealthRecordStore = create<HealthRecordStore>((set, get) => ({
   loadHealthRecords: async () => {
     set({ isLoading: true, error: null });
     try {
-      const [recordsData, treatmentsData, vaccinationsData, alertsData, reviewsData] = await Promise.all([
-        AsyncStorage.getItem(STORAGE_KEYS.HEALTH_RECORDS),
-        AsyncStorage.getItem(STORAGE_KEYS.TREATMENTS),
-        AsyncStorage.getItem(STORAGE_KEYS.VACCINATIONS),
-        AsyncStorage.getItem(STORAGE_KEYS.ALERTS),
-        AsyncStorage.getItem(STORAGE_KEYS.UNKNOWN_REVIEWS),
-      ]);
+      const healthService = ServiceFactory.getHealthService();
+      
+      // Try to load from backend first, fallback to local storage
+      let healthRecords: HealthRecord[] = [];
+      let vaccinations: VaccinationRecord[] = [];
+      let treatments: Treatment[] = [];
+      
+      try {
+        // Note: We'll need to load by animal ID in the actual implementation
+        // For now, we'll load local data and migrate to backend later
+        console.log('🏥 HealthRecordStore: Using health service:', healthService.constructor.name);
+        
+        // Fallback to local storage for now
+        const [recordsData, treatmentsData, vaccinationsData, alertsData, reviewsData] = await Promise.all([
+          AsyncStorage.getItem(STORAGE_KEYS.HEALTH_RECORDS),
+          AsyncStorage.getItem(STORAGE_KEYS.TREATMENTS),
+          AsyncStorage.getItem(STORAGE_KEYS.VACCINATIONS),
+          AsyncStorage.getItem(STORAGE_KEYS.ALERTS),
+          AsyncStorage.getItem(STORAGE_KEYS.UNKNOWN_REVIEWS),
+        ]);
 
-      const healthRecords = recordsData ? JSON.parse(recordsData) : [];
-      const treatments = treatmentsData ? JSON.parse(treatmentsData) : [];
-      const vaccinations = vaccinationsData ? JSON.parse(vaccinationsData) : [];
-      const alerts = alertsData ? JSON.parse(alertsData) : [];
-      const unknownConditionReviews = reviewsData ? JSON.parse(reviewsData) : [];
+        healthRecords = recordsData ? JSON.parse(recordsData) : [];
+        treatments = treatmentsData ? JSON.parse(treatmentsData) : [];
+        vaccinations = vaccinationsData ? JSON.parse(vaccinationsData) : [];
+        const alerts = alertsData ? JSON.parse(alertsData) : [];
+        const unknownConditionReviews = reviewsData ? JSON.parse(reviewsData) : [];
 
-      // Convert date strings back to Date objects
-      healthRecords.forEach((record: any) => {
-        record.recordedDate = new Date(record.recordedDate);
-        record.createdAt = new Date(record.createdAt);
-        record.updatedAt = new Date(record.updatedAt);
-        if (record.followUpDate) record.followUpDate = new Date(record.followUpDate);
-        record.photos.forEach((photo: any) => {
-          photo.capturedAt = new Date(photo.capturedAt);
+        // Convert date strings back to Date objects
+        healthRecords.forEach((record: any) => {
+          record.recordedDate = new Date(record.recordedDate);
+          record.createdAt = new Date(record.createdAt);
+          record.updatedAt = new Date(record.updatedAt);
+          if (record.followUpDate) record.followUpDate = new Date(record.followUpDate);
+          record.photos.forEach((photo: any) => {
+            photo.capturedAt = new Date(photo.capturedAt);
+          });
         });
-      });
 
-      treatments.forEach((treatment: any) => {
-        treatment.administeredDate = new Date(treatment.administeredDate);
-        treatment.createdAt = new Date(treatment.createdAt);
-        treatment.updatedAt = new Date(treatment.updatedAt);
-        if (treatment.nextDoseDate) treatment.nextDoseDate = new Date(treatment.nextDoseDate);
-        if (treatment.followUpDate) treatment.followUpDate = new Date(treatment.followUpDate);
-        if (treatment.medication?.expirationDate) {
-          treatment.medication.expirationDate = new Date(treatment.medication.expirationDate);
-        }
-      });
+        treatments.forEach((treatment: any) => {
+          treatment.administeredDate = new Date(treatment.administeredDate);
+          treatment.createdAt = new Date(treatment.createdAt);
+          treatment.updatedAt = new Date(treatment.updatedAt);
+          if (treatment.nextDoseDate) treatment.nextDoseDate = new Date(treatment.nextDoseDate);
+          if (treatment.followUpDate) treatment.followUpDate = new Date(treatment.followUpDate);
+          if (treatment.medication?.expirationDate) {
+            treatment.medication.expirationDate = new Date(treatment.medication.expirationDate);
+          }
+        });
 
-      vaccinations.forEach((vaccination: any) => {
-        vaccination.administeredDate = new Date(vaccination.administeredDate);
-        vaccination.expirationDate = new Date(vaccination.expirationDate);
-        if (vaccination.nextDueDate) vaccination.nextDueDate = new Date(vaccination.nextDueDate);
-      });
+        vaccinations.forEach((vaccination: any) => {
+          vaccination.administeredDate = new Date(vaccination.administeredDate);
+          vaccination.expirationDate = new Date(vaccination.expirationDate);
+          if (vaccination.nextDueDate) vaccination.nextDueDate = new Date(vaccination.nextDueDate);
+        });
 
-      alerts.forEach((alert: any) => {
-        alert.createdAt = new Date(alert.createdAt);
-        if (alert.dueDate) alert.dueDate = new Date(alert.dueDate);
-      });
+        alerts.forEach((alert: any) => {
+          alert.createdAt = new Date(alert.createdAt);
+          if (alert.dueDate) alert.dueDate = new Date(alert.dueDate);
+        });
 
-      unknownConditionReviews.forEach((review: any) => {
-        review.submittedAt = new Date(review.submittedAt);
-        if (review.assignedDate) review.assignedDate = new Date(review.assignedDate);
-        if (review.reviewedAt) review.reviewedAt = new Date(review.reviewedAt);
-        if (review.completedAt) review.completedAt = new Date(review.completedAt);
-      });
+        unknownConditionReviews.forEach((review: any) => {
+          review.submittedAt = new Date(review.submittedAt);
+          if (review.assignedDate) review.assignedDate = new Date(review.assignedDate);
+          if (review.reviewedAt) review.reviewedAt = new Date(review.reviewedAt);
+          if (review.completedAt) review.completedAt = new Date(review.completedAt);
+        });
 
-      set({ 
-        healthRecords, 
-        treatments, 
-        vaccinations, 
-        alerts, 
-        unknownConditionReviews,
-        diseaseReferences: get().diseaseReferences.length === 0 ? generateSampleDiseaseReferences() : get().diseaseReferences
-      });
+        set({ 
+          healthRecords, 
+          treatments, 
+          vaccinations, 
+          alerts, 
+          unknownConditionReviews,
+          diseaseReferences: get().diseaseReferences.length === 0 ? generateSampleDiseaseReferences() : get().diseaseReferences
+        });
+      } catch (backendError) {
+        console.warn('🏥 Backend load failed, using local storage only:', backendError);
+      }
     } catch (error) {
       set({ error: 'Failed to load health records' });
     } finally {
@@ -158,18 +175,37 @@ export const useHealthRecordStore = create<HealthRecordStore>((set, get) => ({
   // Add Health Record
   addHealthRecord: async (recordData) => {
     const { healthRecords } = get();
-    const newRecord: HealthRecord = {
-      ...recordData,
-      id: `health_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-      createdAt: new Date(),
-      updatedAt: new Date()
-    };
-
-    const updatedRecords = [...healthRecords, newRecord];
-    set({ healthRecords: updatedRecords });
-
+    const healthService = ServiceFactory.getHealthService();
+    
     try {
-      await AsyncStorage.setItem(STORAGE_KEYS.HEALTH_RECORDS, JSON.stringify(updatedRecords));
+      // Try to add to backend first
+      let newRecord: HealthRecord;
+      
+      try {
+        newRecord = await healthService.addHealthRecord(recordData.animalId, recordData);
+        console.log('🏥 Health record added to backend:', newRecord.id);
+      } catch (backendError) {
+        console.warn('🏥 Backend add failed, using local storage:', backendError);
+        
+        // Fallback to local storage
+        newRecord = {
+          ...recordData,
+          id: `health_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+          createdAt: new Date(),
+          updatedAt: new Date()
+        };
+      }
+
+      // Update local state
+      const updatedRecords = [...healthRecords, newRecord];
+      set({ healthRecords: updatedRecords });
+
+      // Also save to local storage as backup
+      try {
+        await AsyncStorage.setItem(STORAGE_KEYS.HEALTH_RECORDS, JSON.stringify(updatedRecords));
+      } catch (localError) {
+        console.warn('🏥 Local storage backup failed:', localError);
+      }
       
       // Create follow-up alert if needed
       if (newRecord.followUpRequired && newRecord.followUpDate) {
@@ -182,41 +218,83 @@ export const useHealthRecordStore = create<HealthRecordStore>((set, get) => ({
           dueDate: newRecord.followUpDate,
           actionRequired: 'Conduct follow-up health check',
           dismissed: false,
-          userId: newRecord.userId
+          userId: newRecord.recordedBy
         });
       }
     } catch (error) {
-      set({ error: 'Failed to save health record', healthRecords });
+      console.error('🏥 Failed to add health record:', error);
+      set({ error: 'Failed to save health record' });
     }
   },
 
   // Update Health Record
   updateHealthRecord: async (id, updates) => {
     const { healthRecords } = get();
-    const updatedRecords = healthRecords.map(record =>
-      record.id === id ? { ...record, ...updates, updatedAt: new Date() } : record
-    );
-
-    set({ healthRecords: updatedRecords });
-
+    const healthService = ServiceFactory.getHealthService();
+    
     try {
-      await AsyncStorage.setItem(STORAGE_KEYS.HEALTH_RECORDS, JSON.stringify(updatedRecords));
+      let updatedRecord: HealthRecord;
+      
+      try {
+        // Try to update in backend first
+        updatedRecord = await healthService.updateHealthRecord(id, updates);
+        console.log('🏥 Health record updated in backend:', updatedRecord.id);
+      } catch (backendError) {
+        console.warn('🏥 Backend update failed, using local storage:', backendError);
+        
+        // Fallback to local update
+        const existingRecord = healthRecords.find(record => record.id === id);
+        if (!existingRecord) {
+          throw new Error('Health record not found');
+        }
+        updatedRecord = { ...existingRecord, ...updates, updatedAt: new Date() };
+      }
+
+      // Update local state
+      const updatedRecords = healthRecords.map(record =>
+        record.id === id ? updatedRecord : record
+      );
+      set({ healthRecords: updatedRecords });
+
+      // Also update local storage as backup
+      try {
+        await AsyncStorage.setItem(STORAGE_KEYS.HEALTH_RECORDS, JSON.stringify(updatedRecords));
+      } catch (localError) {
+        console.warn('🏥 Local storage backup failed:', localError);
+      }
     } catch (error) {
-      set({ error: 'Failed to update health record', healthRecords });
+      console.error('🏥 Failed to update health record:', error);
+      set({ error: 'Failed to update health record' });
     }
   },
 
   // Delete Health Record
   deleteHealthRecord: async (id) => {
     const { healthRecords } = get();
-    const updatedRecords = healthRecords.filter(record => record.id !== id);
-
-    set({ healthRecords: updatedRecords });
-
+    const healthService = ServiceFactory.getHealthService();
+    
     try {
-      await AsyncStorage.setItem(STORAGE_KEYS.HEALTH_RECORDS, JSON.stringify(updatedRecords));
+      try {
+        // Try to delete from backend first
+        await healthService.deleteHealthRecord(id);
+        console.log('🏥 Health record deleted from backend:', id);
+      } catch (backendError) {
+        console.warn('🏥 Backend delete failed, using local storage:', backendError);
+      }
+
+      // Update local state
+      const updatedRecords = healthRecords.filter(record => record.id !== id);
+      set({ healthRecords: updatedRecords });
+
+      // Also update local storage as backup
+      try {
+        await AsyncStorage.setItem(STORAGE_KEYS.HEALTH_RECORDS, JSON.stringify(updatedRecords));
+      } catch (localError) {
+        console.warn('🏥 Local storage backup failed:', localError);
+      }
     } catch (error) {
-      set({ error: 'Failed to delete health record', healthRecords });
+      console.error('🏥 Failed to delete health record:', error);
+      set({ error: 'Failed to delete health record' });
     }
   },
 

@@ -12,11 +12,13 @@ import {
 } from 'react-native';
 import * as Location from 'expo-location';
 import { Journal, FeedTrackingData, FeedItem } from '../../../core/models/Journal';
+import { useAuth } from '../../../core/contexts/AuthContext';
 import { useJournalStore } from '../../../core/stores/JournalStore';
 import { useTimeTrackingStore } from '../../../core/stores/TimeTrackingStore';
 import { useAnimalStore } from '../../../core/stores/AnimalStore';
 import { aetSkillMatcher } from '../../../core/services/AETSkillMatcher';
 import type { AIActivitySuggestion } from '../../../core/services/AETSkillMatcher';
+import { aetFFAIntegrationService } from '../../../core/services/AETFFAIntegrationService';
 import { FormPicker } from '../../../shared/components/FormPicker';
 import { DatePicker } from '../../../shared/components/DatePicker';
 import { TimeTracker } from '../../../shared/components/TimeTracker';
@@ -36,6 +38,7 @@ export const JournalEntryScreen: React.FC<JournalEntryScreenProps> = ({
   onCancel,
   onBack,
 }) => {
+  const { user } = useAuth();
   const { addEntry, updateEntry, entries, loadEntries } = useJournalStore();
   const { activeEntry, startTracking, stopTracking } = useTimeTrackingStore();
   const { animals, loadAnimals } = useAnimalStore();
@@ -1056,13 +1059,36 @@ export const JournalEntryScreen: React.FC<JournalEntryScreenProps> = ({
         animalId: finalAnimalId,
         photos: journalPhotos.length > 0 ? journalPhotos : undefined,
         feedData: finalFeedData, // Include feed data only when present
-        userId: 'current-user', // Would get from auth context
+        userId: user?.id || 'unknown-user',
       };
 
+      let savedEntry: Journal;
       if (entry) {
-        await updateEntry(entry.id, journalData);
+        savedEntry = await updateEntry(entry.id, journalData);
       } else {
-        await addEntry(journalData);
+        savedEntry = await addEntry(journalData);
+      }
+
+      // Process for AET-FFA integration after successful save
+      try {
+        console.log('🎓 Processing journal entry for AET-FFA integration...');
+        const aetFFAMapping = await aetFFAIntegrationService.processJournalActivityForAETFFA(
+          journalData.userId,
+          savedEntry.id,
+          formData.title,
+          formData.description,
+          formData.category,
+          formData.duration
+        );
+        
+        console.log('✅ AET-FFA processing completed:', {
+          aetPointsAwarded: aetFFAMapping.aet_points_awarded,
+          skillsIdentified: aetFFAMapping.aet_skills_identified.length,
+          ffaRequirementsProgressed: aetFFAMapping.ffa_requirements_progressed.length
+        });
+      } catch (aetFFAError) {
+        console.warn('⚠️ AET-FFA processing failed (entry still saved):', aetFFAError);
+        // Don't fail the save if AET-FFA processing fails
       }
 
       const successMessage = finalFeedData

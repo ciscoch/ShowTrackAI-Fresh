@@ -3,20 +3,27 @@ import { View, Text, StyleSheet, TouchableOpacity, Image, Alert, ScrollView } fr
 import * as ImagePicker from 'expo-image-picker';
 import { useAuth } from '../../../core/contexts/AuthContext';
 import { HealthPhoto } from '../../../core/models/HealthRecord';
+import { healthPhotoUploadService } from '../../../core/services/HealthPhotoUploadService';
+import { sentryService } from '../../../core/services/SentryService';
+import { useAnalytics } from '../../../core/hooks/useAnalytics';
 
 interface HealthPhotoCaptureProps {
   photos: HealthPhoto[];
   onPhotosChange: (photos: HealthPhoto[]) => void;
+  animalId: string;
   maxPhotos?: number;
 }
 
 export const HealthPhotoCapture: React.FC<HealthPhotoCaptureProps> = ({
   photos,
   onPhotosChange,
+  animalId,
   maxPhotos = 5,
 }) => {
   const { user } = useAuth();
+  const { trackUserInteraction, trackFeatureUsage } = useAnalytics({ screenName: 'HealthPhotoCapture' });
   const [isCapturing, setIsCapturing] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<{ [photoId: string]: number }>({});
 
   const photoTypes = [
     { key: 'general', label: 'General', icon: '📸', description: 'Overall condition' },
@@ -71,6 +78,13 @@ export const HealthPhotoCapture: React.FC<HealthPhotoCaptureProps> = ({
 
   const processPhoto = async (uri: string, photoType: HealthPhoto['photoType']) => {
     try {
+      // Track photo capture
+      trackUserInteraction('capture_health_photo', 'camera', {
+        photoType,
+        animalId,
+        photoCount: photos.length + 1,
+      });
+
       // Create photo data object for health record
       const healthPhoto: HealthPhoto = {
         id: `health_photo_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
@@ -84,17 +98,93 @@ export const HealthPhotoCapture: React.FC<HealthPhotoCaptureProps> = ({
         userId: user?.id || 'unknown-user',
       };
 
-      // Update photos array
-      const updatedPhotos = [...photos, healthPhoto];
-      onPhotosChange(updatedPhotos);
+      // Initialize upload progress
+      setUploadProgress(prev => ({ ...prev, [healthPhoto.id]: 0 }));
 
-      // Show success feedback
-      const photoTypeInfo = photoTypes.find(pt => pt.key === photoType);
-      Alert.alert(
-        '📸 Photo Captured!',
-        `${photoTypeInfo?.icon} ${photoTypeInfo?.label} photo saved for medical documentation.\n\nThis photo will be valuable for AI analysis and veterinary consultations.`,
-        [{ text: 'Great!', style: 'default' }]
+      // Upload to Supabase storage
+      const uploadResult = await healthPhotoUploadService.uploadHealthPhoto(
+        healthPhoto,
+        animalId,
+        (progress) => {
+          setUploadProgress(prev => ({ 
+            ...prev, 
+            [healthPhoto.id]: progress.progress 
+          }));
+        }
       );
+
+      if (uploadResult.success) {
+        // Update photo with uploaded URL and path
+        const uploadedPhoto: HealthPhoto = {
+          ...healthPhoto,
+          uri: uploadResult.publicUrl,
+          storagePath: uploadResult.path,
+          isUploaded: true,
+          uploadedAt: new Date(),
+        };
+
+        // Update photos array
+        const updatedPhotos = [...photos, uploadedPhoto];
+        onPhotosChange(updatedPhotos);
+
+        // Track successful upload
+        trackFeatureUsage('health_photo_upload_success', {
+          photoType,
+          animalId,
+          fileSize: 'unknown', // Could be tracked if needed
+          uploadTime: 'tracked_automatically',
+        });
+
+        sentryService.trackEducationalEvent('health_photo_upload', {
+          eventType: 'photo_uploaded',
+          category: 'medical_documentation',
+          skillLevel: 'intermediate',
+          completionStatus: 'completed',
+          educationalValue: 'high',
+          photoType,
+        });
+
+        // Show success feedback
+        const photoTypeInfo = photoTypes.find(pt => pt.key === photoType);
+        Alert.alert(
+          '📸 Photo Uploaded Successfully!',
+          `${photoTypeInfo?.icon} ${photoTypeInfo?.label} photo uploaded to secure cloud storage.\n\n✅ Available for AI analysis\n✅ Accessible for veterinary consultations\n✅ Backed up safely`,
+          [{ text: 'Excellent!', style: 'default' }]
+        );
+      } else {
+        // Upload failed - keep local photo but show warning
+        const localPhoto: HealthPhoto = {
+          ...healthPhoto,
+          uploadError: uploadResult.error,
+          isUploaded: false,
+        };
+
+        const updatedPhotos = [...photos, localPhoto];
+        onPhotosChange(updatedPhotos);
+
+        // Track upload failure
+        sentryService.captureError(new Error(`Health photo upload failed: ${uploadResult.error}`), {
+          feature: 'medical',
+          action: 'photo_upload',
+          additional: {
+            photoType,
+            animalId,
+            errorMessage: uploadResult.error,
+          },
+        });
+
+        Alert.alert(
+          '⚠️ Upload Issue',
+          `Photo captured but upload failed: ${uploadResult.error}\n\nPhoto saved locally and will be retried automatically.`,
+          [{ text: 'OK', style: 'default' }]
+        );
+      }
+
+      // Clear upload progress
+      setUploadProgress(prev => {
+        const { [healthPhoto.id]: _, ...rest } = prev;
+        return rest;
+      });
 
     } catch (error) {
       console.error('Error processing photo:', error);

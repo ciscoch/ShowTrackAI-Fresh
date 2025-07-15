@@ -3,9 +3,11 @@
  * 
  * Privacy-first analytics service designed for educational platforms.
  * Complies with FERPA and COPPA requirements for student data protection.
+ * Enhanced with Sentry integration for error tracking and performance monitoring.
  */
 
 import { PostHog } from 'posthog-react-native';
+import { sentryService } from './SentryService';
 
 // Analytics Event Types
 export interface AnalyticsEvent {
@@ -105,8 +107,20 @@ class AnalyticsService {
   /**
    * Identify user with anonymous/educational properties only
    * No PII is transmitted to comply with FERPA
+   * Enhanced with Sentry user context
    */
   identifyUser(userId: string, properties?: UserProperties): void {
+    // Set user context in Sentry for better error tracking
+    try {
+      sentryService.setUser({
+        id: this.hashUserId(userId),
+        subscription_tier: properties?.subscriptionTier,
+        ffa_chapter: properties?.ffaChapter,
+      });
+    } catch (sentryError) {
+      console.error('❌ Failed to set user in Sentry:', sentryError);
+    }
+
     if (!this.shouldTrack()) return;
 
     try {
@@ -151,9 +165,16 @@ class AnalyticsService {
   }
 
   /**
-   * Track educational events (FFA progress, AET skills, etc.)
+   * Track educational events (FFA progress, AET skills, etc.) with Sentry integration
    */
   trackEducationalEvent(eventName: string, properties: EducationalEvent & Record<string, any>): void {
+    // Track in Sentry for performance monitoring
+    try {
+      sentryService.trackEducationalEvent(eventName, properties);
+    } catch (sentryError) {
+      console.error('❌ Failed to track educational event in Sentry:', sentryError);
+    }
+
     if (!this.shouldTrack()) return;
 
     try {
@@ -215,9 +236,22 @@ class AnalyticsService {
   }
 
   /**
-   * Track errors and technical issues
+   * Track errors and technical issues with enhanced Sentry integration
    */
   trackError(error: Error, context?: Record<string, any>): void {
+    // Always send critical errors to Sentry for crash reporting
+    try {
+      sentryService.captureError(error, {
+        feature: context?.feature,
+        action: context?.action,
+        screen: context?.screen,
+        additional: context,
+      });
+    } catch (sentryError) {
+      console.error('❌ Failed to track error in Sentry:', sentryError);
+    }
+
+    // Continue with PostHog tracking if enabled
     if (!this.shouldTrack()) return;
 
     try {

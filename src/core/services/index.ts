@@ -6,3 +6,6 @@ export * from './ParentOversightService';
 export * from './UserRoleService';
 export * from './NotificationService';
 export * from './AnalyticsService';
+export * from './SentryService';
+export * from './AttendedEventsService';
+export * from './EventNotificationService';

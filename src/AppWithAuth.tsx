@@ -3,10 +3,11 @@
  * This component wraps your app with the authentication context
  */
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import { AuthProvider } from './core/contexts/AuthContext';
 import { useSupabaseBackend } from './core/hooks/useSupabaseBackend';
 import RootNavigator from './navigation/RootNavigator';
+import { sentryService } from './core/services/SentryService';
 
 // For testing purposes - you can also use the test screens
 import { UserManagementTestScreen } from './features/profile/screens';
@@ -17,6 +18,28 @@ interface AppWithAuthProps {
 
 const AppWithAuth: React.FC<AppWithAuthProps> = ({ testMode = false }) => {
   const { isEnabled: useBackend, hasCredentials } = useSupabaseBackend();
+
+  // Initialize Sentry on app startup
+  useEffect(() => {
+    const initializeSentry = async () => {
+      try {
+        await sentryService.initialize();
+        
+        // Track app initialization
+        sentryService.addBreadcrumb('App initialized', 'app_lifecycle', {
+          testMode,
+          useBackend,
+          hasCredentials,
+        });
+
+        console.log('📊 Sentry initialized for ShowTrackAI');
+      } catch (error) {
+        console.error('Failed to initialize Sentry:', error);
+      }
+    };
+
+    initializeSentry();
+  }, []);
 
   // Show test screen if requested
   if (testMode) {

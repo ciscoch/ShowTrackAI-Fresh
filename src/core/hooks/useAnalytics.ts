@@ -3,10 +3,12 @@
  * 
  * Provides easy-to-use analytics tracking for React components
  * with built-in privacy protection for educational platforms.
+ * Enhanced with Sentry navigation and performance tracking.
  */
 
 import { useCallback, useEffect, useRef } from 'react';
 import { analyticsService, type EducationalEvent, type UserProperties } from '../services/AnalyticsService';
+import { sentryService } from '../services/SentryService';
 
 interface UseAnalyticsOptions {
   autoTrackScreenView?: boolean;
@@ -18,14 +20,18 @@ export const useAnalytics = (options: UseAnalyticsOptions = {}) => {
   const screenStartTime = useRef<Date | null>(null);
   const previousScreen = useRef<string | null>(null);
 
-  // Auto-track screen view if enabled
+  // Auto-track screen view if enabled with Sentry integration
   useEffect(() => {
     if (autoTrackScreenView && screenName) {
       screenStartTime.current = new Date();
       
+      // Track in PostHog
       analyticsService.trackScreenView(screenName, {
         previousScreen: previousScreen.current || undefined,
       });
+
+      // Track in Sentry
+      sentryService.trackScreenView(screenName);
 
       previousScreen.current = screenName;
 
@@ -146,6 +152,33 @@ export const useAnalytics = (options: UseAnalyticsOptions = {}) => {
     });
   }, []);
 
+  // AI Features Analytics
+  const trackAIEvent = useCallback((action: string, aiData?: any) => {
+    analyticsService.trackFeatureUsage('ai_features', {
+      action,
+      animal_species: aiData?.animal_species,
+      prediction_type: aiData?.prediction_type || 'weight',
+      confidence_score: aiData?.confidence_score,
+      accuracy_rate: aiData?.accuracy_rate,
+      model_version: aiData?.model_version || 'v2.1.0',
+    });
+  }, []);
+
+  // User Interaction Tracking with Sentry
+  const trackUserInteraction = useCallback((element: string, action: string, data?: any) => {
+    if (screenName) {
+      sentryService.trackUserInteraction(element, action, screenName, data);
+    }
+    
+    // Also track in PostHog
+    analyticsService.trackFeatureUsage('user_interaction', {
+      screen: screenName,
+      element,
+      action,
+      ...data,
+    });
+  }, [screenName]);
+
   // Error Tracking
   const trackError = useCallback((error: Error, context?: any) => {
     analyticsService.trackError(error, {
@@ -191,6 +224,11 @@ export const useAnalytics = (options: UseAnalyticsOptions = {}) => {
     analyticsService.trackFeatureUsage(eventName, properties);
   }, []);
 
+  // Feature usage tracking (direct access to analyticsService method)
+  const trackFeatureUsage = useCallback((featureName: string, properties?: any) => {
+    analyticsService.trackFeatureUsage(featureName, properties);
+  }, []);
+
   // Helper function to categorize amounts for privacy
   const getAmountRange = (amount: number): string => {
     if (amount < 10) return 'under_10';
@@ -205,6 +243,8 @@ export const useAnalytics = (options: UseAnalyticsOptions = {}) => {
     // Core tracking functions
     trackScreen,
     trackCustomEvent,
+    trackFeatureUsage,
+    trackUserInteraction,
     trackError,
     identifyUser,
     setAnalyticsConsent,
@@ -221,6 +261,7 @@ export const useAnalytics = (options: UseAnalyticsOptions = {}) => {
     trackParentEvent,
     trackAuthEvent,
     trackSubscriptionEvent,
+    trackAIEvent,
 
     // Service status
     isAnalyticsReady: analyticsService.isReady,

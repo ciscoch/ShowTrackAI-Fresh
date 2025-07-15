@@ -21,8 +21,9 @@ expo-localization: ~16.1.6
 ### **Configuration Complete**
 ```typescript
 // .env file
-EXPO_PUBLIC_POSTHOG_API_KEY=phc_5mWTl6LpBHs2Nfrpg8LXMfqwJFuCyPdMhH7dumzRskP
+EXPO_PUBLIC_POSTHOG_API_KEY=phc_yBNAgY9oYKNGKaNwSHxTucpjkpf8fCNukoJ7BpVeuBQ
 EXPO_PUBLIC_POSTHOG_HOST=https://us.i.posthog.com
+EXPO_PUBLIC_POSTHOG_PROJECT_ID=194392
 EXPO_PUBLIC_ENABLE_ANALYTICS=true
 ```
 
@@ -268,8 +269,9 @@ if (process.env.EXPO_PUBLIC_DEBUG_MODE === 'true' && posthog) {
 ### **Environment Setup**
 ```bash
 # Production environment variables
-EXPO_PUBLIC_POSTHOG_API_KEY=your_production_key
+EXPO_PUBLIC_POSTHOG_API_KEY=phc_yBNAgY9oYKNGKaNwSHxTucpjkpf8fCNukoJ7BpVeuBQ
 EXPO_PUBLIC_POSTHOG_HOST=https://us.i.posthog.com
+EXPO_PUBLIC_POSTHOG_PROJECT_ID=194392
 EXPO_PUBLIC_ENABLE_ANALYTICS=true
 EXPO_PUBLIC_DEBUG_MODE=false
 ```

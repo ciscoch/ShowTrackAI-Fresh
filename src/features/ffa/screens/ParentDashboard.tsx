@@ -28,6 +28,8 @@ import {
   ENHANCED_FFA_DEGREE_REQUIREMENTS,
 } from '../../../core/models/FFADegreeTracker';
 import { ParentOversightService } from '../../../core/services/ParentOversightService';
+import { sentryService } from '../../../core/services/SentryService';
+import { useAnalytics } from '../../../core/hooks/useAnalytics';
 
 interface ParentDashboardProps {
   onBack: () => void;
@@ -49,6 +51,7 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
   onBack,
   studentId,
 }) => {
+  const { trackUserInteraction, trackFeatureUsage } = useAnalytics({ screenName: 'ParentDashboard' });
   const { user } = useAuth();
   const [degreeProgress, setDegreeProgress] = useState<FFADegreeProgress[]>([]);
   const [evidenceSubmissions, setEvidenceSubmissions] = useState<EvidenceSubmission[]>([]);
@@ -106,6 +109,23 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
   }, [handleInitialLoad]);
 
   const handleEvidencePress = (evidence: EvidenceSubmission) => {
+    // Track evidence viewing
+    trackUserInteraction('view_student_evidence', 'tap', {
+      evidenceType: evidence.evidence_type,
+      requirementKey: evidence.requirement_key,
+      isFirstView: !evidence.parent_viewed,
+      hasPreviousFeedback: !!evidence.parent_feedback,
+    });
+    
+    sentryService.trackEducationalEvent('parent_oversight', {
+      eventType: 'evidence_viewed',
+      category: 'parent_engagement',
+      skillLevel: 'beginner',
+      completionStatus: 'in_progress',
+      educationalValue: 'high',
+      evidenceType: evidence.evidence_type,
+    });
+
     setSelectedEvidence(evidence);
     setParentFeedback(evidence.parent_feedback || '');
     setShowEvidenceModal(true);
@@ -119,11 +139,29 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
   const handleSubmitFeedback = async () => {
     if (!selectedEvidence) return;
 
+    // Track feedback submission
+    trackUserInteraction('submit_parent_feedback', 'tap', {
+      evidenceType: selectedEvidence.evidence_type,
+      requirementKey: selectedEvidence.requirement_key,
+      feedbackLength: parentFeedback.length,
+      isUpdate: !!selectedEvidence.parent_feedback,
+    });
+
     try {
       await parentOversightService.submitParentFeedback(
         selectedEvidence.id,
         parentFeedback
       );
+      
+      // Track successful feedback submission
+      sentryService.trackEducationalEvent('parent_feedback', {
+        eventType: 'feedback_submitted',
+        category: 'parent_engagement',
+        skillLevel: 'intermediate',
+        completionStatus: 'completed',
+        educationalValue: 'high',
+        feedbackType: selectedEvidence.parent_feedback ? 'update' : 'new',
+      });
       
       setShowEvidenceModal(false);
       setSelectedEvidence(null);

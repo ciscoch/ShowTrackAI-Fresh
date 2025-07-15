@@ -558,6 +558,7 @@ export const AddHealthRecordModal: React.FC<AddHealthRecordModalProps> = ({
             <HealthPhotoCapture
               photos={formData.photos}
               onPhotosChange={(photos) => setFormData(prev => ({ ...prev, photos }))}
+              animalId={selectedAnimalId || 'unknown'}
               maxPhotos={5}
             />
 

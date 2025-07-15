@@ -44,6 +44,8 @@ import {
   getSampleMotivationalContent, 
   setOfflineMode 
 } from '../../../utils/ffaOfflineMode';
+import { sentryService } from '../../../core/services/SentryService';
+import { useAnalytics } from '../../../core/hooks/useAnalytics';
 
 const { width } = Dimensions.get('window');
 
@@ -63,6 +65,7 @@ export const EnhancedFFADashboard: React.FC<EnhancedFFADashboardProps> = ({
   onBack,
 }) => {
   const { user } = useAuth();
+  const { trackUserInteraction, trackFeatureUsage } = useAnalytics({ screenName: 'FFADashboard' });
   const [degreeProgress, setDegreeProgress] = useState<FFADegreeProgress[]>([]);
   const [saeProjects, setSaeProjects] = useState<EnhancedSAEProject[]>([]);
   const [saeAnalytics, setSaeAnalytics] = useState<SAEProjectAnalytics | null>(null);
@@ -341,7 +344,23 @@ export const EnhancedFFADashboard: React.FC<EnhancedFFADashboardProps> = ({
       <View style={styles.sectionContainer}>
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionTitle}>🏆 Degree Progress</Text>
-          <TouchableOpacity onPress={onNavigateToProgress}>
+          <TouchableOpacity onPress={() => {
+            trackUserInteraction('ffa_degree_progress_link', 'tap', {
+              degreeCount: degreeProgress.length,
+              currentLevel: degreeProgress[0]?.degree_level,
+              completionPercentage: degreeProgress[0]?.completion_percentage,
+            });
+            
+            sentryService.trackEducationalEvent('ffa_navigation', {
+              eventType: 'degree_progress_accessed',
+              category: 'ffa_tracking',
+              skillLevel: 'intermediate',
+              completionStatus: 'in_progress',
+              educationalValue: 'high',
+            });
+            
+            onNavigateToProgress();
+          }}>
             <Text style={styles.sectionLink}>View Details →</Text>
           </TouchableOpacity>
         </View>
@@ -397,7 +416,23 @@ export const EnhancedFFADashboard: React.FC<EnhancedFFADashboardProps> = ({
       <View style={styles.sectionContainer}>
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionTitle}>🚜 SAE Projects</Text>
-          <TouchableOpacity onPress={onNavigateToSAE}>
+          <TouchableOpacity onPress={() => {
+            trackUserInteraction('ffa_sae_projects_link', 'tap', {
+              projectCount: saeProjects.length,
+              activeProjects: saeProjects.filter(p => p.status === 'active').length,
+              totalEarnings: saeAnalytics?.totalEarnings || 0,
+            });
+            
+            sentryService.trackEducationalEvent('ffa_navigation', {
+              eventType: 'sae_projects_accessed',
+              category: 'sae_management',
+              skillLevel: 'advanced',
+              completionStatus: 'in_progress',
+              educationalValue: 'high',
+            });
+            
+            onNavigateToSAE();
+          }}>
             <Text style={styles.sectionLink}>View All →</Text>
           </TouchableOpacity>
         </View>
@@ -602,22 +637,45 @@ export const EnhancedFFADashboard: React.FC<EnhancedFFADashboardProps> = ({
       <Text style={styles.sectionTitle}>⚡ Quick Actions</Text>
       
       <View style={styles.quickActionsGrid}>
-        <TouchableOpacity style={styles.quickActionButton} onPress={onNavigateToProgress}>
+        <TouchableOpacity style={styles.quickActionButton} onPress={() => {
+          trackUserInteraction('quick_action_degree_progress', 'tap', {
+            section: 'quick_actions',
+            degreeCount: degreeProgress.length,
+          });
+          onNavigateToProgress();
+        }}>
           <Text style={styles.quickActionIcon}>🎯</Text>
           <Text style={styles.quickActionText}>Degree Progress</Text>
         </TouchableOpacity>
         
-        <TouchableOpacity style={styles.quickActionButton} onPress={onNavigateToSAE}>
+        <TouchableOpacity style={styles.quickActionButton} onPress={() => {
+          trackUserInteraction('quick_action_sae_projects', 'tap', {
+            section: 'quick_actions',
+            projectCount: saeProjects.length,
+          });
+          onNavigateToSAE();
+        }}>
           <Text style={styles.quickActionIcon}>🚜</Text>
           <Text style={styles.quickActionText}>SAE Projects</Text>
         </TouchableOpacity>
         
-        <TouchableOpacity style={styles.quickActionButton} onPress={onNavigateToCompetitions}>
+        <TouchableOpacity style={styles.quickActionButton} onPress={() => {
+          trackUserInteraction('quick_action_competitions', 'tap', {
+            section: 'quick_actions',
+          });
+          onNavigateToCompetitions();
+        }}>
           <Text style={styles.quickActionIcon}>🏆</Text>
           <Text style={styles.quickActionText}>Competitions</Text>
         </TouchableOpacity>
         
-        <TouchableOpacity style={styles.quickActionButton} onPress={onNavigateToAnalytics}>
+        <TouchableOpacity style={styles.quickActionButton} onPress={() => {
+          trackUserInteraction('quick_action_analytics', 'tap', {
+            section: 'quick_actions',
+            hasPerformanceData: !!performanceAnalytics,
+          });
+          onNavigateToAnalytics();
+        }}>
           <Text style={styles.quickActionIcon}>📊</Text>
           <Text style={styles.quickActionText}>Analytics</Text>
         </TouchableOpacity>

@@ -13,7 +13,8 @@
       "backgroundColor": "#ffffff"
     },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.cwcharles81.ShowTrackAI-Fresh"
     },
     "android": {
       "adaptiveIcon": {
@@ -26,7 +27,14 @@
       "favicon": "./assets/favicon.png"
     },
     "plugins": [
-      "expo-localization"
+      "expo-localization",
+      [
+        "@sentry/react-native/expo",
+        {
+          "organization": "showtrack-ai",
+          "project": "react-native"
+        }
+      ]
     ]
   }
 }

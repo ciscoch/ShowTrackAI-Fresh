@@ -17,6 +17,8 @@ import { AddHealthRecordModal } from '../components/AddHealthRecordModal';
 import { HealthRecordDetailModal } from '../components/HealthRecordDetailModal';
 import { PendingHealthIssuesScreen } from './PendingHealthIssuesScreen';
 import { EducatorDashboardScreen } from './EducatorDashboardScreen';
+import { sentryService } from '../../../core/services/SentryService';
+import { useAnalytics } from '../../../core/hooks/useAnalytics';
 
 interface MedicalRecordsScreenProps {
   onBack: () => void;
@@ -24,6 +26,7 @@ interface MedicalRecordsScreenProps {
 }
 
 export const MedicalRecordsScreen: React.FC<MedicalRecordsScreenProps> = ({ onBack, onNavigateToAddAnimal }) => {
+  const { trackUserInteraction, trackFeatureUsage } = useAnalytics({ screenName: 'MedicalRecords' });
   const {
     healthRecords,
     alerts,
@@ -82,7 +85,24 @@ export const MedicalRecordsScreen: React.FC<MedicalRecordsScreenProps> = ({ onBa
       <Text style={styles.headerTitle}>Medical Records</Text>
       <TouchableOpacity 
         style={styles.addButton}
-        onPress={() => setShowAddModal(true)}
+        onPress={() => {
+          // Track add health record action
+          trackUserInteraction('add_health_record_button', 'tap', {
+            animalId: selectedAnimal,
+            totalRecords: healthRecords.length,
+            alertsCount: alerts.length,
+          });
+          
+          sentryService.trackEducationalEvent('health_record_management', {
+            eventType: 'add_record_initiated',
+            category: 'animal_health',
+            skillLevel: 'intermediate',
+            completionStatus: 'in_progress',
+            educationalValue: 'high',
+          });
+
+          setShowAddModal(true);
+        }}
       >
         <Text style={styles.addButtonIcon}>+</Text>
         <Text style={styles.addButtonText}>Add</Text>
@@ -133,7 +153,17 @@ export const MedicalRecordsScreen: React.FC<MedicalRecordsScreenProps> = ({ onBa
         <TouchableOpacity
           key={tab.id}
           style={[styles.tab, activeTab === tab.id && styles.activeTab]}
-          onPress={() => setActiveTab(tab.id as any)}
+          onPress={() => {
+            // Track tab navigation
+            trackUserInteraction('medical_tab_navigation', 'tap', {
+              fromTab: activeTab,
+              toTab: tab.id,
+              animalSelected: !!selectedAnimal,
+              recordsCount: healthRecords.length,
+            });
+            
+            setActiveTab(tab.id as any);
+          }}
         >
           <Text style={[styles.tabIcon, activeTab === tab.id && styles.activeTabIcon]}>
             {tab.icon}
@@ -207,7 +237,26 @@ export const MedicalRecordsScreen: React.FC<MedicalRecordsScreenProps> = ({ onBa
                 </View>
                 <TouchableOpacity
                   style={styles.dismissButton}
-                  onPress={() => dismissAlert(alert.id)}
+                  onPress={() => {
+                    // Track alert dismissal
+                    trackUserInteraction('dismiss_alert_button', 'tap', {
+                      alertType: alert.type,
+                      severity: alert.severity,
+                      animalId: alert.animalId,
+                    });
+                    
+                    sentryService.trackEducationalEvent('health_alert_management', {
+                      eventType: 'alert_dismissed',
+                      category: 'animal_health',
+                      skillLevel: 'beginner',
+                      completionStatus: 'completed',
+                      educationalValue: 'medium',
+                      alertType: alert.type,
+                      severity: alert.severity,
+                    });
+
+                    dismissAlert(alert.id);
+                  }}
                 >
                   <Text style={styles.dismissButtonText}>✕</Text>
                 </TouchableOpacity>

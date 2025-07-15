@@ -25,6 +25,7 @@ interface EliteDashboardProps {
   onNavigateToFinancial: () => void;
   onNavigateToMedical: () => void;
   onNavigateToCalendar: () => void;
+  onNavigateToAttendedEvents: () => void;
   onAddAnimal?: () => void;
   onTakePhoto?: () => void;
   onAddEvent?: () => void;
@@ -43,6 +44,7 @@ export const EliteDashboard: React.FC<EliteDashboardProps> = ({
   onNavigateToFinancial,
   onNavigateToMedical,
   onNavigateToCalendar,
+  onNavigateToAttendedEvents,
   onAddAnimal,
   onTakePhoto,
   onAddEvent,
@@ -252,6 +254,18 @@ export const EliteDashboard: React.FC<EliteDashboardProps> = ({
                 <Text style={styles.featureTitle}>Medical Records</Text>
                 <Text style={styles.featureSubtitle}>Health tracking & vet records</Text>
               </TouchableOpacity>
+
+              <TouchableOpacity 
+                style={[styles.featureCard, styles.attendanceCard]}
+                onPress={onNavigateToAttendedEvents}
+              >
+                <Text style={styles.featureIcon}>🎯</Text>
+                <Text style={styles.featureTitle}>Event Attendance</Text>
+                <Text style={styles.featureSubtitle}>Earn FFA SAE/AET points</Text>
+                <View style={styles.pointsBadge}>
+                  <Text style={styles.pointsBadgeText}>🌟 Earn Points!</Text>
+                </View>
+              </TouchableOpacity>
             </View>
           </View>
         </View>
@@ -297,14 +311,18 @@ export const EliteDashboard: React.FC<EliteDashboardProps> = ({
                 </TouchableOpacity>
               )}
               <TouchableOpacity onPress={onNavigateToCalendar} style={styles.viewAllButton}>
-                <Text style={styles.viewAllText}>View All</Text>
+                <Text style={styles.viewAllText}>View</Text>
               </TouchableOpacity>
             </View>
           </View>
 
           {/* County Show Countdown */}
           {countyShow && (
-            <View style={styles.countyShowCard}>
+            <TouchableOpacity 
+              style={styles.countyShowCard}
+              onPress={onNavigateToCalendar}
+              activeOpacity={0.7}
+            >
               <View style={styles.countyShowHeader}>
                 <Text style={styles.countyShowIcon}>🏆</Text>
                 <View style={styles.countyShowInfo}>
@@ -320,7 +338,7 @@ export const EliteDashboard: React.FC<EliteDashboardProps> = ({
                   {daysUntilCountyShow === 1 ? 'day' : 'days'}
                 </Text>
               </View>
-            </View>
+            </TouchableOpacity>
           )}
 
           {/* Upcoming Events Preview */}
@@ -516,7 +534,7 @@ export const EliteDashboard: React.FC<EliteDashboardProps> = ({
               onPress={() => setShowQRGenerator(true)}
             >
               <Text style={styles.quickActionIcon}>📱</Text>
-              <Text style={styles.quickActionText}>Share QR Code</Text>
+              <Text style={styles.quickActionText}>Generate Observer QR Code</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -786,6 +804,24 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontWeight: 'bold',
   },
+  attendanceCard: {
+    borderColor: '#4CAF50',
+    borderWidth: 2,
+    backgroundColor: '#F8FFF8',
+  },
+  pointsBadge: {
+    backgroundColor: '#FF9800',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    marginTop: 8,
+  },
+  pointsBadgeText: {
+    fontSize: 10,
+    color: '#fff',
+    fontWeight: 'bold',
+    textAlign: 'center',
+  },
   highlightFeatureCard: {
     flex: 1,
     minWidth: '45%',
@@ -961,10 +997,13 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 16,
+    paddingBottom: 8,
+    zIndex: 0, // Ensure header doesn't overlap cards below
   },
   calendarActions: {
     flexDirection: 'row',
     gap: 8,
+    alignItems: 'center',
   },
   addEventButton: {
     backgroundColor: '#28a745',
@@ -979,9 +1018,11 @@ const styles = StyleSheet.create({
   },
   viewAllButton: {
     backgroundColor: '#007AFF',
-    paddingHorizontal: 12,
+    paddingHorizontal: 10,
     paddingVertical: 6,
-    borderRadius: 12,
+    borderRadius: 8,
+    minWidth: 50,
+    alignItems: 'center',
   },
   viewAllText: {
     color: '#fff',
@@ -992,6 +1033,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff3cd',
     borderRadius: 16,
     padding: 20,
+    marginTop: 8,
     marginBottom: 16,
     borderWidth: 2,
     borderColor: '#ffc107',
@@ -1000,6 +1042,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 3,
+    zIndex: 1, // Ensure card doesn't get overlapped by floating elements
   },
   countyShowHeader: {
     flexDirection: 'row',

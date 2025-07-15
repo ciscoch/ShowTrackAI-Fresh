@@ -78,6 +78,12 @@ export interface HealthPhoto {
   };
   capturedAt: Date;
   userId: string;
+  
+  // Supabase Storage Integration
+  storagePath?: string; // Path in Supabase storage
+  uploadError?: string; // Error message if upload failed
+  uploadedAt?: Date; // When photo was uploaded to cloud
+  isUploaded?: boolean; // Upload status flag
 }
 
 export interface Treatment {

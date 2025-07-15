@@ -1,0 +1,14 @@
+{
+  "timestamp": "2025-07-15T03:07:04.709Z",
+  "tests": {
+    "configuration": [
+      "SENTRY_PROJECT=react-native",
+      "react-native"
+    ],
+    "service": true,
+    "tests": true,
+    "initialization": true,
+    "dependencies": true,
+    "properties": true
+  }
+}

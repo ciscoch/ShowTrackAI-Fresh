@@ -8,6 +8,9 @@ interface AnimalDetailsScreenProps {
   onEdit: () => void;
   onBack: () => void;
   onViewWeightHistory?: () => void;
+  onViewPhotoGallery?: () => void;
+  onViewAIWeightPrediction?: () => void;
+  onViewHealthRecords?: () => void;
 }
 
 export const AnimalDetailsScreen: React.FC<AnimalDetailsScreenProps> = ({
@@ -15,6 +18,9 @@ export const AnimalDetailsScreen: React.FC<AnimalDetailsScreenProps> = ({
   onEdit,
   onBack,
   onViewWeightHistory,
+  onViewPhotoGallery,
+  onViewAIWeightPrediction,
+  onViewHealthRecords,
 }) => {
   // Analytics
   const { trackAnimalEvent, trackFeatureUsage, trackCustomEvent } = useAnalytics({
@@ -75,7 +81,7 @@ export const AnimalDetailsScreen: React.FC<AnimalDetailsScreenProps> = ({
       animal_species: animal.species,
       has_photos: false, // placeholder
     });
-    // TODO: Implement photo gallery navigation
+    onViewPhotoGallery?.();
   };
 
   const handleAIWeightPrediction = () => {
@@ -84,7 +90,7 @@ export const AnimalDetailsScreen: React.FC<AnimalDetailsScreenProps> = ({
       animal_species: animal.species,
       current_weight: animal.weight ? 'available' : 'not_available',
     });
-    // TODO: Implement AI weight prediction navigation
+    onViewAIWeightPrediction?.();
   };
 
   const handleHealthRecords = () => {
@@ -93,7 +99,7 @@ export const AnimalDetailsScreen: React.FC<AnimalDetailsScreenProps> = ({
       animal_species: animal.species,
       health_status: animal.healthStatus,
     });
-    // TODO: Implement health records navigation
+    onViewHealthRecords?.();
   };
 
   const DetailRow: React.FC<{ icon: string; label: string; value: string | number; color?: string }> = ({

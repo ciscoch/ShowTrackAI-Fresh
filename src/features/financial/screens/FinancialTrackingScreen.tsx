@@ -28,6 +28,8 @@ import { FormPicker } from '../../../shared/components/FormPicker';
 import { FeedCostCalculator } from '../../../core/services/FeedCostCalculator';
 import { KidFriendlyAnalytics } from '../../../core/services/KidFriendlyAnalytics';
 import { AIReceiptProcessor } from '../../../core/services/AIReceiptProcessor';
+import { sentryService } from '../../../core/services/SentryService';
+import { useAnalytics } from '../../../core/hooks/useAnalytics';
 
 interface FinancialTrackingScreenProps {
   onBack: () => void;
@@ -35,6 +37,7 @@ interface FinancialTrackingScreenProps {
 
 export const FinancialTrackingScreen: React.FC<FinancialTrackingScreenProps> = ({ onBack }) => {
   const { user } = useAuth();
+  const { trackUserInteraction, trackFeatureUsage } = useAnalytics({ screenName: 'FinancialTracking' });
   const { 
     entries, 
     loadEntries, 
@@ -672,6 +675,11 @@ export const FinancialTrackingScreen: React.FC<FinancialTrackingScreenProps> = (
     console.log('🤖 Starting AI receipt processing...');
     console.log('📄 Processing image:', imageUri);
     
+    // Track AI receipt processing attempt
+    trackUserInteraction('ai_receipt_process', 'start', {
+      hasImage: !!imageUri,
+    });
+    
     try {
       setIsProcessingReceipt(true);
       
@@ -693,6 +701,25 @@ export const FinancialTrackingScreen: React.FC<FinancialTrackingScreenProps> = (
       
       console.log('✅ Processing complete!');
       console.log(`📋 Found ${result.lineItems.length} items in ${result.suggestedExpenses.length} categories`);
+      
+      // Track successful AI processing
+      trackFeatureUsage('ai_receipt_processing_success', {
+        itemsFound: result.lineItems.length,
+        categoriesFound: result.suggestedExpenses.length,
+        totalAmount: result.lineItems.reduce((sum, item) => sum + item.amount, 0),
+        hasFeedAnalysis: !!(result.feedAnalysis && result.feedAnalysis.totalFeedWeight > 0),
+        warningsCount: result.warnings?.length || 0,
+      });
+
+      sentryService.trackEducationalEvent('ai_receipt_processing', {
+        eventType: 'ai_processing_success',
+        category: 'financial_technology',
+        skillLevel: 'advanced',
+        completionStatus: 'completed',
+        educationalValue: 'high',
+        itemsProcessed: result.lineItems.length,
+        accuracy: result.lineItems.length > 0 ? 'high' : 'low',
+      });
       
       // Show comprehensive processing results
       const feedInfo = result.feedAnalysis && result.feedAnalysis.totalFeedWeight > 0 
@@ -717,6 +744,22 @@ export const FinancialTrackingScreen: React.FC<FinancialTrackingScreenProps> = (
       
     } catch (error) {
       console.error('❌ Receipt processing error:', error);
+      
+      // Track AI processing error
+      sentryService.captureError(error as Error, {
+        feature: 'financial',
+        action: 'ai_receipt_processing',
+        additional: {
+          hasImage: !!imageUri,
+          processingType: 'receipt_analysis',
+        },
+      });
+      
+      trackFeatureUsage('ai_receipt_processing_error', {
+        errorType: error instanceof Error ? error.name : 'Unknown',
+        hasImage: !!imageUri,
+      });
+      
       Alert.alert(
         '❌ Processing Failed',
         'Unable to process receipt automatically. You can still:\n\n• Enter expenses manually\n• Try processing again\n• Use the manual category selection\n\nThe receipt photo has been saved for your records.',
@@ -814,8 +857,21 @@ export const FinancialTrackingScreen: React.FC<FinancialTrackingScreenProps> = (
     console.log('📸 Receipt photo:', formData.receiptPhoto ? 'HAS PHOTO' : 'NO PHOTO');
     console.log('🤖 AI processing result:', receiptProcessingResult ? 'HAS RESULTS' : 'NO RESULTS');
     
+    // Track user interaction
+    trackUserInteraction('add_entry_button', 'tap', {
+      entryType: formData.type,
+      category: formData.category,
+      hasPhoto: !!formData.receiptPhoto,
+      hasAIProcessing: !!receiptProcessingResult,
+    });
+    
     if (!formData.category || !formData.amount || !formData.description) {
       Alert.alert('Missing Information', 'Please fill in all required fields');
+      sentryService.captureMessage('Financial entry validation failed - missing fields', 'warning', {
+        feature: 'financial',
+        action: 'add_entry_validation',
+        additional: { formData: { ...formData, receiptPhoto: formData.receiptPhoto ? 'PRESENT' : 'NONE' } },
+      });
       return;
     }
 
@@ -884,6 +940,28 @@ export const FinancialTrackingScreen: React.FC<FinancialTrackingScreenProps> = (
 
       console.log('✅ Entry saved successfully!');
       
+      // Track successful financial entry
+      trackFeatureUsage('financial_entry_success', {
+        action: editingEntry ? 'update' : 'create',
+        entryType: formData.type,
+        category: formData.category,
+        amount: amount,
+        hasPhoto: !!formData.receiptPhoto,
+        hasAIProcessing: !!receiptProcessingResult,
+        vendor: formData.vendor || receiptProcessingResult?.receiptData?.vendor,
+      });
+
+      sentryService.trackEducationalEvent('financial_tracking', {
+        eventType: editingEntry ? 'entry_updated' : 'entry_created',
+        category: 'financial_literacy',
+        skillLevel: 'intermediate',
+        completionStatus: 'completed',
+        educationalValue: 'high',
+        entryType: formData.type,
+        amount: amount,
+        hasAISupport: !!receiptProcessingResult,
+      });
+      
       Alert.alert(
         'Success! 🎉',
         `${editingEntry ? 'Updated' : 'Created'} entry successfully${formData.receiptPhoto ? ' with receipt photo' : ''}`,
@@ -896,6 +974,20 @@ export const FinancialTrackingScreen: React.FC<FinancialTrackingScreenProps> = (
       
     } catch (error) {
       console.error('❌ Error saving entry:', error);
+      
+      // Track financial entry error
+      sentryService.captureError(error as Error, {
+        feature: 'financial',
+        action: 'save_entry',
+        additional: {
+          entryType: formData.type,
+          category: formData.category,
+          hasPhoto: !!formData.receiptPhoto,
+          hasAIProcessing: !!receiptProcessingResult,
+          isEditing: !!editingEntry,
+        },
+      });
+      
       Alert.alert('Error', 'Failed to save entry. Please try again.');
     }
   };

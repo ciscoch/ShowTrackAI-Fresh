@@ -5,15 +5,19 @@
 
 import React, { useState, useEffect } from 'react';
 import { View, Alert } from 'react-native';
+import * as ImagePicker from 'expo-image-picker';
 import { PostHogProvider } from 'posthog-react-native';
 import { useAuth } from '../core/contexts/AuthContext';
 import { analyticsService } from '../core/services/AnalyticsService';
+import { sentryService } from '../core/services/SentryService';
 import { EliteDashboard } from '../features/dashboard/screens/EliteDashboard';
 import { AnimalListScreen } from '../features/animals/screens/AnimalListScreen';
 import { AnimalFormScreen } from '../features/animals/screens/AnimalFormScreen';
 import { AnimalDetailsScreen } from '../features/animals/screens/AnimalDetailsScreen';
 import { WeightHistoryScreen } from '../features/animals/screens/WeightHistoryScreen';
 import { AddWeightScreen } from '../features/animals/screens/AddWeightScreen';
+import { PhotoGalleryScreen } from '../features/animals/screens/PhotoGalleryScreen';
+import { AIWeightPredictionScreen } from '../features/animals/screens/AIWeightPredictionScreen';
 import { JournalListScreen, JournalEntryScreen, JournalDetailScreen } from '../features/journal/screens';
 import { FinancialTrackingScreen } from '../features/financial/screens/FinancialTrackingScreen';
 import { MedicalRecordsScreen } from '../features/medical/screens/MedicalRecordsScreen';
@@ -28,6 +32,7 @@ import {
   EvidenceSubmissionScreen
 } from '../features/ffa/screens';
 import { CalendarScreen, EventFormScreen } from '../features/calendar/screens';
+import { AttendedEventsScreen, NotificationSettingsScreen } from '../features/events/screens';
 import { Animal } from '../core/models/Animal';
 import { Journal } from '../core/models/Journal';
 import { Event } from '../core/models/Event';
@@ -38,12 +43,13 @@ interface MainAppProps {
   profile?: any;
 }
 
-type AppScreen = 'dashboard' | 'animalList' | 'animalForm' | 'animalDetails' | 'weightHistory' | 'addWeight' | 'journalList' | 'journalEntry' | 'journalDetail' | 'financial' | 'medical' | 'ffaDashboard' | 'ffaDegreeProgress' | 'ffaSAEProjects' | 'ffaCompetitions' | 'parentDashboard' | 'parentLinking' | 'studentLinking' | 'evidenceSubmission' | 'calendar' | 'eventForm';
+type AppScreen = 'dashboard' | 'animalList' | 'animalForm' | 'animalDetails' | 'weightHistory' | 'addWeight' | 'photoGallery' | 'aiWeightPrediction' | 'journalList' | 'journalEntry' | 'journalDetail' | 'financial' | 'medical' | 'ffaDashboard' | 'ffaDegreeProgress' | 'ffaSAEProjects' | 'ffaCompetitions' | 'parentDashboard' | 'parentLinking' | 'studentLinking' | 'evidenceSubmission' | 'calendar' | 'eventForm' | 'attendedEvents' | 'notificationSettings';
 
 const MainApp: React.FC<MainAppProps> = ({ user, profile }) => {
   const { signOut } = useAuth();
   const { createProfile, switchProfile, currentProfile, getAllProfiles } = useProfileStore();
   const [currentScreen, setCurrentScreen] = useState<AppScreen>('dashboard');
+  const [previousScreen, setPreviousScreen] = useState<AppScreen>('dashboard');
   const [selectedAnimal, setSelectedAnimal] = useState<Animal | undefined>();
   const [selectedJournal, setSelectedJournal] = useState<Journal | undefined>();
   const [selectedEvent, setSelectedEvent] = useState<Event | undefined>();
@@ -79,6 +85,27 @@ const MainApp: React.FC<MainAppProps> = ({ user, profile }) => {
 
     initializeAnalytics();
   }, []);
+
+  // Track screen changes with Sentry
+  const navigateToScreen = (screen: AppScreen) => {
+    const startTime = Date.now();
+    
+    // Track navigation in Sentry
+    sentryService.trackNavigation(currentScreen, screen);
+    
+    // Update state
+    setPreviousScreen(currentScreen);
+    setCurrentScreen(screen);
+    
+    // Track in analytics
+    analyticsService.trackScreenView(screen, previousScreen);
+    
+    // Track screen load time
+    setTimeout(() => {
+      const loadTime = Date.now() - startTime;
+      sentryService.trackScreenView(screen, loadTime);
+    }, 100);
+  };
 
   // Create a profile for the authenticated user if one doesn't exist
   useEffect(() => {
@@ -157,22 +184,32 @@ const MainApp: React.FC<MainAppProps> = ({ user, profile }) => {
 
   const handleAddAnimal = () => {
     setSelectedAnimal(undefined);
-    setCurrentScreen('animalForm');
+    navigateToScreen('animalForm');
+    sentryService.trackUserInteraction('add_animal_button', 'tap', currentScreen);
   };
 
   const handleEditAnimal = (animal: Animal) => {
     setSelectedAnimal(animal);
-    setCurrentScreen('animalForm');
+    navigateToScreen('animalForm');
+    sentryService.trackUserInteraction('edit_animal_button', 'tap', currentScreen, {
+      animal_id: animal.id,
+      animal_type: animal.species,
+    });
   };
 
   const handleViewAnimal = (animal: Animal) => {
     setSelectedAnimal(animal);
-    setCurrentScreen('animalDetails');
+    navigateToScreen('animalDetails');
+    sentryService.trackUserInteraction('view_animal_details', 'tap', currentScreen, {
+      animal_id: animal.id,
+      animal_type: animal.species,
+    });
   };
 
   const handleSaveAnimal = () => {
-    setCurrentScreen('animalList');
+    navigateToScreen('animalList');
     setSelectedAnimal(undefined);
+    sentryService.trackUserInteraction('save_animal_button', 'submit', currentScreen);
   };
 
   const handleCancelAnimal = () => {
@@ -184,25 +221,147 @@ const MainApp: React.FC<MainAppProps> = ({ user, profile }) => {
     setCurrentScreen('dashboard');
   };
 
-  const handleTakePhoto = () => {
-    Alert.alert(
-      'Take Photo',
-      'Choose an option:',
-      [
-        { text: 'Camera', onPress: () => console.log('Open camera') },
-        { text: 'Photo Library', onPress: () => console.log('Open photo library') },
-        { text: 'Cancel', style: 'cancel' }
-      ]
-    );
+  const handleTakePhoto = async () => {
+    try {
+      // Request camera permissions
+      const { status } = await ImagePicker.requestCameraPermissionsAsync();
+      
+      if (status !== 'granted') {
+        Alert.alert(
+          'Camera Permission Required',
+          'Please allow camera access to take photos of your animals.',
+          [{ text: 'OK' }]
+        );
+        return;
+      }
+
+      Alert.alert(
+        'Take Photo',
+        'Choose an option:',
+        [
+          { 
+            text: 'Camera', 
+            onPress: async () => {
+              try {
+                const result = await ImagePicker.launchCameraAsync({
+                  mediaTypes: ImagePicker.MediaTypeOptions.Images,
+                  allowsEditing: true,
+                  aspect: [4, 3],
+                  quality: 0.8,
+                });
+
+                if (!result.canceled && result.assets[0]) {
+                  // Photo taken successfully
+                  console.log('📸 Photo taken:', result.assets[0].uri);
+                  
+                  // Track the photo capture
+                  analyticsService.trackFeatureUsage('photo_capture', {
+                    source: 'camera',
+                    screen: currentScreen,
+                  });
+                  
+                  Alert.alert(
+                    'Photo Captured!',
+                    'Your photo has been saved successfully.',
+                    [{ text: 'Great!' }]
+                  );
+                }
+              } catch (error) {
+                console.error('Camera error:', error);
+                Alert.alert('Error', 'Failed to open camera. Please try again.');
+              }
+            }
+          },
+          { 
+            text: 'Photo Library', 
+            onPress: async () => {
+              try {
+                const result = await ImagePicker.launchImageLibraryAsync({
+                  mediaTypes: ImagePicker.MediaTypeOptions.Images,
+                  allowsEditing: true,
+                  aspect: [4, 3],
+                  quality: 0.8,
+                });
+
+                if (!result.canceled && result.assets[0]) {
+                  // Photo selected successfully
+                  console.log('📱 Photo selected:', result.assets[0].uri);
+                  
+                  // Track the photo selection
+                  analyticsService.trackFeatureUsage('photo_capture', {
+                    source: 'library',
+                    screen: currentScreen,
+                  });
+                  
+                  Alert.alert(
+                    'Photo Selected!',
+                    'Your photo has been imported successfully.',
+                    [{ text: 'Great!' }]
+                  );
+                }
+              } catch (error) {
+                console.error('Photo library error:', error);
+                Alert.alert('Error', 'Failed to access photo library. Please try again.');
+              }
+            }
+          },
+          { text: 'Cancel', style: 'cancel' }
+        ]
+      );
+    } catch (error) {
+      console.error('Permission error:', error);
+      Alert.alert('Error', 'Failed to request camera permissions.');
+    }
   };
 
   const handlePlaceholderAction = (action: string) => {
     Alert.alert('Coming Soon', `${action} feature coming soon!`);
   };
 
+  const handleNavigateToAI = () => {
+    // Create a demo animal for AI features if needed
+    const demoAnimal: Animal = {
+      id: 'demo-ai-animal',
+      name: 'Demo Goat',
+      species: 'Goat',
+      breed: 'Boer',
+      sex: 'Male',
+      earTag: 'AI001',
+      penNumber: '1',
+      projectType: 'Market',
+      breeder: 'ShowTrackAI Demo',
+      weight: 75,
+      healthStatus: 'Healthy',
+      acquisitionCost: 250,
+      birthDate: new Date('2024-03-15'),
+      pickupDate: new Date('2024-05-01'),
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+    
+    // Set the demo animal and navigate to AI Weight Prediction
+    setSelectedAnimal(demoAnimal);
+    navigateToScreen('aiWeightPrediction');
+  };
+
   const handleViewWeightHistory = (animal: Animal) => {
     setSelectedAnimal(animal);
     setCurrentScreen('weightHistory');
+  };
+
+  const handleViewPhotoGallery = (animal: Animal) => {
+    setSelectedAnimal(animal);
+    setCurrentScreen('photoGallery');
+  };
+
+  const handleViewAIWeightPrediction = (animal: Animal) => {
+    setSelectedAnimal(animal);
+    setCurrentScreen('aiWeightPrediction');
+  };
+
+  const handleViewHealthRecords = (animal: Animal) => {
+    setSelectedAnimal(animal);
+    setCurrentScreen('medical');
   };
 
   const handleAddWeight = () => {
@@ -325,6 +484,13 @@ const MainApp: React.FC<MainAppProps> = ({ user, profile }) => {
     setCurrentScreen('calendar');
   };
 
+  const handleNavigateToAttendedEvents = () => {
+    setCurrentScreen('attendedEvents');
+  };
+  const handleNavigateToNotificationSettings = () => {
+    setCurrentScreen('notificationSettings');
+  };
+
   const handleAddEvent = () => {
     setSelectedEvent(undefined);
     setCurrentScreen('eventForm');
@@ -359,12 +525,13 @@ const MainApp: React.FC<MainAppProps> = ({ user, profile }) => {
             onShowSettings={handleSignOut}
             onNavigateToAnimals={navigateToAnimals}
             onNavigateToAnalytics={() => handlePlaceholderAction('Analytics')}
-            onNavigateToAI={() => handlePlaceholderAction('AI Features')}
+            onNavigateToAI={handleNavigateToAI}
             onNavigateToExport={() => handlePlaceholderAction('Export')}
             onNavigateToJournal={handleNavigateToJournal}
             onNavigateToFinancial={() => setCurrentScreen('financial')}
             onNavigateToMedical={handleNavigateToMedical}
             onNavigateToCalendar={handleNavigateToCalendar}
+            onNavigateToAttendedEvents={handleNavigateToAttendedEvents}
             onAddAnimal={handleAddAnimal}
             onTakePhoto={handleTakePhoto}
             onNavigateToVetConnect={() => handlePlaceholderAction('VetConnect')}
@@ -403,6 +570,9 @@ const MainApp: React.FC<MainAppProps> = ({ user, profile }) => {
               setSelectedAnimal(undefined);
             }}
             onViewWeightHistory={() => handleViewWeightHistory(selectedAnimal)}
+            onViewPhotoGallery={() => handleViewPhotoGallery(selectedAnimal)}
+            onViewAIWeightPrediction={() => handleViewAIWeightPrediction(selectedAnimal)}
+            onViewHealthRecords={() => handleViewHealthRecords(selectedAnimal)}
           />
         ) : null;
 
@@ -421,6 +591,28 @@ const MainApp: React.FC<MainAppProps> = ({ user, profile }) => {
             animal={selectedAnimal}
             onSave={handleSaveWeight}
             onCancel={handleBackFromWeight}
+          />
+        ) : null;
+
+      case 'photoGallery':
+        return selectedAnimal ? (
+          <PhotoGalleryScreen
+            animal={selectedAnimal}
+            onBack={() => {
+              setCurrentScreen('animalDetails');
+            }}
+            onTakePhoto={handleTakePhoto}
+          />
+        ) : null;
+
+      case 'aiWeightPrediction':
+        return selectedAnimal ? (
+          <AIWeightPredictionScreen
+            animal={selectedAnimal}
+            onBack={() => {
+              setCurrentScreen('animalDetails');
+            }}
+            onTakePhoto={handleTakePhoto}
           />
         ) : null;
 
@@ -559,6 +751,23 @@ const MainApp: React.FC<MainAppProps> = ({ user, profile }) => {
           />
         );
 
+      case 'attendedEvents':
+        return (
+          <AttendedEventsScreen
+            onNavigateToCalendar={handleNavigateToCalendar}
+            onNavigateToFFA={handleNavigateToFFA}
+            onNavigateToNotificationSettings={handleNavigateToNotificationSettings}
+            onNavigateBack={() => setCurrentScreen('dashboard')}
+            onNavigateToHome={() => setCurrentScreen('dashboard')}
+          />
+        );
+      case 'notificationSettings':
+        return (
+          <NotificationSettingsScreen
+            onNavigateBack={() => setCurrentScreen('attendedEvents')}
+          />
+        );
+
       default:
         return (
           <EliteDashboard
@@ -566,12 +775,13 @@ const MainApp: React.FC<MainAppProps> = ({ user, profile }) => {
             onShowSettings={handleSignOut}
             onNavigateToAnimals={navigateToAnimals}
             onNavigateToAnalytics={() => handlePlaceholderAction('Analytics')}
-            onNavigateToAI={() => handlePlaceholderAction('AI Features')}
+            onNavigateToAI={handleNavigateToAI}
             onNavigateToExport={() => handlePlaceholderAction('Export')}
             onNavigateToJournal={handleNavigateToJournal}
             onNavigateToFinancial={() => setCurrentScreen('financial')}
             onNavigateToMedical={handleNavigateToMedical}
             onNavigateToCalendar={handleNavigateToCalendar}
+            onNavigateToAttendedEvents={handleNavigateToAttendedEvents}
             onAddAnimal={handleAddAnimal}
             onTakePhoto={handleTakePhoto}
             onNavigateToVetConnect={() => handlePlaceholderAction('VetConnect')}

@@ -6,7 +6,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, Alert } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
-import { PostHogProvider } from 'posthog-react-native';
+// PostHog temporarily disabled to resolve navigation conflicts
 import { useAuth } from '../core/contexts/AuthContext';
 import { analyticsService } from '../core/services/AnalyticsService';
 import { sentryService } from '../core/services/SentryService';
@@ -31,6 +31,13 @@ import {
   StudentLinkingScreen,
   EvidenceSubmissionScreen
 } from '../features/ffa/screens';
+import { 
+  AgriculturalEducationDashboard,
+  SAEProjectManagement,
+  HealthRecordManagement,
+  FeedEfficiencyAnalysis,
+  CompetencyTracking
+} from '../features/education/screens';
 import { CalendarScreen, EventFormScreen } from '../features/calendar/screens';
 import { AttendedEventsScreen, NotificationSettingsScreen } from '../features/events/screens';
 import { Animal } from '../core/models/Animal';
@@ -38,12 +45,23 @@ import { Journal } from '../core/models/Journal';
 import { Event } from '../core/models/Event';
 import { useProfileStore } from '../core/stores/ProfileStore';
 
+export type RootStackParamList = {
+  AgriculturalEducationDashboard: undefined;
+  SAEProjectManagement: undefined;
+  HealthRecordManagement: undefined;
+  FeedEfficiencyAnalysis: undefined;
+  CompetencyTracking: undefined;
+  AnimalList: undefined;
+  JournalList: undefined;
+  [key: string]: any;
+};
+
 interface MainAppProps {
   user?: any;
   profile?: any;
 }
 
-type AppScreen = 'dashboard' | 'animalList' | 'animalForm' | 'animalDetails' | 'weightHistory' | 'addWeight' | 'photoGallery' | 'aiWeightPrediction' | 'journalList' | 'journalEntry' | 'journalDetail' | 'financial' | 'medical' | 'ffaDashboard' | 'ffaDegreeProgress' | 'ffaSAEProjects' | 'ffaCompetitions' | 'parentDashboard' | 'parentLinking' | 'studentLinking' | 'evidenceSubmission' | 'calendar' | 'eventForm' | 'attendedEvents' | 'notificationSettings';
+type AppScreen = 'dashboard' | 'animalList' | 'animalForm' | 'animalDetails' | 'weightHistory' | 'addWeight' | 'photoGallery' | 'aiWeightPrediction' | 'journalList' | 'journalEntry' | 'journalDetail' | 'financial' | 'medical' | 'ffaDashboard' | 'ffaDegreeProgress' | 'ffaSAEProjects' | 'ffaCompetitions' | 'parentDashboard' | 'parentLinking' | 'studentLinking' | 'evidenceSubmission' | 'calendar' | 'eventForm' | 'attendedEvents' | 'notificationSettings' | 'agriculturalEducation' | 'saeProjectManagement' | 'healthRecordManagement' | 'feedEfficiencyAnalysis' | 'competencyTracking';
 
 const MainApp: React.FC<MainAppProps> = ({ user, profile }) => {
   const { signOut } = useAuth();
@@ -516,6 +534,31 @@ const MainApp: React.FC<MainAppProps> = ({ user, profile }) => {
     setSelectedEvent(undefined);
   };
 
+  // Agricultural Education Navigation Handlers
+  const handleNavigateToAgriculturalEducation = () => {
+    setCurrentScreen('agriculturalEducation');
+  };
+
+  const handleNavigateToSAEProjectManagement = () => {
+    setCurrentScreen('saeProjectManagement');
+  };
+
+  const handleNavigateToHealthRecordManagement = () => {
+    setCurrentScreen('healthRecordManagement');
+  };
+
+  const handleNavigateToFeedEfficiencyAnalysis = () => {
+    setCurrentScreen('feedEfficiencyAnalysis');
+  };
+
+  const handleNavigateToCompetencyTracking = () => {
+    setCurrentScreen('competencyTracking');
+  };
+
+  const handleBackFromAgriculturalEducation = () => {
+    setCurrentScreen('dashboard');
+  };
+
   const renderCurrentScreen = () => {
     switch (currentScreen) {
       case 'dashboard':
@@ -536,6 +579,7 @@ const MainApp: React.FC<MainAppProps> = ({ user, profile }) => {
             onTakePhoto={handleTakePhoto}
             onNavigateToVetConnect={() => handlePlaceholderAction('VetConnect')}
             onNavigateToFFA={handleNavigateToFFA}
+            onNavigateToAgriculturalEducation={handleNavigateToAgriculturalEducation}
           />
         );
 
@@ -768,6 +812,37 @@ const MainApp: React.FC<MainAppProps> = ({ user, profile }) => {
           />
         );
 
+      case 'agriculturalEducation':
+        return (
+          <AgriculturalEducationDashboard 
+            onNavigateToSAE={() => navigateToScreen('saeProjectManagement')}
+            onNavigateToHealth={() => navigateToScreen('healthRecordManagement')}
+            onNavigateToFeed={() => navigateToScreen('feedEfficiencyAnalysis')}
+            onNavigateToCompetency={() => navigateToScreen('competencyTracking')}
+            onBack={() => navigateToScreen('dashboard')}
+          />
+        );
+
+      case 'saeProjectManagement':
+        return (
+          <SAEProjectManagement onBack={() => navigateToScreen('agriculturalEducation')} />
+        );
+
+      case 'healthRecordManagement':
+        return (
+          <HealthRecordManagement onBack={() => navigateToScreen('agriculturalEducation')} />
+        );
+
+      case 'feedEfficiencyAnalysis':
+        return (
+          <FeedEfficiencyAnalysis onBack={() => navigateToScreen('agriculturalEducation')} />
+        );
+
+      case 'competencyTracking':
+        return (
+          <CompetencyTracking onBack={() => navigateToScreen('agriculturalEducation')} />
+        );
+
       default:
         return (
           <EliteDashboard
@@ -786,20 +861,14 @@ const MainApp: React.FC<MainAppProps> = ({ user, profile }) => {
             onTakePhoto={handleTakePhoto}
             onNavigateToVetConnect={() => handlePlaceholderAction('VetConnect')}
             onNavigateToFFA={handleNavigateToFFA}
+            onNavigateToAgriculturalEducation={handleNavigateToAgriculturalEducation}
           />
         );
     }
   };
 
   return (
-    <PostHogProvider
-      apiKey={process.env.EXPO_PUBLIC_POSTHOG_API_KEY || ''}
-      options={{
-        host: process.env.EXPO_PUBLIC_POSTHOG_HOST || 'https://us.i.posthog.com',
-      }}
-    >
-      <View style={{ flex: 1 }}>{renderCurrentScreen()}</View>
-    </PostHogProvider>
+    <View style={{ flex: 1 }}>{renderCurrentScreen()}</View>
   );
 };
 

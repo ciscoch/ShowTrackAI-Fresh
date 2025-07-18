@@ -73,6 +73,8 @@ class AnalyticsService {
         captureAppLifecycleEvents: true,
         flushInterval: 30, // Flush events every 30 seconds
         flushAt: 10, // Flush after 10 events
+        captureAutomaticPageViews: false, // Disable automatic navigation tracking
+        enableNavigation: false, // Disable React Navigation integration
       });
 
       await this.posthog.ready();

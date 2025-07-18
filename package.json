@@ -31,6 +31,7 @@
     "expo-notifications": "^0.31.4",
     "expo-sharing": "^13.1.5",
     "expo-status-bar": "~2.2.3",
+    "openai": "^5.10.1",
     "posthog-react-native": "^4.1.5",
     "process": "^0.11.10",
     "react": "19.0.0",

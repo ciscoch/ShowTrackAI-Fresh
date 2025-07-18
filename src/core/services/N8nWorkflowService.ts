@@ -1,414 +1,390 @@
 /**
- * N8nWorkflowService - Agricultural Intelligence Workflow Automation
+ * N8N Workflow Service for ShowTrackAI Agricultural Education Platform
  * 
- * Manages automated workflows for feed analytics, educational interventions,
- * research data collection, and business intelligence processes.
+ * Integrates with N8N automation platform to provide:
+ * - Daily progress tracking workflows
+ * - Feed efficiency monitoring
+ * - Health alert systems
+ * - SAE project automation
+ * - Student reminder systems
  */
 
-import { Animal } from '../models/Animal';
-import { FeedEntry, FCRAnalysis, PhotoAnalysis } from '../models/FeedProduct';
-import { Journal } from '../models/Journal';
-import { zepMemoryService } from './ZepMemoryService';
-import { analyticsService } from './AnalyticsService';
-import { sentryService } from './SentryService';
+export interface N8nWorkflowConfig {
+  baseUrl: string;
+  apiKey?: string;
+  enableWebhooks: boolean;
+  enableScheduledTasks: boolean;
+}
 
-export interface WorkflowTrigger {
+export interface WorkflowTriggerData {
+  workflowId: string;
+  data: any;
+  executionMode?: 'synchronous' | 'asynchronous';
+  timeout?: number;
+}
+
+export interface WorkflowExecution {
   id: string;
-  type: 'feed_entry' | 'weight_change' | 'photo_analysis' | 'fcr_calculation' | 'educational_milestone' | 'performance_alert';
-  animalId?: string;
-  userId: string;
-  data: Record<string, any>;
-  timestamp: Date;
-  priority: 'low' | 'medium' | 'high' | 'critical';
+  workflowId: string;
+  status: 'new' | 'running' | 'success' | 'error' | 'canceled';
+  data?: any;
+  error?: string;
+  startedAt: string;
+  finishedAt?: string;
 }
 
-export interface WorkflowAction {
-  id: string;
-  type: 'notification' | 'recommendation' | 'data_analysis' | 'report_generation' | 'intervention' | 'api_call';
-  config: Record<string, any>;
-  conditions: WorkflowCondition[];
-  outputs: WorkflowOutput[];
-}
+export class N8nWorkflowService {
+  private config: N8nWorkflowConfig;
+  private webhookUrl: string;
+  private isInitialized: boolean = false;
 
-export interface WorkflowCondition {
-  field: string;
-  operator: 'equals' | 'not_equals' | 'greater_than' | 'less_than' | 'contains' | 'exists';
-  value: any;
-  logicalOperator?: 'and' | 'or';
-}
-
-export interface WorkflowOutput {
-  destination: 'user_notification' | 'educator_alert' | 'parent_report' | 'research_database' | 'api_endpoint';
-  format: 'json' | 'email' | 'sms' | 'pdf' | 'csv';
-  template: string;
-  data: Record<string, any>;
-}
-
-export interface EducationalIntervention {
-  id: string;
-  studentId: string;
-  triggerEvent: string;
-  interventionType: 'guidance' | 'remediation' | 'enrichment' | 'peer_support' | 'instructor_alert';
-  content: {
-    title: string;
-    description: string;
-    actionItems: string[];
-    resources: string[];
-    timeline: string;
-  };
-  delivery: {
-    method: 'in_app' | 'email' | 'sms' | 'dashboard';
-    timing: 'immediate' | 'scheduled' | 'optimal';
-    frequency: 'once' | 'daily' | 'weekly' | 'until_resolved';
-  };
-  effectiveness: {
-    deliveryConfirmed: boolean;
-    userEngagement: number;
-    outcomeAchieved: boolean;
-    followUpRequired: boolean;
-  };
-}
-
-export interface FeedOptimizationWorkflow {
-  animalId: string;
-  currentPerformance: {
-    fcr: number;
-    dailyGain: number;
-    feedCost: number;
-    healthStatus: string;
-  };
-  optimization: {
-    recommendedFeed: string;
-    expectedImprovement: number;
-    costImpact: number;
-    implementationPlan: string[];
-  };
-  monitoring: {
-    trackingSchedule: string;
-    keyMetrics: string[];
-    alertThresholds: Record<string, number>;
-  };
-}
-
-export interface ResearchDataWorkflow {
-  dataType: 'feed_performance' | 'educational_outcome' | 'photo_analysis' | 'fcr_study';
-  anonymizationLevel: 'basic' | 'advanced' | 'complete';
-  aggregationPeriod: 'daily' | 'weekly' | 'monthly' | 'quarterly';
-  outputFormat: 'csv' | 'json' | 'parquet' | 'database';
-  qualityChecks: {
-    completeness: number;
-    accuracy: number;
-    consistency: number;
-    timeliness: number;
-  };
-  complianceValidation: {
-    ferpaCompliant: boolean;
-    gdprCompliant: boolean;
-    institutionalApproval: boolean;
-  };
-}
-
-class N8nWorkflowService {
-  private workflows: Map<string, WorkflowAction[]> = new Map();
-  private activeWorkflows: Map<string, any> = new Map();
-  private workflowHistory: Map<string, any[]> = new Map();
-  private n8nEndpoint: string | null = null;
-  private isInitialized = false;
-
-  /**
-   * Initialize N8n workflow service
-   */
-  async initialize(endpoint?: string): Promise<void> {
-    try {
-      this.n8nEndpoint = endpoint || process.env.EXPO_PUBLIC_N8N_ENDPOINT || null;
-      
-      if (!this.n8nEndpoint || this.n8nEndpoint === 'n8n_placeholder_endpoint') {
-        console.warn('⚠️ N8n endpoint not configured. Workflow automation disabled.');
-        return;
-      }
-
-      // Initialize default workflows
-      this.setupDefaultWorkflows();
-      
+  constructor(webhookUrl: string, config?: Partial<N8nWorkflowConfig>) {
+    this.webhookUrl = webhookUrl;
+    this.config = {
+      baseUrl: config?.baseUrl || 'http://localhost:5678',
+      apiKey: config?.apiKey,
+      enableWebhooks: config?.enableWebhooks ?? true,
+      enableScheduledTasks: config?.enableScheduledTasks ?? true
+    };
+    
+    if (this.webhookUrl) {
       this.isInitialized = true;
-      console.log('🔄 N8n Workflow Service initialized successfully');
-      
-    } catch (error) {
-      console.error('❌ Failed to initialize N8n Workflow Service:', error);
-      sentryService.captureError(error as Error, {
-        feature: 'n8n_workflows',
-        action: 'initialization',
-      });
     }
   }
 
-  /**
-   * Trigger workflow based on application events
-   */
-  async triggerWorkflow(trigger: WorkflowTrigger): Promise<void> {
-    if (!this.shouldProcess()) return;
-
+  async getStatus(): Promise<boolean> {
+    if (!this.isInitialized) return false;
+    
     try {
-      const workflowId = this.getWorkflowId(trigger.type);
-      const workflow = this.workflows.get(workflowId);
-      
-      if (!workflow) {
-        console.warn(`⚠️ No workflow found for trigger type: ${trigger.type}`);
-        return;
-      }
-
-      // Process workflow actions
-      const results = await this.processWorkflow(workflow, trigger);
-      
-      // Store workflow execution history
-      this.storeWorkflowHistory(workflowId, trigger, results);
-      
-      // Track analytics
-      analyticsService.trackFeatureUsage('workflow_automation', {
-        trigger_type: trigger.type,
-        workflow_id: workflowId,
-        actions_executed: results.length,
-        success_rate: results.filter(r => r.success).length / results.length
-      });
-
-      console.log(`🔄 Workflow triggered: ${trigger.type} for ${trigger.animalId || trigger.userId}`);
-      
-    } catch (error) {
-      console.error('❌ Failed to trigger workflow:', error);
-      sentryService.captureError(error as Error, {
-        feature: 'n8n_workflows',
-        action: 'trigger_workflow',
-        trigger_type: trigger.type
-      });
-    }
-  }
-
-  /**
-   * Process feed performance optimization workflow
-   */
-  async processFeedOptimizationWorkflow(
-    animalId: string, 
-    fcrAnalysis: FCRAnalysis
-  ): Promise<FeedOptimizationWorkflow> {
-    try {
-      const optimization = await this.generateFeedOptimization(animalId, fcrAnalysis);
-      
-      // Trigger optimization workflow
-      await this.triggerWorkflow({
-        id: `feed_opt_${Date.now()}`,
-        type: 'fcr_calculation',
-        animalId,
-        userId: 'system',
-        data: {
-          fcr: fcrAnalysis.metrics.feedConversionRatio,
-          optimization: optimization.optimization,
-          priority: this.calculateOptimizationPriority(fcrAnalysis)
-        },
-        timestamp: new Date(),
-        priority: 'medium'
-      });
-
-      return optimization;
-      
-    } catch (error) {
-      console.error('❌ Failed to process feed optimization workflow:', error);
-      throw error;
-    }
-  }
-
-  /**
-   * Process educational intervention workflow
-   */
-  async processEducationalIntervention(
-    studentId: string,
-    trigger: string,
-    context: Record<string, any>
-  ): Promise<EducationalIntervention> {
-    try {
-      const intervention = this.generateEducationalIntervention(studentId, trigger, context);
-      
-      // Execute intervention delivery
-      await this.deliverIntervention(intervention);
-      
-      // Schedule follow-up monitoring
-      this.scheduleInterventionMonitoring(intervention);
-      
-      console.log(`🎓 Educational intervention triggered for student: ${studentId}`);
-      return intervention;
-      
-    } catch (error) {
-      console.error('❌ Failed to process educational intervention:', error);
-      throw error;
-    }
-  }
-
-  /**
-   * Process research data collection workflow
-   */
-  async processResearchDataWorkflow(
-    dataType: string,
-    data: any[],
-    config: Partial<ResearchDataWorkflow>
-  ): Promise<ResearchDataWorkflow> {
-    try {
-      const workflow: ResearchDataWorkflow = {
-        dataType: dataType as any,
-        anonymizationLevel: config.anonymizationLevel || 'advanced',
-        aggregationPeriod: config.aggregationPeriod || 'monthly',
-        outputFormat: config.outputFormat || 'json',
-        qualityChecks: {
-          completeness: this.calculateDataCompleteness(data),
-          accuracy: this.calculateDataAccuracy(data),
-          consistency: this.calculateDataConsistency(data),
-          timeliness: this.calculateDataTimeliness(data)
-        },
-        complianceValidation: {
-          ferpaCompliant: await this.validateFERPACompliance(data),
-          gdprCompliant: await this.validateGDPRCompliance(data),
-          institutionalApproval: await this.validateInstitutionalApproval(dataType)
+      const response = await fetch(`${this.config.baseUrl}/healthz`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(this.config.apiKey && { 'Authorization': `Bearer ${this.config.apiKey}` })
         }
+      });
+      return response.ok;
+    } catch (error) {
+      console.error('N8N service status check failed:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Trigger a workflow via webhook
+   */
+  async triggerWorkflow(workflowName: string, data: any, options?: {
+    async?: boolean;
+    timeout?: number;
+  }): Promise<any> {
+    if (!this.isInitialized) {
+      console.warn('N8N Workflow Service not initialized - skipping workflow trigger');
+      return null;
+    }
+
+    try {
+      const payload = {
+        workflowName,
+        data,
+        timestamp: new Date().toISOString(),
+        async: options?.async ?? true
       };
 
-      // Process data anonymization
-      const anonymizedData = await this.anonymizeData(data, workflow.anonymizationLevel);
-      
-      // Aggregate data according to configuration
-      const aggregatedData = await this.aggregateData(anonymizedData, workflow.aggregationPeriod);
-      
-      // Export data in specified format
-      await this.exportResearchData(aggregatedData, workflow.outputFormat);
-      
-      console.log(`📊 Research data workflow processed: ${dataType}`);
-      return workflow;
-      
+      const response = await fetch(this.webhookUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(this.config.apiKey && { 'Authorization': `Bearer ${this.config.apiKey}` })
+        },
+        body: JSON.stringify(payload)
+      });
+
+      if (!response.ok) {
+        throw new Error(`N8N webhook failed: ${response.status} ${response.statusText}`);
+      }
+
+      const result = await response.json();
+      console.log(`N8N workflow triggered: ${workflowName}`, result);
+      return result;
     } catch (error) {
-      console.error('❌ Failed to process research data workflow:', error);
+      console.error(`N8N workflow trigger failed for ${workflowName}:`, error);
       throw error;
     }
   }
 
   /**
-   * Setup default workflows for common scenarios
+   * Execute a workflow directly (if API access is available)
    */
-  private setupDefaultWorkflows(): void {
-    // Feed Performance Alert Workflow
-    this.workflows.set('feed_performance_alert', [
-      {
-        id: 'check_fcr_threshold',
-        type: 'data_analysis',
-        config: {
-          analysis_type: 'fcr_threshold',
-          threshold: 7.0,
-          comparison: 'greater_than'
-        },
-        conditions: [
-          {
-            field: 'fcr',
-            operator: 'greater_than',
-            value: 7.0
-          }
-        ],
-        outputs: [
-          {
-            destination: 'user_notification',
-            format: 'json',
-            template: 'poor_fcr_alert',
-            data: {
-              title: 'Feed Efficiency Alert',
-              message: 'Your animal\'s feed conversion ratio is above optimal range. Consider feed optimization.',
-              severity: 'medium'
-            }
-          }
-        ]
-      }
-    ]);
+  async executeWorkflow(workflowId: string, data: any): Promise<WorkflowExecution> {
+    if (!this.config.apiKey) {
+      throw new Error('API key required for direct workflow execution');
+    }
 
-    // Educational Milestone Workflow
-    this.workflows.set('educational_milestone', [
-      {
-        id: 'milestone_achievement',
-        type: 'recommendation',
-        config: {
-          recommendation_type: 'skill_progression',
-          next_level: 'intermediate'
+    try {
+      const response = await fetch(`${this.config.baseUrl}/api/v1/workflows/${workflowId}/execute`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${this.config.apiKey}`
         },
-        conditions: [
-          {
-            field: 'skill_level',
-            operator: 'equals',
-            value: 'beginner_complete'
-          }
-        ],
-        outputs: [
-          {
-            destination: 'user_notification',
-            format: 'json',
-            template: 'skill_progression',
-            data: {
-              title: 'Skill Milestone Achieved!',
-              message: 'You\'ve completed beginner level. Ready for intermediate challenges?',
-              nextSteps: ['Advanced feed analysis', 'Cost optimization', 'Breeding considerations']
-            }
-          }
-        ]
-      }
-    ]);
+        body: JSON.stringify({ data })
+      });
 
-    // Photo Analysis Workflow
-    this.workflows.set('photo_analysis_workflow', [
-      {
-        id: 'body_condition_alert',
-        type: 'data_analysis',
-        config: {
-          analysis_type: 'body_condition',
-          alert_threshold: 4.0
-        },
-        conditions: [
-          {
-            field: 'body_condition_score',
-            operator: 'less_than',
-            value: 4.5
-          }
-        ],
-        outputs: [
-          {
-            destination: 'user_notification',
-            format: 'json',
-            template: 'body_condition_alert',
-            data: {
-              title: 'Body Condition Alert',
-              message: 'Animal appears to be losing condition. Consider nutritional assessment.',
-              recommendations: ['Increase feed quantity', 'Check for health issues', 'Consult veterinarian']
-            }
-          }
-        ]
+      if (!response.ok) {
+        throw new Error(`Workflow execution failed: ${response.status} ${response.statusText}`);
       }
-    ]);
+
+      return await response.json();
+    } catch (error) {
+      console.error('Direct workflow execution failed:', error);
+      throw error;
+    }
   }
 
   /**
-   * Process workflow actions sequentially
+   * Get workflow execution status
    */
-  private async processWorkflow(
-    workflow: WorkflowAction[], 
-    trigger: WorkflowTrigger
-  ): Promise<any[]> {
+  async getExecutionStatus(executionId: string): Promise<WorkflowExecution | null> {
+    if (!this.config.apiKey) {
+      throw new Error('API key required for execution status check');
+    }
+
+    try {
+      const response = await fetch(`${this.config.baseUrl}/api/v1/executions/${executionId}`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${this.config.apiKey}`
+        }
+      });
+
+      if (!response.ok) {
+        if (response.status === 404) return null;
+        throw new Error(`Execution status check failed: ${response.status} ${response.statusText}`);
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error('Execution status check failed:', error);
+      return null;
+    }
+  }
+
+  // ===== PREDEFINED AGRICULTURAL WORKFLOWS =====
+
+  /**
+   * Student Onboarding Workflow
+   */
+  async triggerStudentOnboarding(data: {
+    studentId: string;
+    studentName: string;
+    organizationId?: string;
+    gradeLevel?: number;
+    ffaChapter?: string;
+  }): Promise<any> {
+    return this.triggerWorkflow('student-onboarding', {
+      ...data,
+      actions: [
+        'create_welcome_message',
+        'setup_initial_assessments',
+        'assign_mentor',
+        'create_progress_tracking',
+        'send_parent_notification'
+      ]
+    });
+  }
+
+  /**
+   * SAE Project Creation Workflow
+   */
+  async triggerSAEProjectCreated(data: {
+    projectId: string;
+    studentId: string;
+    projectType: string;
+    category: string;
+    supervisorId?: string;
+  }): Promise<any> {
+    return this.triggerWorkflow('sae-project-created', {
+      ...data,
+      actions: [
+        'create_project_timeline',
+        'setup_milestone_tracking',
+        'notify_supervisor',
+        'create_record_keeping_templates',
+        'schedule_progress_reviews'
+      ]
+    });
+  }
+
+  /**
+   * SAE Activity Logged Workflow
+   */
+  async triggerSAEActivityLogged(data: {
+    activityId: string;
+    studentId: string;
+    activityType: string;
+    duration: number;
+    skillsDemonstrated?: string[];
+  }): Promise<any> {
+    return this.triggerWorkflow('sae-activity-logged', {
+      ...data,
+      actions: [
+        'update_progress_tracking',
+        'analyze_skill_development',
+        'check_milestone_completion',
+        'generate_competency_updates',
+        'trigger_recommendation_engine'
+      ]
+    });
+  }
+
+  /**
+   * Health Record Created Workflow
+   */
+  async triggerHealthRecordCreated(data: {
+    recordId: string;
+    animalId: string;
+    observationType: string;
+    severityLevel?: number;
+    conditionStatus: string;
+    symptoms?: string[];
+  }): Promise<any> {
+    return this.triggerWorkflow('health-record-created', {
+      ...data,
+      actions: [
+        'analyze_health_patterns',
+        'check_alert_conditions',
+        'notify_relevant_parties',
+        'update_health_dashboard',
+        'schedule_follow_up_reminders'
+      ]
+    });
+  }
+
+  /**
+   * Feed Efficiency Calculated Workflow
+   */
+  async triggerFeedEfficiencyCalculated(data: {
+    animalId: string;
+    fcr: number;
+    efficiencyScore: number;
+    studentId: string;
+  }): Promise<any> {
+    return this.triggerWorkflow('feed-efficiency-calculated', {
+      ...data,
+      actions: [
+        'analyze_efficiency_trends',
+        'compare_to_benchmarks',
+        'generate_recommendations',
+        'update_cost_tracking',
+        'notify_if_threshold_exceeded'
+      ]
+    });
+  }
+
+  /**
+   * Competency Assessed Workflow
+   */
+  async triggerCompetencyAssessed(data: {
+    assessmentId: string;
+    studentId: string;
+    standardCode: string;
+    proficiencyLevel: string;
+  }): Promise<any> {
+    return this.triggerWorkflow('competency-assessed', {
+      ...data,
+      actions: [
+        'update_competency_progress',
+        'check_graduation_requirements',
+        'identify_skill_gaps',
+        'recommend_next_activities',
+        'notify_instructor_if_needed'
+      ]
+    });
+  }
+
+  /**
+   * Daily Progress Tracking Setup
+   */
+  async setupDailyProgressTracking(data: {
+    studentId: string;
+    enableReminders: boolean;
+    reminderTime: string;
+    reminderFrequency: string;
+  }): Promise<any> {
+    return this.triggerWorkflow('setup-daily-tracking', {
+      ...data,
+      actions: [
+        'create_daily_reminder_schedule',
+        'setup_progress_monitoring',
+        'configure_notification_preferences',
+        'initialize_tracking_dashboard'
+      ]
+    });
+  }
+
+  /**
+   * Feed Efficiency Monitoring Setup
+   */
+  async setupFeedEfficiencyMonitoring(data: {
+    animalId: string;
+    enableAlerts: boolean;
+    alertThreshold: number;
+    monitoringFrequency: string;
+  }): Promise<any> {
+    return this.triggerWorkflow('setup-feed-monitoring', {
+      ...data,
+      actions: [
+        'create_monitoring_schedule',
+        'setup_alert_thresholds',
+        'configure_efficiency_dashboard',
+        'initialize_trend_analysis'
+      ]
+    });
+  }
+
+  /**
+   * Health Alert System Setup
+   */
+  async setupHealthAlerts(data: {
+    animalId: string;
+    enableEmergencyAlerts: boolean;
+    enableReminderAlerts: boolean;
+    severityThreshold: number;
+  }): Promise<any> {
+    return this.triggerWorkflow('setup-health-alerts', {
+      ...data,
+      actions: [
+        'configure_emergency_protocols',
+        'setup_reminder_schedule',
+        'create_alert_escalation_rules',
+        'initialize_health_monitoring'
+      ]
+    });
+  }
+
+  // ===== BATCH OPERATIONS =====
+
+  /**
+   * Trigger multiple workflows in sequence
+   */
+  async triggerWorkflowBatch(workflows: Array<{
+    name: string;
+    data: any;
+    delay?: number;
+  }>): Promise<any[]> {
     const results: any[] = [];
     
-    for (const action of workflow) {
+    for (const workflow of workflows) {
       try {
-        // Check conditions
-        if (!this.evaluateConditions(action.conditions, trigger.data)) {
-          continue;
+        if (workflow.delay) {
+          await new Promise(resolve => setTimeout(resolve, workflow.delay));
         }
         
-        // Execute action
-        const result = await this.executeAction(action, trigger);
-        results.push({ action: action.id, success: true, result });
-        
+        const result = await this.triggerWorkflow(workflow.name, workflow.data);
+        results.push(result);
       } catch (error) {
-        console.error(`❌ Failed to execute action ${action.id}:`, error);
-        results.push({ action: action.id, success: false, error: error.message });
+        console.error(`Batch workflow failed: ${workflow.name}`, error);
+        results.push({ error: error.message });
       }
     }
     
@@ -416,302 +392,186 @@ class N8nWorkflowService {
   }
 
   /**
-   * Execute individual workflow action
+   * Schedule a workflow to run at a specific time
    */
-  private async executeAction(action: WorkflowAction, trigger: WorkflowTrigger): Promise<any> {
-    switch (action.type) {
-      case 'notification':
-        return this.sendNotification(action, trigger);
-      
-      case 'recommendation':
-        return this.generateRecommendation(action, trigger);
-      
-      case 'data_analysis':
-        return this.performDataAnalysis(action, trigger);
-      
-      case 'report_generation':
-        return this.generateReport(action, trigger);
-      
-      case 'intervention':
-        return this.triggerIntervention(action, trigger);
-      
-      case 'api_call':
-        return this.makeAPICall(action, trigger);
-      
-      default:
-        throw new Error(`Unknown action type: ${action.type}`);
+  async scheduleWorkflow(workflowName: string, data: any, scheduleTime: Date): Promise<any> {
+    const delay = scheduleTime.getTime() - Date.now();
+    
+    if (delay <= 0) {
+      throw new Error('Schedule time must be in the future');
+    }
+
+    return this.triggerWorkflow('schedule-workflow', {
+      targetWorkflow: workflowName,
+      targetData: data,
+      scheduleTime: scheduleTime.toISOString(),
+      delay: delay
+    });
+  }
+
+  // ===== WORKFLOW MANAGEMENT =====
+
+  /**
+   * Get available workflows
+   */
+  async getWorkflows(): Promise<any[]> {
+    if (!this.config.apiKey) {
+      throw new Error('API key required for workflow management');
+    }
+
+    try {
+      const response = await fetch(`${this.config.baseUrl}/api/v1/workflows`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${this.config.apiKey}`
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error(`Get workflows failed: ${response.status} ${response.statusText}`);
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error('Get workflows failed:', error);
+      throw error;
     }
   }
 
   /**
-   * Generate feed optimization recommendations
+   * Create a new workflow
    */
-  private async generateFeedOptimization(
-    animalId: string, 
-    fcrAnalysis: FCRAnalysis
-  ): Promise<FeedOptimizationWorkflow> {
-    return {
-      animalId,
-      currentPerformance: {
-        fcr: fcrAnalysis.metrics.feedConversionRatio,
-        dailyGain: fcrAnalysis.metrics.avgDailyGain,
-        feedCost: fcrAnalysis.metrics.totalCost,
-        healthStatus: 'good' // Would integrate with health records
-      },
-      optimization: {
-        recommendedFeed: 'high_protein_grower',
-        expectedImprovement: 12,
-        costImpact: 8,
-        implementationPlan: [
-          'Gradually transition over 7-10 days',
-          'Monitor feed intake daily',
-          'Track weight changes weekly',
-          'Adjust amounts based on performance'
-        ]
-      },
-      monitoring: {
-        trackingSchedule: 'daily_intake_weekly_weights',
-        keyMetrics: ['feed_consumption', 'weight_gain', 'body_condition'],
-        alertThresholds: {
-          fcr_increase: 0.5,
-          daily_gain_decrease: 0.1,
-          feed_refusal: 0.8
+  async createWorkflow(workflowData: {
+    name: string;
+    nodes: any[];
+    connections: any[];
+    active?: boolean;
+  }): Promise<any> {
+    if (!this.config.apiKey) {
+      throw new Error('API key required for workflow creation');
+    }
+
+    try {
+      const response = await fetch(`${this.config.baseUrl}/api/v1/workflows`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${this.config.apiKey}`
+        },
+        body: JSON.stringify(workflowData)
+      });
+
+      if (!response.ok) {
+        throw new Error(`Create workflow failed: ${response.status} ${response.statusText}`);
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error('Create workflow failed:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Update workflow status (activate/deactivate)
+   */
+  async updateWorkflowStatus(workflowId: string, active: boolean): Promise<any> {
+    if (!this.config.apiKey) {
+      throw new Error('API key required for workflow management');
+    }
+
+    try {
+      const response = await fetch(`${this.config.baseUrl}/api/v1/workflows/${workflowId}/activate`, {
+        method: active ? 'POST' : 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${this.config.apiKey}`
         }
+      });
+
+      if (!response.ok) {
+        throw new Error(`Update workflow status failed: ${response.status} ${response.statusText}`);
       }
-    };
+
+      return await response.json();
+    } catch (error) {
+      console.error('Update workflow status failed:', error);
+      throw error;
+    }
   }
+
+  // ===== UTILITIES =====
 
   /**
-   * Generate educational intervention
+   * Test webhook connectivity
    */
-  private generateEducationalIntervention(
-    studentId: string,
-    trigger: string,
-    context: Record<string, any>
-  ): EducationalIntervention {
-    return {
-      id: `intervention_${Date.now()}`,
-      studentId,
-      triggerEvent: trigger,
-      interventionType: this.determineInterventionType(trigger, context),
-      content: {
-        title: this.generateInterventionTitle(trigger),
-        description: this.generateInterventionDescription(trigger, context),
-        actionItems: this.generateActionItems(trigger, context),
-        resources: this.generateResources(trigger),
-        timeline: this.generateTimeline(trigger)
-      },
-      delivery: {
-        method: 'in_app',
-        timing: 'immediate',
-        frequency: 'once'
-      },
-      effectiveness: {
-        deliveryConfirmed: false,
-        userEngagement: 0,
-        outcomeAchieved: false,
-        followUpRequired: true
-      }
-    };
-  }
-
-  // Helper methods for workflow processing
-  private shouldProcess(): boolean {
-    return this.isInitialized;
-  }
-
-  private getWorkflowId(triggerType: string): string {
-    const mapping: Record<string, string> = {
-      'fcr_calculation': 'feed_performance_alert',
-      'educational_milestone': 'educational_milestone',
-      'photo_analysis': 'photo_analysis_workflow',
-      'weight_change': 'weight_monitoring_workflow',
-      'feed_entry': 'feed_tracking_workflow'
-    };
-    
-    return mapping[triggerType] || 'default_workflow';
-  }
-
-  private evaluateConditions(conditions: WorkflowCondition[], data: Record<string, any>): boolean {
-    return conditions.every(condition => {
-      const fieldValue = data[condition.field];
+  async testWebhook(testData?: any): Promise<boolean> {
+    try {
+      const result = await this.triggerWorkflow('test-webhook', testData || {
+        test: true,
+        timestamp: new Date().toISOString()
+      });
       
-      switch (condition.operator) {
-        case 'equals':
-          return fieldValue === condition.value;
-        case 'not_equals':
-          return fieldValue !== condition.value;
-        case 'greater_than':
-          return fieldValue > condition.value;
-        case 'less_than':
-          return fieldValue < condition.value;
-        case 'contains':
-          return Array.isArray(fieldValue) && fieldValue.includes(condition.value);
-        case 'exists':
-          return fieldValue !== undefined && fieldValue !== null;
-        default:
-          return false;
-      }
-    });
-  }
-
-  private async sendNotification(action: WorkflowAction, trigger: WorkflowTrigger): Promise<any> {
-    // Implementation would integrate with notification service
-    console.log('📱 Notification sent:', action.config);
-    return { sent: true, timestamp: new Date() };
-  }
-
-  private async generateRecommendation(action: WorkflowAction, trigger: WorkflowTrigger): Promise<any> {
-    // Integration with Zep memory service for personalized recommendations
-    const guidance = await zepMemoryService.getPersonalizedGuidance({
-      userId: trigger.userId,
-      currentActivity: trigger.type,
-      recentHistory: [],
-      skillLevel: 'intermediate',
-      goals: ['feed_optimization', 'cost_efficiency'],
-      preferences: {}
-    });
-    
-    return guidance;
-  }
-
-  private async performDataAnalysis(action: WorkflowAction, trigger: WorkflowTrigger): Promise<any> {
-    // Implementation would perform specified analysis
-    console.log('📊 Data analysis performed:', action.config);
-    return { analysis: 'completed', results: {} };
-  }
-
-  private async generateReport(action: WorkflowAction, trigger: WorkflowTrigger): Promise<any> {
-    console.log('📋 Report generated:', action.config);
-    return { report: 'generated', format: action.config.format };
-  }
-
-  private async triggerIntervention(action: WorkflowAction, trigger: WorkflowTrigger): Promise<any> {
-    console.log('🎯 Intervention triggered:', action.config);
-    return { intervention: 'triggered', type: action.config.type };
-  }
-
-  private async makeAPICall(action: WorkflowAction, trigger: WorkflowTrigger): Promise<any> {
-    console.log('🔗 API call made:', action.config);
-    return { api_call: 'completed', endpoint: action.config.endpoint };
-  }
-
-  // Additional helper methods
-  private calculateOptimizationPriority(fcrAnalysis: FCRAnalysis): 'low' | 'medium' | 'high' {
-    const fcr = fcrAnalysis.metrics.feedConversionRatio;
-    if (fcr > 8.0) return 'high';
-    if (fcr > 6.5) return 'medium';
-    return 'low';
-  }
-
-  private determineInterventionType(trigger: string, context: Record<string, any>): any {
-    return 'guidance'; // Simplified for demo
-  }
-
-  private generateInterventionTitle(trigger: string): string {
-    return `Educational Guidance: ${trigger}`;
-  }
-
-  private generateInterventionDescription(trigger: string, context: Record<string, any>): string {
-    return `Based on recent activity, here's personalized guidance to help you improve.`;
-  }
-
-  private generateActionItems(trigger: string, context: Record<string, any>): string[] {
-    return ['Review current practices', 'Implement suggested changes', 'Monitor results'];
-  }
-
-  private generateResources(trigger: string): string[] {
-    return ['Best Practices Guide', 'Video Tutorials', 'Expert Consultations'];
-  }
-
-  private generateTimeline(trigger: string): string {
-    return '1-2 weeks for implementation and initial results';
-  }
-
-  private async deliverIntervention(intervention: EducationalIntervention): Promise<void> {
-    // Implementation would deliver intervention through specified method
-    console.log('📚 Intervention delivered:', intervention.id);
-  }
-
-  private scheduleInterventionMonitoring(intervention: EducationalIntervention): void {
-    // Implementation would schedule follow-up monitoring
-    console.log('⏰ Intervention monitoring scheduled:', intervention.id);
-  }
-
-  private storeWorkflowHistory(workflowId: string, trigger: WorkflowTrigger, results: any[]): void {
-    const history = this.workflowHistory.get(workflowId) || [];
-    history.push({
-      trigger,
-      results,
-      timestamp: new Date(),
-      success: results.every(r => r.success)
-    });
-    this.workflowHistory.set(workflowId, history);
-  }
-
-  // Data quality and compliance methods
-  private calculateDataCompleteness(data: any[]): number {
-    // Implementation would calculate actual completeness
-    return 95; // Placeholder
-  }
-
-  private calculateDataAccuracy(data: any[]): number {
-    return 92; // Placeholder
-  }
-
-  private calculateDataConsistency(data: any[]): number {
-    return 88; // Placeholder
-  }
-
-  private calculateDataTimeliness(data: any[]): number {
-    return 97; // Placeholder
-  }
-
-  private async validateFERPACompliance(data: any[]): Promise<boolean> {
-    // Implementation would validate FERPA compliance
-    return true;
-  }
-
-  private async validateGDPRCompliance(data: any[]): Promise<boolean> {
-    return true;
-  }
-
-  private async validateInstitutionalApproval(dataType: string): Promise<boolean> {
-    return true;
-  }
-
-  private async anonymizeData(data: any[], level: string): Promise<any[]> {
-    // Implementation would anonymize data according to specified level
-    return data;
-  }
-
-  private async aggregateData(data: any[], period: string): Promise<any[]> {
-    // Implementation would aggregate data according to period
-    return data;
-  }
-
-  private async exportResearchData(data: any[], format: string): Promise<void> {
-    // Implementation would export data in specified format
-    console.log(`📤 Research data exported in ${format} format`);
+      return result !== null;
+    } catch (error) {
+      console.error('Webhook test failed:', error);
+      return false;
+    }
   }
 
   /**
-   * Get service status for debugging
+   * Get workflow execution history
    */
-  getStatus(): {
-    initialized: boolean;
-    hasEndpoint: boolean;
-    activeWorkflows: number;
-    workflowHistory: number;
-  } {
-    return {
-      initialized: this.isInitialized,
-      hasEndpoint: this.n8nEndpoint !== null,
-      activeWorkflows: this.activeWorkflows.size,
-      workflowHistory: Array.from(this.workflowHistory.values()).reduce((sum, history) => sum + history.length, 0)
-    };
+  async getExecutionHistory(limit: number = 10, workflowId?: string): Promise<WorkflowExecution[]> {
+    if (!this.config.apiKey) {
+      throw new Error('API key required for execution history');
+    }
+
+    try {
+      const queryParams = new URLSearchParams({
+        limit: limit.toString(),
+        ...(workflowId && { workflowId })
+      });
+
+      const response = await fetch(`${this.config.baseUrl}/api/v1/executions?${queryParams}`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${this.config.apiKey}`
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error(`Get execution history failed: ${response.status} ${response.statusText}`);
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error('Get execution history failed:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Cancel a running workflow execution
+   */
+  async cancelExecution(executionId: string): Promise<boolean> {
+    if (!this.config.apiKey) {
+      throw new Error('API key required for execution cancellation');
+    }
+
+    try {
+      const response = await fetch(`${this.config.baseUrl}/api/v1/executions/${executionId}/cancel`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${this.config.apiKey}`
+        }
+      });
+
+      return response.ok;
+    } catch (error) {
+      console.error('Cancel execution failed:', error);
+      return false;
+    }
   }
 }
 
-// Export singleton instance
-export const n8nWorkflowService = new N8nWorkflowService();
+export default N8nWorkflowService;

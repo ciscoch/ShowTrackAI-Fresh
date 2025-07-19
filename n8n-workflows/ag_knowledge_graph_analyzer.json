@@ -1,0 +1,662 @@
+{
+  "name": "AG Education - Knowledge Graph Analyzer",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours",
+              "hoursInterval": 6
+            }
+          ]
+        }
+      },
+      "id": "schedule-trigger",
+      "name": "Schedule: Every 6 Hours",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1,
+      "position": [
+        240,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "users",
+        "returnAll": false,
+        "limit": 100,
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "role",
+              "condition": "equals",
+              "keyValue": "student"
+            },
+            {
+              "keyName": "last_activity",
+              "condition": "dateAfter",
+              "keyValue": "={{ new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString() }}"
+            }
+          ]
+        },
+        "sort": {
+          "sortRules": [
+            {
+              "keyName": "last_activity",
+              "order": "descending"
+            }
+          ]
+        }
+      },
+      "id": "get-active-students",
+      "name": "Get Active Students",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        460,
+        300
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "id": "{{ $env.SUPABASE_CREDENTIAL_ID }}",
+          "name": "Supabase Agricultural Education"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "batchSize": 5,
+        "options": {}
+      },
+      "id": "split-batches",
+      "name": "Process in Batches",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        680,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "requestMethod": "GET",
+        "url": "={{ $env.ZEP_API_URL }}/api/v1/graph/search",
+        "authentication": "headerAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer {{ $env.ZEP_API_KEY }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "entity_id",
+              "value": "student_{{ $json.id }}"
+            },
+            {
+              "name": "relationship_types",
+              "value": "PARTICIPATED_IN,DEMONSTRATES,LEARNS_ABOUT,MANAGES,CARES_FOR"
+            },
+            {
+              "name": "depth",
+              "value": "3"
+            },
+            {
+              "name": "limit",
+              "value": "200"
+            }
+          ]
+        }
+      },
+      "id": "get-knowledge-graph",
+      "name": "Get Student Knowledge Graph",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        900,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "student_competencies",
+        "returnAll": true,
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "student_id",
+              "condition": "equals",
+              "keyValue": "={{ $json.id }}"
+            }
+          ]
+        }
+      },
+      "id": "get-competency-data",
+      "name": "Get Competency Progress",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        900,
+        420
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "id": "{{ $env.SUPABASE_CREDENTIAL_ID }}",
+          "name": "Supabase Agricultural Education"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "educational_activities",
+        "returnAll": false,
+        "limit": 50,
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "student_id",
+              "condition": "equals",
+              "keyValue": "={{ $json.id }}"
+            },
+            {
+              "keyName": "timestamp",
+              "condition": "dateAfter",
+              "keyValue": "={{ new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString() }}"
+            }
+          ]
+        },
+        "sort": {
+          "sortRules": [
+            {
+              "keyName": "timestamp",
+              "order": "descending"
+            }
+          ]
+        }
+      },
+      "id": "get-recent-activities",
+      "name": "Get Recent Activities",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        900,
+        540
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "id": "{{ $env.SUPABASE_CREDENTIAL_ID }}",
+          "name": "Supabase Agricultural Education"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "functionCode": "// Agricultural Education Knowledge Graph Analysis Engine\n// Analyzes student learning patterns and generates actionable insights\n\nconst student = $input.first().json;\nconst knowledgeGraph = $input.all()[1].json;\nconst competencyData = $input.all()[2].json || [];\nconst recentActivities = $input.all()[3].json || [];\n\n// Core analysis functions\nconst analysis = {\n  student_id: student.id,\n  analysis_timestamp: new Date().toISOString(),\n  competency_analysis: analyzeCompetencyProgression(),\n  learning_patterns: analyzeLearningPatterns(),\n  skill_gaps: identifySkillGaps(),\n  peer_comparisons: generatePeerComparisons(),\n  recommendations: generateRecommendations()\n};\n\nfunction analyzeCompetencyProgression() {\n  const competencies = {};\n  const ffaStandards = ['AS.07.01', 'AS.07.02', 'AS.07.03', 'AS.07.04'];\n  \n  // Initialize all FFA standards\n  ffaStandards.forEach(standard => {\n    competencies[standard] = {\n      demonstrations: 0,\n      average_quality: 0,\n      last_demonstration: null,\n      progression_trend: 'no_data',\n      mastery_level: 'novice',\n      consistency_score: 0\n    };\n  });\n  \n  // Process competency data\n  competencyData.forEach(comp => {\n    if (competencies[comp.competency]) {\n      competencies[comp.competency] = {\n        demonstrations: comp.demonstrations || 0,\n        average_quality: calculateAverageQuality(comp.quality_scores),\n        last_demonstration: comp.last_demonstration,\n        progression_trend: calculateProgressionTrend(comp.quality_scores),\n        mastery_level: determineMasteryLevel(comp),\n        consistency_score: calculateConsistency(comp.quality_scores)\n      };\n    }\n  });\n  \n  // Analyze knowledge graph relationships\n  if (knowledgeGraph.relationships) {\n    knowledgeGraph.relationships\n      .filter(rel => rel.type === 'PARTICIPATED_IN' && rel.properties.competency)\n      .forEach(rel => {\n        const competency = rel.properties.competency;\n        if (competencies[competency]) {\n          competencies[competency].graph_connections = (competencies[competency].graph_connections || 0) + 1;\n        }\n      });\n  }\n  \n  return competencies;\n}\n\nfunction analyzeLearningPatterns() {\n  const patterns = {\n    learning_frequency: calculateLearningFrequency(),\n    preferred_activities: identifyPreferredActivities(),\n    time_patterns: analyzeTimePatterns(),\n    concept_mastery_rate: calculateConceptMasteryRate(),\n    supervision_dependency: analyzSupervisionDependency()\n  };\n  \n  return patterns;\n}\n\nfunction identifySkillGaps() {\n  const gaps = [];\n  const expectedLevels = {\n    'AS.07.01': { min_demonstrations: 5, target_level: 'proficient' },\n    'AS.07.02': { min_demonstrations: 4, target_level: 'proficient' },\n    'AS.07.03': { min_demonstrations: 3, target_level: 'developing' },\n    'AS.07.04': { min_demonstrations: 3, target_level: 'developing' }\n  };\n  \n  Object.entries(expectedLevels).forEach(([competency, expected]) => {\n    const current = analysis.competency_analysis[competency];\n    \n    if (current.demonstrations < expected.min_demonstrations) {\n      gaps.push({\n        competency: competency,\n        gap_type: 'demonstration_count',\n        current_demonstrations: current.demonstrations,\n        needed_demonstrations: expected.min_demonstrations - current.demonstrations,\n        priority: calculateGapPriority(competency, 'demonstration_count'),\n        recommended_activities: getRecommendedActivities(competency)\n      });\n    }\n    \n    if (current.average_quality < 70 && current.demonstrations > 0) {\n      gaps.push({\n        competency: competency,\n        gap_type: 'quality_improvement',\n        current_quality: current.average_quality,\n        target_quality: 80,\n        priority: calculateGapPriority(competency, 'quality_improvement'),\n        improvement_suggestions: getQualityImprovementSuggestions(competency)\n      });\n    }\n  });\n  \n  return gaps;\n}\n\nfunction generatePeerComparisons() {\n  // Note: In production, this would compare with anonymized peer data\n  return {\n    competency_percentile: calculateCompetencyPercentile(),\n    activity_frequency_percentile: calculateActivityPercentile(),\n    quality_percentile: calculateQualityPercentile(),\n    areas_above_peers: identifyStrengthAreas(),\n    areas_below_peers: identifyImprovementAreas()\n  };\n}\n\nfunction generateRecommendations() {\n  const recommendations = [];\n  \n  // Skill gap recommendations\n  analysis.skill_gaps.forEach(gap => {\n    recommendations.push({\n      type: 'skill_development',\n      title: `Improve ${gap.competency} ${gap.gap_type.replace('_', ' ')}`,\n      description: generateGapDescription(gap),\n      priority: gap.priority,\n      action_items: gap.recommended_activities || gap.improvement_suggestions || [],\n      estimated_time: estimateTimeToImprove(gap),\n      resources: getRecommendedResources(gap.competency)\n    });\n  });\n  \n  // Learning pattern recommendations\n  if (analysis.learning_patterns.learning_frequency < 0.5) {\n    recommendations.push({\n      type: 'engagement_improvement',\n      title: 'Increase Learning Activity Frequency',\n      description: 'Your learning activity frequency is below optimal levels. Consider setting daily or weekly learning goals.',\n      priority: 'medium',\n      action_items: [\n        'Set up daily learning reminders',\n        'Schedule regular animal health checks',\n        'Join study groups with peers'\n      ]\n    });\n  }\n  \n  // Knowledge graph insights\n  const missingConnections = findMissingKnowledgeConnections();\n  missingConnections.forEach(connection => {\n    recommendations.push({\n      type: 'knowledge_connection',\n      title: `Explore: ${connection.concept_a} → ${connection.concept_b}`,\n      description: `Understanding the relationship between ${connection.concept_a} and ${connection.concept_b} will strengthen your agricultural knowledge.`,\n      priority: 'low',\n      educational_value: connection.value,\n      suggested_activities: connection.activities\n    });\n  });\n  \n  // Sort by priority\n  return recommendations.sort((a, b) => {\n    const priorityOrder = { 'high': 3, 'medium': 2, 'low': 1 };\n    return priorityOrder[b.priority] - priorityOrder[a.priority];\n  });\n}\n\n// Helper functions\nfunction calculateAverageQuality(scores) {\n  if (!scores || scores.length === 0) return 0;\n  const parsedScores = Array.isArray(scores) ? scores : JSON.parse(scores || '[]');\n  return parsedScores.reduce((sum, score) => sum + score, 0) / parsedScores.length;\n}\n\nfunction calculateProgressionTrend(scores) {\n  if (!scores || scores.length < 2) return 'insufficient_data';\n  const parsedScores = Array.isArray(scores) ? scores : JSON.parse(scores || '[]');\n  const recent = parsedScores.slice(-3);\n  const earlier = parsedScores.slice(-6, -3);\n  \n  if (recent.length === 0 || earlier.length === 0) return 'insufficient_data';\n  \n  const recentAvg = recent.reduce((sum, score) => sum + score, 0) / recent.length;\n  const earlierAvg = earlier.reduce((sum, score) => sum + score, 0) / earlier.length;\n  \n  if (recentAvg > earlierAvg + 5) return 'improving';\n  if (recentAvg < earlierAvg - 5) return 'declining';\n  return 'stable';\n}\n\nfunction determineMasteryLevel(competency) {\n  const demos = competency.demonstrations || 0;\n  const quality = calculateAverageQuality(competency.quality_scores);\n  \n  if (demos >= 8 && quality >= 85) return 'advanced';\n  if (demos >= 5 && quality >= 75) return 'proficient';\n  if (demos >= 3 && quality >= 60) return 'developing';\n  return 'novice';\n}\n\nfunction calculateConsistency(scores) {\n  if (!scores || scores.length < 2) return 0;\n  const parsedScores = Array.isArray(scores) ? scores : JSON.parse(scores || '[]');\n  const mean = parsedScores.reduce((sum, score) => sum + score, 0) / parsedScores.length;\n  const variance = parsedScores.reduce((sum, score) => sum + Math.pow(score - mean, 2), 0) / parsedScores.length;\n  const stdDev = Math.sqrt(variance);\n  return Math.max(0, 100 - stdDev); // Higher consistency = lower standard deviation\n}\n\nfunction calculateLearningFrequency() {\n  const days = 30;\n  const activitiesInPeriod = recentActivities.length;\n  return activitiesInPeriod / days; // Activities per day\n}\n\nfunction identifyPreferredActivities() {\n  const activityCounts = {};\n  recentActivities.forEach(activity => {\n    activityCounts[activity.activity_type] = (activityCounts[activity.activity_type] || 0) + 1;\n  });\n  \n  return Object.entries(activityCounts)\n    .sort(([,a], [,b]) => b - a)\n    .slice(0, 3)\n    .map(([type, count]) => ({ type, count, percentage: (count / recentActivities.length) * 100 }));\n}\n\nfunction analyzeTimePatterns() {\n  const hourCounts = {};\n  recentActivities.forEach(activity => {\n    const hour = new Date(activity.timestamp).getHours();\n    hourCounts[hour] = (hourCounts[hour] || 0) + 1;\n  });\n  \n  const peakHour = Object.entries(hourCounts)\n    .sort(([,a], [,b]) => b - a)[0];\n  \n  return {\n    peak_learning_hour: peakHour ? parseInt(peakHour[0]) : null,\n    learning_distribution: hourCounts,\n    consistency: calculateTimeConsistency(hourCounts)\n  };\n}\n\nfunction calculateConceptMasteryRate() {\n  const conceptCounts = {};\n  recentActivities.forEach(activity => {\n    try {\n      const concepts = JSON.parse(activity.concepts_covered || '[]');\n      concepts.forEach(concept => {\n        conceptCounts[concept] = (conceptCounts[concept] || 0) + 1;\n      });\n    } catch (e) {\n      // Skip invalid JSON\n    }\n  });\n  \n  return Object.keys(conceptCounts).length / 30; // New concepts per day\n}\n\nfunction analyzSupervisionDependency() {\n  const supervisedCount = recentActivities.filter(activity => activity.supervisor).length;\n  return supervisedCount / recentActivities.length; // Percentage of supervised activities\n}\n\nfunction calculateGapPriority(competency, gapType) {\n  const competencyPriority = {\n    'AS.07.01': 'high',    // Health management is critical\n    'AS.07.02': 'high',   // Disease prevention is critical\n    'AS.07.03': 'medium', // Treatment protocols\n    'AS.07.04': 'medium'  // Health procedures\n  };\n  \n  return competencyPriority[competency] || 'low';\n}\n\nfunction getRecommendedActivities(competency) {\n  const activities = {\n    'AS.07.01': [\n      'Perform daily health checks on assigned animals',\n      'Practice body condition scoring',\n      'Create health management protocols',\n      'Shadow veterinarian during farm visits'\n    ],\n    'AS.07.02': [\n      'Design biosecurity protocols',\n      'Create vaccination schedules',\n      'Study disease transmission pathways',\n      'Implement quarantine procedures'\n    ],\n    'AS.07.03': [\n      'Practice treatment administration under supervision',\n      'Develop treatment decision trees',\n      'Study common agricultural animal diseases',\n      'Practice diagnostic techniques'\n    ],\n    'AS.07.04': [\n      'Practice animal restraint techniques',\n      'Learn to use veterinary instruments',\n      'Document health procedures thoroughly',\n      'Practice injection techniques on models'\n    ]\n  };\n  \n  return activities[competency] || ['Consult with instructor for specific activities'];\n}\n\nfunction getQualityImprovementSuggestions(competency) {\n  return [\n    'Include more detailed observations in records',\n    'Explain reasoning behind decisions',\n    'Use proper agricultural terminology',\n    'Seek feedback from instructors or veterinarians',\n    'Practice procedures multiple times for consistency'\n  ];\n}\n\nfunction findMissingKnowledgeConnections() {\n  // Simplified version - in production would use more sophisticated graph analysis\n  return [\n    {\n      concept_a: 'animal_nutrition',\n      concept_b: 'disease_prevention',\n      value: 85,\n      activities: ['Study nutritional impacts on immune system']\n    },\n    {\n      concept_a: 'biosecurity',\n      concept_b: 'herd_management',\n      value: 80,\n      activities: ['Design facility layouts with biosecurity in mind']\n    }\n  ];\n}\n\nfunction generateGapDescription(gap) {\n  if (gap.gap_type === 'demonstration_count') {\n    return `You need ${gap.needed_demonstrations} more practice sessions with ${gap.competency} to reach proficiency level.`;\n  } else if (gap.gap_type === 'quality_improvement') {\n    return `Your current quality score for ${gap.competency} is ${Math.round(gap.current_quality)}%. Focus on detailed observations and proper documentation to reach the target of ${gap.target_quality}%.`;\n  }\n  return 'Skill development needed in this area.';\n}\n\nfunction estimateTimeToImprove(gap) {\n  if (gap.gap_type === 'demonstration_count') {\n    return `${gap.needed_demonstrations * 2} weeks with regular practice`;\n  }\n  return '2-4 weeks with focused effort';\n}\n\nfunction getRecommendedResources(competency) {\n  return [\n    'FFA Agricultural Education Curriculum Guide',\n    'NCBI Animal Health Resources',\n    'Veterinary Extension Programs',\n    'Agricultural Education Online Modules'\n  ];\n}\n\nfunction calculateTimeConsistency(hourCounts) {\n  const hours = Object.keys(hourCounts).length;\n  const maxHours = 24;\n  return (hours / maxHours) * 100; // Percentage of hours with activity\n}\n\nfunction calculateCompetencyPercentile() {\n  // Placeholder - would use actual peer data in production\n  return Math.floor(Math.random() * 40) + 30; // 30-70th percentile\n}\n\nfunction calculateActivityPercentile() {\n  // Placeholder - would use actual peer data in production\n  return Math.floor(Math.random() * 40) + 30;\n}\n\nfunction calculateQualityPercentile() {\n  // Placeholder - would use actual peer data in production\n  return Math.floor(Math.random() * 40) + 30;\n}\n\nfunction identifyStrengthAreas() {\n  return ['animal_observation', 'record_keeping'];\n}\n\nfunction identifyImprovementAreas() {\n  return ['treatment_protocols', 'diagnostic_skills'];\n}\n\nreturn analysis;"
+      },
+      "id": "analyze-knowledge-graph",
+      "name": "Analyze Knowledge Graph",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        1120,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "upsert",
+        "tableId": "learning_analytics",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "student_id",
+              "fieldValue": "={{ $json.student_id }}"
+            },
+            {
+              "fieldId": "analysis_timestamp",
+              "fieldValue": "={{ $json.analysis_timestamp }}"
+            },
+            {
+              "fieldId": "competency_analysis",
+              "fieldValue": "={{ JSON.stringify($json.competency_analysis) }}"
+            },
+            {
+              "fieldId": "learning_patterns",
+              "fieldValue": "={{ JSON.stringify($json.learning_patterns) }}"
+            },
+            {
+              "fieldId": "skill_gaps",
+              "fieldValue": "={{ JSON.stringify($json.skill_gaps) }}"
+            },
+            {
+              "fieldId": "peer_comparisons",
+              "fieldValue": "={{ JSON.stringify($json.peer_comparisons) }}"
+            },
+            {
+              "fieldId": "recommendations",
+              "fieldValue": "={{ JSON.stringify($json.recommendations) }}"
+            }
+          ]
+        }
+      },
+      "id": "store-analytics",
+      "name": "Store Learning Analytics",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        1340,
+        300
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "id": "{{ $env.SUPABASE_CREDENTIAL_ID }}",
+          "name": "Supabase Agricultural Education"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "has-high-priority-gaps",
+              "leftValue": "={{ $json.skill_gaps.filter(gap => gap.priority === 'high').length }}",
+              "rightValue": "0",
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "check-priority-gaps",
+      "name": "Has High Priority Gaps?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        1560,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "batchSize": 1,
+        "options": {}
+      },
+      "id": "split-recommendations",
+      "name": "Split Recommendations",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        1780,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "create",
+        "tableId": "student_recommendations",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "student_id",
+              "fieldValue": "={{ $('Analyze Knowledge Graph').first().json.student_id }}"
+            },
+            {
+              "fieldId": "recommendation_type",
+              "fieldValue": "={{ $json.type }}"
+            },
+            {
+              "fieldId": "title",
+              "fieldValue": "={{ $json.title }}"
+            },
+            {
+              "fieldId": "description",
+              "fieldValue": "={{ $json.description }}"
+            },
+            {
+              "fieldId": "priority",
+              "fieldValue": "={{ $json.priority }}"
+            },
+            {
+              "fieldId": "metadata",
+              "fieldValue": "={{ JSON.stringify($json) }}"
+            },
+            {
+              "fieldId": "status",
+              "fieldValue": "active"
+            },
+            {
+              "fieldId": "expires_at",
+              "fieldValue": "={{ new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString() }}"
+            }
+          ]
+        }
+      },
+      "id": "create-recommendations",
+      "name": "Create Recommendations",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        2000,
+        200
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "id": "{{ $env.SUPABASE_CREDENTIAL_ID }}",
+          "name": "Supabase Agricultural Education"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "create",
+        "tableId": "notifications",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "user_id",
+              "fieldValue": "={{ $('Analyze Knowledge Graph').first().json.student_id }}"
+            },
+            {
+              "fieldId": "type",
+              "fieldValue": "skill_gap_alert"
+            },
+            {
+              "fieldId": "title",
+              "fieldValue": "High Priority Learning Gaps Detected"
+            },
+            {
+              "fieldId": "message",
+              "fieldValue": "{{ $('Analyze Knowledge Graph').first().json.skill_gaps.filter(gap => gap.priority === 'high')[0].competency }} requires immediate attention. Check your recommendations for improvement strategies."
+            },
+            {
+              "fieldId": "data",
+              "fieldValue": "={{ JSON.stringify($('Analyze Knowledge Graph').first().json.skill_gaps.filter(gap => gap.priority === 'high')) }}"
+            },
+            {
+              "fieldId": "priority",
+              "fieldValue": "high"
+            }
+          ]
+        }
+      },
+      "id": "create-alert-notification",
+      "name": "Create Alert Notification",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        1780,
+        400
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "id": "{{ $env.SUPABASE_CREDENTIAL_ID }}",
+          "name": "Supabase Agricultural Education"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "learning-frequency-low",
+              "leftValue": "={{ $('Analyze Knowledge Graph').first().json.learning_patterns.learning_frequency }}",
+              "rightValue": "0.3",
+              "operator": {
+                "type": "number",
+                "operation": "lt"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "check-engagement",
+      "name": "Low Engagement?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        1560,
+        480
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "create",
+        "tableId": "notifications",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "user_id",
+              "fieldValue": "={{ $('Analyze Knowledge Graph').first().json.student_id }}"
+            },
+            {
+              "fieldId": "type",
+              "fieldValue": "engagement_reminder"
+            },
+            {
+              "fieldId": "title",
+              "fieldValue": "Learning Activity Reminder"
+            },
+            {
+              "fieldId": "message",
+              "fieldValue": "Your learning activity has been lower than usual. Consider scheduling some animal health checks or journal entries to stay on track with your agricultural education goals."
+            },
+            {
+              "fieldId": "data",
+              "fieldValue": "={{ JSON.stringify({ learning_frequency: $('Analyze Knowledge Graph').first().json.learning_patterns.learning_frequency, target_frequency: 0.5 }) }}"
+            },
+            {
+              "fieldId": "priority",
+              "fieldValue": "medium"
+            }
+          ]
+        }
+      },
+      "id": "create-engagement-reminder",
+      "name": "Create Engagement Reminder",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        1780,
+        560
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "id": "{{ $env.SUPABASE_CREDENTIAL_ID }}",
+          "name": "Supabase Agricultural Education"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Schedule: Every 6 Hours": {
+      "main": [
+        [
+          {
+            "node": "Get Active Students",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Active Students": {
+      "main": [
+        [
+          {
+            "node": "Process in Batches",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Process in Batches": {
+      "main": [
+        [
+          {
+            "node": "Get Student Knowledge Graph",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Get Competency Progress",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Get Recent Activities",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Student Knowledge Graph": {
+      "main": [
+        [
+          {
+            "node": "Analyze Knowledge Graph",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Competency Progress": {
+      "main": [
+        [
+          {
+            "node": "Analyze Knowledge Graph",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Recent Activities": {
+      "main": [
+        [
+          {
+            "node": "Analyze Knowledge Graph",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Analyze Knowledge Graph": {
+      "main": [
+        [
+          {
+            "node": "Store Learning Analytics",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Store Learning Analytics": {
+      "main": [
+        [
+          {
+            "node": "Has High Priority Gaps?",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Low Engagement?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has High Priority Gaps?": {
+      "main": [
+        [
+          {
+            "node": "Split Recommendations",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Create Alert Notification",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "Split Recommendations": {
+      "main": [
+        [
+          {
+            "node": "Create Recommendations",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Low Engagement?": {
+      "main": [
+        [
+          {
+            "node": "Create Engagement Reminder",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    }
+  },
+  "createdAt": "2024-01-15T10:30:00.000Z",
+  "updatedAt": "2024-01-15T10:30:00.000Z",
+  "settings": {
+    "timezone": "America/Chicago",
+    "saveExecutionProgress": true,
+    "saveManualExecutions": true
+  },
+  "staticData": {},
+  "tags": [
+    "agricultural-education",
+    "knowledge-graph",
+    "learning-analytics",
+    "competency-tracking"
+  ],
+  "triggerCount": 1,
+  "versionId": "1"
+}

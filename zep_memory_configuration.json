@@ -1,0 +1,10 @@
+{
+  "name": "Configure Zep Memory Settings",
+  "parameters": {
+    "functionCode": "// Configure Zep Memory Settings via API\n// This runs once to set up your Zep project for agricultural education\n\nconst zepConfig = {\n  api_url: $env.ZEP_API_URL,\n  api_key: $env.ZEP_API_KEY,\n  project_uuid: $env.ZEP_PROJECT_UUID\n};\n\n// Memory configuration settings\nconst memorySettings = {\n  memory_window_days: 90,\n  session_timeout_hours: 24,\n  auto_summarize: true,\n  enable_entity_extraction: true,\n  enable_relationship_extraction: true,\n  \n  // Agricultural education specific settings\n  custom_entities: [\n    {\n      name: 'agricultural_concept',\n      description: 'Agricultural education concepts and skills',\n      examples: ['animal health', 'nutrition management', 'breeding protocols']\n    },\n    {\n      name: 'ffa_competency',\n      description: 'FFA competency standards',\n      examples: ['AS.07.01', 'AS.07.02', 'AS.07.03', 'AS.07.04']\n    },\n    {\n      name: 'animal_species',\n      description: 'Livestock species',\n      examples: ['cattle', 'sheep', 'swine', 'goats', 'poultry']\n    },\n    {\n      name: 'learning_activity',\n      description: 'Educational activities',\n      examples: ['health check', 'journal entry', 'competency assessment']\n    }\n  ],\n  \n  relationship_types: [\n    'demonstrates_competency',\n    'involves_animal',\n    'builds_upon',\n    'requires_prerequisite',\n    'leads_to_skill'\n  ]\n};\n\n// Session ID pattern for agricultural education\nconst sessionIdPattern = 'student_{student_id}_{date}';\n\nreturn {\n  message: 'Zep memory configuration prepared for agricultural education',\n  settings: memorySettings,\n  session_pattern: sessionIdPattern,\n  configured_for: 'ShowTrackAI Agricultural Education Platform'\n};"
+  },
+  "id": "configure-zep-memory",
+  "name": "Configure Zep Memory",
+  "type": "n8n-nodes-base.function",
+  "typeVersion": 1
+}

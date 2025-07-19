@@ -198,11 +198,21 @@ export class AgriculturalEducationService {
       });
 
       // Trigger N8N workflow for new student onboarding
-      await this.n8nWorkflowService.triggerWorkflow('student-onboarding', {
+      await this.n8nWorkflowService.triggerStudentOnboarding({
         studentId: data.id,
         studentName: data.full_name,
-        organizationId: data.organization_id
+        organizationId: data.organization_id,
+        gradeLevel: data.grade_level,
+        ffaChapter: data.ffa_chapter
       });
+      
+      // Trigger knowledge graph analysis for new student
+      setTimeout(async () => {
+        await this.n8nWorkflowService.triggerKnowledgeGraphAnalysis(data.id, {
+          force_analysis: true,
+          include_recommendations: true
+        });
+      }, 5000); // Delay to allow initial setup
 
       return data;
     } catch (error) {
@@ -274,12 +284,24 @@ export class AgriculturalEducationService {
         }
       });
 
-      // Trigger N8N workflow for project setup
-      await this.n8nWorkflowService.triggerWorkflow('sae-project-created', {
+      // Trigger N8N workflow for SAE project creation
+      await this.n8nWorkflowService.triggerSAEProjectCreated({
         projectId: data.id,
         studentId: data.user_id,
         projectType: data.project_type,
-        category: data.category
+        category: data.category,
+        supervisorId: projectData.supervisorId
+      });
+      
+      // Generate initial recommendations for the new project
+      await this.n8nWorkflowService.generateRecommendations({
+        student_id: data.user_id,
+        trigger: 'completion_milestone',
+        context: {
+          sae_project_id: data.id,
+          recent_activities: ['project_creation'],
+          learning_goals: [`Complete ${data.project_type} SAE project in ${data.category}`]
+        }
       });
 
       return data;
@@ -343,7 +365,18 @@ export class AgriculturalEducationService {
           );
         }
 
-        // Trigger N8N workflow for activity analysis
+        // Trigger N8N learning event processor for SAE activity
+        await this.n8nWorkflowService.processSAEActivity(
+          project.user_id,
+          activityData.detailedDescription || `SAE Activity: ${activityData.activityType}`,
+          {
+            sae_project_id: project.id,
+            competency: this.mapActivityToCompetency(activityData.activityType),
+            supervisor: activityData.supervisorId
+          }
+        );
+        
+        // Also trigger legacy workflow
         await this.n8nWorkflowService.triggerWorkflow('sae-activity-logged', {
           activityId: data.id,
           studentId: project.user_id,
@@ -421,7 +454,18 @@ export class AgriculturalEducationService {
         }
       });
 
-      // Trigger N8N workflow for health monitoring
+      // Trigger N8N workflow for health monitoring using cloud workflow
+      await this.n8nWorkflowService.processHealthCheckEvent(
+        recordData.recordedBy || 'unknown_user',
+        recordData.detailedNotes || `Health observation: ${data.observation_type}`,
+        {
+          animal_id: data.animal_id,
+          competency: 'AS.07.01', // Health management practices
+          supervisor: recordData.supervisorId
+        }
+      );
+      
+      // Also trigger legacy workflow for backward compatibility
       await this.n8nWorkflowService.triggerWorkflow('health-record-created', {
         recordId: data.id,
         animalId: data.animal_id,
@@ -496,8 +540,17 @@ export class AgriculturalEducationService {
           }
         });
 
-        // Trigger N8N workflow for feed efficiency analysis
-        await this.n8nWorkflowService.triggerWorkflow('feed-efficiency-calculated', {
+        // Trigger N8N learning event for feed efficiency analysis
+        await this.n8nWorkflowService.processLearningEvent({
+          student_id: animal.user_id,
+          event_type: 'feeding_record',
+          content: `Feed efficiency analysis: FCR ${analytics.feedConversionRatio.toFixed(2)}, Efficiency Score: ${analytics.efficiencyScore}%. Cost per lb gain: $${analytics.costPerLbGain.toFixed(2)}`,
+          animal_id: animalId,
+          competency: 'AS.06.01' // Animal nutrition and feed management
+        });
+        
+        // Also trigger legacy workflow
+        await this.n8nWorkflowService.triggerFeedEfficiencyCalculated({
           animalId: animalId,
           fcr: analytics.feedConversionRatio,
           efficiencyScore: analytics.efficiencyScore,
@@ -553,7 +606,16 @@ export class AgriculturalEducationService {
         }
       });
 
-      // Trigger N8N workflow for competency tracking
+      // Trigger N8N learning event processor for competency assessment
+      await this.n8nWorkflowService.processLearningEvent({
+        student_id: data.user_id,
+        event_type: 'competency_assessment',
+        content: `Competency Assessment: ${data.standard_code} - ${data.proficiency_level}. ${data.notes || ''}`,
+        competency: data.standard_code,
+        supervisor: assessmentData.assessorId
+      });
+      
+      // Also trigger legacy workflow
       await this.n8nWorkflowService.triggerWorkflow('competency-assessed', {
         assessmentId: data.id,
         studentId: data.user_id,
@@ -780,11 +842,17 @@ export class AgriculturalEducationService {
   // ===== WORKFLOW AUTOMATION =====
   async setupDailyProgressTracking(userId: string): Promise<void> {
     try {
-      await this.n8nWorkflowService.triggerWorkflow('setup-daily-tracking', {
+      await this.n8nWorkflowService.setupDailyProgressTracking({
         studentId: userId,
         enableReminders: true,
         reminderTime: '08:00',
         reminderFrequency: 'daily'
+      });
+      
+      // Trigger initial knowledge graph analysis
+      await this.n8nWorkflowService.triggerKnowledgeGraphAnalysis(userId, {
+        force_analysis: false,
+        include_recommendations: true
       });
     } catch (error) {
       console.error('Error setting up daily progress tracking:', error);
@@ -794,7 +862,7 @@ export class AgriculturalEducationService {
 
   async setupFeedEfficiencyMonitoring(animalId: string): Promise<void> {
     try {
-      await this.n8nWorkflowService.triggerWorkflow('setup-feed-monitoring', {
+      await this.n8nWorkflowService.setupFeedEfficiencyMonitoring({
         animalId: animalId,
         enableAlerts: true,
         alertThreshold: 7.0, // FCR threshold
@@ -808,7 +876,7 @@ export class AgriculturalEducationService {
 
   async setupHealthAlerts(animalId: string): Promise<void> {
     try {
-      await this.n8nWorkflowService.triggerWorkflow('setup-health-alerts', {
+      await this.n8nWorkflowService.setupHealthAlerts({
         animalId: animalId,
         enableEmergencyAlerts: true,
         enableReminderAlerts: true,
@@ -883,6 +951,28 @@ export class AgriculturalEducationService {
     } catch (error) {
       return false;
     }
+  }
+
+  /**
+   * Maps SAE activity types to FFA Agricultural Education competency standards
+   */
+  private mapActivityToCompetency(activityType: string): string {
+    const competencyMapping: { [key: string]: string } = {
+      'animal_health_check': 'AS.07.01', // Health management practices
+      'feeding': 'AS.06.01', // Animal nutrition and feeding
+      'breeding': 'AS.05.01', // Animal reproduction
+      'record_keeping': 'AS.01.01', // Record keeping and management
+      'facility_maintenance': 'AS.08.01', // Housing and facilities
+      'treatment_administration': 'AS.07.03', // Treatment protocols
+      'vaccination': 'AS.07.02', // Disease prevention
+      'weight_measurement': 'AS.03.01', // Animal growth and development
+      'financial_planning': 'AS.02.01', // Business management
+      'marketing': 'AS.02.02', // Marketing and sales
+      'equipment_maintenance': 'AS.08.02', // Equipment operation
+      'safety_procedures': 'AS.09.01' // Safety practices
+    };
+    
+    return competencyMapping[activityType] || 'AS.01.01'; // Default to record keeping
   }
 }
 

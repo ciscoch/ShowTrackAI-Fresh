@@ -1,0 +1,556 @@
+{
+  "name": "AG Education - AI Agent Learning Event Processor",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "learning-event",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook-trigger",
+      "name": "Learning Event Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [
+        240,
+        300
+      ],
+      "webhookId": "ag-learning-event"
+    },
+    {
+      "parameters": {
+        "functionCode": "// Agricultural Education Learning Event Processor\n// Validates and enriches learning events for AI Agent analysis\n\nconst eventData = $input.first().json.body;\n\n// Validate required fields\nif (!eventData.student_id || !eventData.event_type || !eventData.content) {\n  throw new Error('Missing required fields: student_id, event_type, content');\n}\n\n// Agricultural education event types\nconst validEventTypes = [\n  'health_check', 'journal_entry', 'competency_assessment', \n  'consultation', 'sae_activity', 'animal_observation',\n  'feeding_record', 'treatment_administration', 'vaccination',\n  'breeding_record', 'weight_measurement', 'equipment_maintenance'\n];\n\nif (!validEventTypes.includes(eventData.event_type)) {\n  throw new Error(`Invalid event type: ${eventData.event_type}`);\n}\n\n// Process and enrich the learning event for AI Agent\nconst processedEvent = {\n  student_id: eventData.student_id,\n  event_type: eventData.event_type,\n  content: eventData.content,\n  metadata: {\n    timestamp: new Date().toISOString(),\n    animal_id: eventData.animal_id || null,\n    competency: eventData.competency || null,\n    location: eventData.location || 'Farm/Laboratory',\n    supervisor: eventData.supervisor || null,\n    session_id: eventData.session_id || `student_${eventData.student_id}_${Date.now()}`,\n    grade_level: eventData.grade_level || null,\n    sae_project_id: eventData.sae_project_id || null,\n    animal_species: eventData.animal_species || 'Unknown'\n  },\n  \n  // Structured prompt for AI Agent\n  ai_agent_prompt: `Analyze this agricultural learning event for FFA competency assessment:\n\nStudent Activity: ${eventData.content}\nEvent Type: ${eventData.event_type}\nCompetency Focus: ${eventData.competency || 'General Agricultural Education'}\nAnimal Context: ${eventData.animal_species || 'Multi-species'}\nLearning Environment: ${eventData.location || 'Farm Laboratory'}\nSupervision Level: ${eventData.supervisor ? 'Supervised' : 'Independent'}\n\nAnalyze for:\n1. Agricultural concepts demonstrated\n2. FFA competency alignment (AS.07.01-AS.07.04)\n3. Learning quality assessment\n4. Knowledge connections and prerequisites\n5. Personalized recommendations\n\nRespond with structured JSON analysis.`,\n  \n  zep_payload: {\n    sessionId: eventData.session_id || `student_${eventData.student_id}_${Date.now()}`,\n    message: {\n      role: 'user',\n      content: eventData.content,\n      metadata: {\n        event_type: eventData.event_type,\n        timestamp: new Date().toISOString(),\n        competency: eventData.competency,\n        animal_id: eventData.animal_id,\n        animal_species: eventData.animal_species,\n        educational_context: 'agricultural_education',\n        ffa_program: true\n      }\n    }\n  }\n};\n\nreturn processedEvent;"
+      },
+      "id": "process-event",
+      "name": "Process & Enrich Event",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        460,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "requestMethod": "POST",
+        "url": "={{ $env.ZEP_API_URL }}/api/v1/sessions/{{ $json.zep_payload.sessionId }}/memory",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "zepApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyContentType": "json",
+        "jsonParameters": true,
+        "options": {},
+        "bodyParametersJson": "={{ JSON.stringify({ messages: [$json.zep_payload.message], summary: `Agricultural learning: ${$json.event_type} - ${$json.content.substring(0, 150)}...` }) }}"
+      },
+      "id": "retrieve-student-memory",
+      "name": "Retrieve Student Memory",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        680,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "name": "Agricultural Education AI Agent",
+        "description": "Expert AI agent for comprehensive agricultural education analysis, competency assessment, and personalized learning recommendations",
+        "instructions": "You are an expert Agricultural Education AI Agent specializing in livestock management, animal health, and FFA competency standards (AS.07.01 - AS.07.04).\n\nYour capabilities include:\n- Deep analysis of agricultural learning activities\n- FFA competency mapping and progression tracking\n- Knowledge graph construction for agricultural concepts\n- Personalized learning pathway generation\n- Quality assessment of hands-on agricultural experiences\n\nYou work with high school FFA students learning through practical experiences with cattle, sheep, swine, goats, and poultry. Always provide structured, actionable insights that advance agricultural competency development.",
+        "model": "gpt-4-turbo",
+        "temperature": 0.3,
+        "maxTokens": 2000,
+        "tools": {
+          "values": [
+            {
+              "name": "agricultural_concept_extractor",
+              "description": "Extracts and categorizes agricultural concepts from learning activities",
+              "parameters": {
+                "type": "object",
+                "properties": {
+                  "concepts": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "name": {"type": "string"},
+                        "category": {"type": "string", "enum": ["health", "nutrition", "reproduction", "management", "safety"]},
+                        "complexity": {"type": "string", "enum": ["basic", "intermediate", "advanced"]},
+                        "confidence": {"type": "number", "minimum": 0, "maximum": 1}
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "name": "ffa_competency_assessor",
+              "description": "Maps learning activities to FFA competency standards and assesses demonstration level",
+              "parameters": {
+                "type": "object",
+                "properties": {
+                  "competency_mapping": {
+                    "type": "object",
+                    "properties": {
+                      "primary_competency": {"type": "string"},
+                      "demonstration_level": {"type": "string", "enum": ["observation", "application", "mastery"]},
+                      "sub_competencies": {"type": "array", "items": {"type": "string"}},
+                      "progression_indicator": {"type": "string"}
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "name": "learning_quality_analyzer",
+              "description": "Assesses the quality and depth of agricultural learning experiences",
+              "parameters": {
+                "type": "object",
+                "properties": {
+                  "quality_assessment": {
+                    "type": "object",
+                    "properties": {
+                      "depth_level": {"type": "string", "enum": ["surface", "strategic", "deep"]},
+                      "practical_application": {"type": "string", "enum": ["low", "medium", "high"]},
+                      "critical_thinking": {"type": "array", "items": {"type": "string"}},
+                      "quality_score": {"type": "number", "minimum": 0, "maximum": 100}
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "name": "recommendation_generator",
+              "description": "Generates personalized learning recommendations based on analysis",
+              "parameters": {
+                "type": "object",
+                "properties": {
+                  "recommendations": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "title": {"type": "string"},
+                        "description": {"type": "string"},
+                        "priority": {"type": "string", "enum": ["high", "medium", "low"]},
+                        "competency_alignment": {"type": "string"},
+                        "time_estimate": {"type": "string"}
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          ]
+        },
+        "systemPromptTemplate": "Student Context: {{ $('Retrieve Student Memory').first().json.summary || 'New student beginning agricultural education journey' }}\n\nCurrent Analysis Request: {{ $json.ai_agent_prompt }}",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "student_activity": {"type": "string"},
+            "event_type": {"type": "string"},
+            "competency_focus": {"type": "string"},
+            "animal_context": {"type": "string"},
+            "learning_environment": {"type": "string"}
+          }
+        }
+      },
+      "id": "ai-agricultural-agent",
+      "name": "AI Agricultural Agent",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1,
+      "position": [
+        680,
+        300
+      ],
+      "credentials": {
+        "openAiApi": {
+          "id": "{{ $env.OPENAI_CREDENTIAL_ID }}",
+          "name": "OpenAI Agricultural Education"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "model": "text-embedding-ada-002",
+        "options": {}
+      },
+      "id": "openai-embeddings",
+      "name": "Generate Embeddings",
+      "type": "@n8n/n8n-nodes-langchain.embeddingsOpenAi",
+      "typeVersion": 1,
+      "position": [
+        680,
+        400
+      ],
+      "credentials": {
+        "openAiApi": {
+          "id": "{{ $env.OPENAI_CREDENTIAL_ID }}",
+          "name": "OpenAI Agricultural Education"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "memory": "zepMemory",
+        "sessionId": "={{ $('Process & Enrich Event').first().json.zep_payload.sessionId }}",
+        "apiUrl": "={{ $env.ZEP_API_URL }}",
+        "apiKey": "={{ $env.ZEP_API_KEY }}"
+      },
+      "id": "zep-memory",
+      "name": "Zep Memory",
+      "type": "@n8n/n8n-nodes-langchain.memoryZep",
+      "typeVersion": 1,
+      "position": [
+        680,
+        500
+      ]
+    },
+    {
+      "parameters": {
+        "functionCode": "// Process AI Agent Results and Create Enhanced Data Structure\n\nconst originalEvent = $('Process & Enrich Event').first().json;\nconst agentResponse = $input.first().json;\n\n// Parse AI Agent response and tool calls\nlet agentAnalysis;\ntry {\n  agentAnalysis = {\n    main_response: agentResponse.text || agentResponse.output || '',\n    tool_results: agentResponse.toolCalls || [],\n    reasoning: agentResponse.reasoning || '',\n    confidence: agentResponse.confidence || 0.85\n  };\n} catch (error) {\n  console.log('AI Agent response parsing failed, using fallback');\n  agentAnalysis = {\n    main_response: 'Analysis completed with basic assessment',\n    tool_results: [],\n    reasoning: 'Fallback analysis applied',\n    confidence: 0.7\n  };\n}\n\n// Extract structured data from tool calls\nconst extractedConcepts = extractToolResult(agentAnalysis.tool_results, 'agricultural_concept_extractor');\nconst competencyAssessment = extractToolResult(agentAnalysis.tool_results, 'ffa_competency_assessor');\nconst qualityAnalysis = extractToolResult(agentAnalysis.tool_results, 'learning_quality_analyzer');\nconst recommendations = extractToolResult(agentAnalysis.tool_results, 'recommendation_generator');\n\n// Enhanced event data with AI Agent insights\nconst enhancedEvent = {\n  ...originalEvent,\n  ai_agent_analysis: {\n    main_response: agentAnalysis.main_response,\n    reasoning: agentAnalysis.reasoning,\n    confidence_score: agentAnalysis.confidence,\n    analysis_timestamp: new Date().toISOString(),\n    model_used: 'gpt-4-turbo-agent',\n    tools_utilized: agentAnalysis.tool_results.map(t => t.toolName || t.name)\n  },\n  \n  // Structured concept extraction\n  processed_concepts: extractedConcepts?.concepts || extractFallbackConcepts(originalEvent.content),\n  \n  // Enhanced competency mapping\n  competency_mapping: {\n    ...competencyAssessment?.competency_mapping,\n    ai_enhanced: true,\n    assessment_confidence: agentAnalysis.confidence\n  },\n  \n  // Quality assessment\n  learning_assessment: {\n    ...qualityAnalysis?.quality_assessment,\n    agent_reasoning: agentAnalysis.reasoning,\n    assessment_factors: getQualityFactors(qualityAnalysis, originalEvent)\n  },\n  \n  // AI-generated recommendations\n  ai_recommendations: recommendations?.recommendations || generateFallbackRecommendations(originalEvent)\n};\n\n// Helper functions\nfunction extractToolResult(toolResults, toolName) {\n  const tool = toolResults.find(t => (t.toolName || t.name) === toolName);\n  return tool ? (tool.result || tool.output) : null;\n}\n\nfunction extractFallbackConcepts(content) {\n  const concepts = [];\n  const lowerContent = content.toLowerCase();\n  \n  // Basic concept extraction\n  const conceptMap = {\n    health: ['health', 'disease', 'symptoms', 'treatment', 'vaccination', 'medicine'],\n    nutrition: ['feed', 'nutrition', 'diet', 'supplement', 'weight', 'growth'],\n    management: ['management', 'housing', 'facility', 'record', 'breeding'],\n    safety: ['safety', 'protocol', 'procedure', 'biosecurity', 'handling']\n  };\n  \n  Object.keys(conceptMap).forEach(category => {\n    conceptMap[category].forEach(term => {\n      if (lowerContent.includes(term)) {\n        concepts.push({\n          name: term,\n          category: category,\n          complexity: 'basic',\n          confidence: 0.7\n        });\n      }\n    });\n  });\n  \n  return concepts.slice(0, 8); // Limit to top 8 concepts\n}\n\nfunction getQualityFactors(qualityAnalysis, originalEvent) {\n  const factors = [];\n  \n  if (originalEvent.content.length > 200) factors.push('detailed_description');\n  if (originalEvent.metadata.supervisor) factors.push('supervised_activity');\n  if (qualityAnalysis?.quality_assessment?.practical_application === 'high') factors.push('hands_on_application');\n  if (qualityAnalysis?.quality_assessment?.critical_thinking?.length > 0) factors.push('critical_thinking');\n  \n  return factors;\n}\n\nfunction generateFallbackRecommendations(originalEvent) {\n  return [\n    {\n      title: 'Continue Skill Development',\n      description: `Based on your ${originalEvent.event_type} activity, continue practicing these skills with increased complexity.`,\n      priority: 'medium',\n      competency_alignment: originalEvent.metadata.competency || 'General',\n      time_estimate: '1-2 weeks'\n    },\n    {\n      title: 'Expand Knowledge Base',\n      description: 'Explore related agricultural concepts to broaden your understanding.',\n      priority: 'low',\n      competency_alignment: 'General Agricultural Education',\n      time_estimate: '2-3 weeks'\n    }\n  ];\n}\n\nreturn enhancedEvent;"
+      },
+      "id": "process-agent-results",
+      "name": "Process AI Agent Results",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        900,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "requestMethod": "POST",
+        "url": "={{ $env.ZEP_API_URL }}/api/v1/sessions/{{ $json.zep_payload.sessionId }}/memory",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "zepApi",
+        "sendBody": true,
+        "bodyContentType": "json",
+        "jsonParameters": true,
+        "options": {},
+        "bodyParametersJson": "={{ JSON.stringify({ messages: [{ role: 'assistant', content: `AI Agent Analysis: ${$json.ai_agent_analysis.tools_utilized.join(', ')} tools used. Quality: ${$json.learning_assessment.quality_assessment?.quality_score || 'assessed'}. Concepts: ${$json.processed_concepts.map(c => c.name).join(', ')}. Confidence: ${Math.round($json.ai_agent_analysis.confidence_score * 100)}%`, metadata: { analysis_type: 'ai_agent_enhanced', tools_used: $json.ai_agent_analysis.tools_utilized, confidence: $json.ai_agent_analysis.confidence_score, timestamp: $json.ai_agent_analysis.analysis_timestamp } }] }) }}"
+      },
+      "id": "update-zep-memory",
+      "name": "Update Zep Memory",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        1120,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "create",
+        "tableId": "educational_activities",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "id",
+              "fieldValue": "={{ $json.metadata.session_id }}_{{ Date.now() }}"
+            },
+            {
+              "fieldId": "student_id",
+              "fieldValue": "={{ $json.student_id }}"
+            },
+            {
+              "fieldId": "activity_type",
+              "fieldValue": "={{ $json.event_type }}"
+            },
+            {
+              "fieldId": "content",
+              "fieldValue": "={{ $json.content }}"
+            },
+            {
+              "fieldId": "competency_addressed",
+              "fieldValue": "={{ $json.metadata.competency }}"
+            },
+            {
+              "fieldId": "concepts_covered",
+              "fieldValue": "={{ JSON.stringify($json.processed_concepts) }}"
+            },
+            {
+              "fieldId": "learning_assessment",
+              "fieldValue": "={{ JSON.stringify($json.learning_assessment) }}"
+            },
+            {
+              "fieldId": "ai_analysis",
+              "fieldValue": "={{ JSON.stringify($json.ai_agent_analysis) }}"
+            },
+            {
+              "fieldId": "ai_recommendations",
+              "fieldValue": "={{ JSON.stringify($json.ai_recommendations) }}"
+            },
+            {
+              "fieldId": "timestamp",
+              "fieldValue": "={{ $json.metadata.timestamp }}"
+            },
+            {
+              "fieldId": "animal_id",
+              "fieldValue": "={{ $json.metadata.animal_id }}"
+            },
+            {
+              "fieldId": "session_id",
+              "fieldValue": "={{ $json.zep_payload.sessionId }}"
+            }
+          ]
+        }
+      },
+      "id": "log-to-database",
+      "name": "Log to Supabase",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        1120,
+        320
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "id": "{{ $env.SUPABASE_CREDENTIAL_ID }}",
+          "name": "Supabase Agricultural Education"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "high-quality",
+              "leftValue": "={{ $json.learning_assessment.quality_assessment?.quality_score || 70 }}",
+              "rightValue": "75",
+              "operator": {
+                "type": "number",
+                "operation": "gte"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "check-quality",
+      "name": "High Quality Learning?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        1340,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "requestMethod": "POST",
+        "url": "{{ $env.N8N_WEBHOOK_BASE }}/recommendation-generator",
+        "sendBody": true,
+        "bodyContentType": "json",
+        "jsonParameters": true,
+        "options": {},
+        "bodyParametersJson": "={{ JSON.stringify({ trigger: 'high_quality_learning', student_id: $json.student_id, event_data: $json, ai_agent_insights: { tools_used: $json.ai_agent_analysis.tools_utilized, confidence: $json.ai_agent_analysis.confidence_score, reasoning: $json.ai_agent_analysis.reasoning }, timestamp: new Date().toISOString() }) }}"
+      },
+      "id": "trigger-recommendations",
+      "name": "Trigger AI Agent Recommendations",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        1560,
+        240
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ success: true, message: 'Learning event processed with AI Agent enhancement', data: { session_id: $json.zep_payload.sessionId, concepts_extracted: $json.processed_concepts.length, quality_score: $json.learning_assessment.quality_assessment?.quality_score || 75, ai_confidence: Math.round($json.ai_agent_analysis.confidence_score * 100), competency_mapped: $json.competency_mapping.primary_competency || $json.metadata.competency, tools_utilized: $json.ai_agent_analysis.tools_utilized, recommendations_count: $json.ai_recommendations.length, reasoning_provided: !!$json.ai_agent_analysis.reasoning, timestamp: new Date().toISOString() } }) }}"
+      },
+      "id": "success-response",
+      "name": "Success Response",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        1780,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ success: false, error: $json.error?.message || 'AI Agent analysis failed', timestamp: new Date().toISOString() }) }}",
+        "responseCode": 400
+      },
+      "id": "error-response",
+      "name": "Error Response",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        460,
+        480
+      ]
+    }
+  ],
+  "connections": {
+    "Learning Event Webhook": {
+      "main": [
+        [
+          {
+            "node": "Process & Enrich Event",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Process & Enrich Event": {
+      "main": [
+        [
+          {
+            "node": "Retrieve Student Memory",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "AI Agricultural Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Retrieve Student Memory": {
+      "main": [
+        [
+          {
+            "node": "AI Agricultural Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agricultural Agent": {
+      "main": [
+        [
+          {
+            "node": "Process AI Agent Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ],
+      "ai_memory": [
+        [
+          {
+            "node": "Zep Memory",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ],
+      "ai_tool": [
+        [
+          {
+            "node": "Generate Embeddings",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Process AI Agent Results": {
+      "main": [
+        [
+          {
+            "node": "Update Zep Memory",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Log to Supabase",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Zep Memory": {
+      "main": [
+        [
+          {
+            "node": "High Quality Learning?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log to Supabase": {
+      "main": [
+        [
+          {
+            "node": "High Quality Learning?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "High Quality Learning?": {
+      "main": [
+        [
+          {
+            "node": "Trigger AI Agent Recommendations",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Success Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Trigger AI Agent Recommendations": {
+      "main": [
+        [
+          {
+            "node": "Success Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "createdAt": "2024-01-15T10:00:00.000Z",
+  "updatedAt": "2024-01-15T10:00:00.000Z",
+  "settings": {
+    "timezone": "America/Chicago"
+  },
+  "staticData": {},
+  "tags": [
+    "agricultural-education",
+    "ai-agent",
+    "langchain",
+    "zep-memory",
+    "multi-tool-analysis"
+  ],
+  "triggerCount": 1,
+  "versionId": "3"
+}

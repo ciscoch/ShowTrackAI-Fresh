@@ -1,0 +1,553 @@
+{
+  "name": "AG Education - Recommendation Generator",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "recommendation-generator",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "recommendation-webhook",
+      "name": "Recommendation Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [
+        240,
+        300
+      ],
+      "webhookId": "ag-recommendation-generator"
+    },
+    {
+      "parameters": {
+        "functionCode": "// Agricultural Education Recommendation Generator\n// Processes triggers and generates personalized learning recommendations\n\nconst triggerData = $input.first().json.body;\n\n// Validate trigger data\nif (!triggerData.student_id) {\n  throw new Error('Missing required field: student_id');\n}\n\n// Process different trigger types\nconst processedTrigger = {\n  student_id: triggerData.student_id,\n  trigger_type: triggerData.trigger || 'manual',\n  timestamp: new Date().toISOString(),\n  context: {\n    event_data: triggerData.event_data || null,\n    analysis_data: triggerData.analysis_data || null,\n    competency_focus: triggerData.competency_focus || null,\n    learning_goals: triggerData.learning_goals || []\n  },\n  recommendation_categories: determineCategoriesFromTrigger(triggerData)\n};\n\nfunction determineCategoriesFromTrigger(data) {\n  const categories = ['skill_development']; // Always include skill development\n  \n  switch (data.trigger) {\n    case 'high_quality_learning':\n      categories.push('skill_advancement', 'peer_mentoring');\n      break;\n    case 'skill_gap_detected':\n      categories.push('remedial_practice', 'instructor_consultation');\n      break;\n    case 'low_engagement':\n      categories.push('engagement_activities', 'goal_setting');\n      break;\n    case 'competency_milestone':\n      categories.push('next_level_challenges', 'certification_prep');\n      break;\n    case 'peer_comparison':\n      categories.push('collaborative_learning', 'study_groups');\n      break;\n    case 'seasonal_activities':\n      categories.push('seasonal_projects', 'calendar_planning');\n      break;\n    default:\n      categories.push('general_improvement', 'assessment_preparation');\n  }\n  \n  return categories;\n}\n\nreturn processedTrigger;"
+      },
+      "id": "process-trigger",
+      "name": "Process Recommendation Trigger",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        460,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "learning_analytics",
+        "returnAll": false,
+        "limit": 1,
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "student_id",
+              "condition": "equals",
+              "keyValue": "={{ $json.student_id }}"
+            }
+          ]
+        },
+        "sort": {
+          "sortRules": [
+            {
+              "keyName": "analysis_timestamp",
+              "order": "descending"
+            }
+          ]
+        }
+      },
+      "id": "get-latest-analytics",
+      "name": "Get Latest Analytics",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        680,
+        200
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "id": "{{ $env.SUPABASE_CREDENTIAL_ID }}",
+          "name": "Supabase Agricultural Education"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "student_competencies",
+        "returnAll": true,
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "student_id",
+              "condition": "equals",
+              "keyValue": "={{ $('Process Recommendation Trigger').first().json.student_id }}"
+            }
+          ]
+        }
+      },
+      "id": "get-competency-status",
+      "name": "Get Competency Status",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        680,
+        320
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "id": "{{ $env.SUPABASE_CREDENTIAL_ID }}",
+          "name": "Supabase Agricultural Education"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "users",
+        "returnAll": false,
+        "limit": 1,
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "id",
+              "condition": "equals",
+              "keyValue": "={{ $('Process Recommendation Trigger').first().json.student_id }}"
+            }
+          ]
+        }
+      },
+      "id": "get-student-profile",
+      "name": "Get Student Profile",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        680,
+        440
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "id": "{{ $env.SUPABASE_CREDENTIAL_ID }}",
+          "name": "Supabase Agricultural Education"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "requestMethod": "GET",
+        "url": "={{ $env.ZEP_API_URL }}/api/v1/sessions/search",
+        "authentication": "headerAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer {{ $env.ZEP_API_KEY }}"
+            }
+          ]
+        },
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "user_id",
+              "value": "{{ $('Process Recommendation Trigger').first().json.student_id }}"
+            },
+            {
+              "name": "limit",
+              "value": "10"
+            }
+          ]
+        }
+      },
+      "id": "get-learning-context",
+      "name": "Get Learning Context from Zep",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        680,
+        560
+      ]
+    },
+    {
+      "parameters": {
+        "functionCode": "// Agricultural Education AI-Powered Recommendation Engine\n// Generates personalized learning recommendations using comprehensive data analysis\n\nconst triggerData = $input.first().json;\nconst analyticsData = $input.all()[1].json?.[0] || {};\nconst competencyData = $input.all()[2].json || [];\nconst studentProfile = $input.all()[3].json?.[0] || {};\nconst zepContext = $input.all()[4].json || {};\n\n// Generate comprehensive recommendations\nconst recommendationEngine = {\n  student_id: triggerData.student_id,\n  generation_timestamp: new Date().toISOString(),\n  trigger_context: triggerData,\n  recommendations: generatePersonalizedRecommendations()\n};\n\nfunction generatePersonalizedRecommendations() {\n  const recommendations = [];\n  const categories = triggerData.recommendation_categories;\n  \n  // Generate recommendations for each category\n  categories.forEach(category => {\n    switch (category) {\n      case 'skill_development':\n        recommendations.push(...generateSkillDevelopmentRecommendations());\n        break;\n      case 'skill_advancement':\n        recommendations.push(...generateSkillAdvancementRecommendations());\n        break;\n      case 'remedial_practice':\n        recommendations.push(...generateRemedialPracticeRecommendations());\n        break;\n      case 'engagement_activities':\n        recommendations.push(...generateEngagementActivities());\n        break;\n      case 'peer_mentoring':\n        recommendations.push(...generatePeerMentoringRecommendations());\n        break;\n      case 'seasonal_projects':\n        recommendations.push(...generateSeasonalProjectRecommendations());\n        break;\n      case 'next_level_challenges':\n        recommendations.push(...generateAdvancedChallenges());\n        break;\n      case 'collaborative_learning':\n        recommendations.push(...generateCollaborativeLearningRecommendations());\n        break;\n      case 'assessment_preparation':\n        recommendations.push(...generateAssessmentPrepRecommendations());\n        break;\n    }\n  });\n  \n  // Remove duplicates and prioritize\n  const uniqueRecommendations = removeDuplicates(recommendations);\n  return prioritizeRecommendations(uniqueRecommendations);\n}\n\nfunction generateSkillDevelopmentRecommendations() {\n  const recommendations = [];\n  const skillGaps = parseAnalyticsData(analyticsData.skill_gaps);\n  \n  skillGaps.forEach(gap => {\n    if (gap.priority === 'high') {\n      recommendations.push({\n        id: `skill_dev_${gap.competency}_${Date.now()}`,\n        type: 'skill_development',\n        category: 'urgent_improvement',\n        title: `Master ${getCompetencyName(gap.competency)}`,\n        description: `Focus on ${gap.competency} - you need ${gap.needed_demonstrations || 'additional'} practice sessions to reach proficiency.`,\n        priority: 'high',\n        estimated_time: '2-3 weeks',\n        action_items: generateActionItems(gap.competency),\n        success_criteria: generateSuccessCriteria(gap.competency),\n        resources: getEducationalResources(gap.competency),\n        competency_focus: gap.competency,\n        difficulty_level: 'intermediate',\n        learning_style_match: matchLearningStyle(gap.competency),\n        expires_at: new Date(Date.now() + 21 * 24 * 60 * 60 * 1000).toISOString() // 3 weeks\n      });\n    }\n  });\n  \n  return recommendations;\n}\n\nfunction generateSkillAdvancementRecommendations() {\n  const recommendations = [];\n  const strongCompetencies = getStrongCompetencies();\n  \n  strongCompetencies.forEach(competency => {\n    recommendations.push({\n      id: `skill_adv_${competency}_${Date.now()}`,\n      type: 'skill_advancement',\n      category: 'excellence_pursuit',\n      title: `Advanced ${getCompetencyName(competency)} Projects`,\n      description: `Since you've mastered basic ${competency}, try these advanced challenges to deepen your expertise.`,\n      priority: 'medium',\n      estimated_time: '4-6 weeks',\n      action_items: generateAdvancedActionItems(competency),\n      success_criteria: generateAdvancedSuccessCriteria(competency),\n      resources: getAdvancedResources(competency),\n      competency_focus: competency,\n      difficulty_level: 'advanced',\n      learning_style_match: matchLearningStyle(competency),\n      expires_at: new Date(Date.now() + 42 * 24 * 60 * 60 * 1000).toISOString() // 6 weeks\n    });\n  });\n  \n  return recommendations;\n}\n\nfunction generateRemedialPracticeRecommendations() {\n  const recommendations = [];\n  const strugglingAreas = getStrugglingAreas();\n  \n  strugglingAreas.forEach(area => {\n    recommendations.push({\n      id: `remedial_${area.competency}_${Date.now()}`,\n      type: 'remedial_practice',\n      category: 'foundational_support',\n      title: `${getCompetencyName(area.competency)} Foundation Building`,\n      description: `Let's strengthen your foundation in ${area.competency} with guided practice and supervision.`,\n      priority: 'high',\n      estimated_time: '1-2 weeks',\n      action_items: generateRemedialActionItems(area.competency),\n      success_criteria: generateBasicSuccessCriteria(area.competency),\n      resources: getFoundationalResources(area.competency),\n      competency_focus: area.competency,\n      difficulty_level: 'beginner',\n      requires_supervision: true,\n      learning_style_match: 'hands_on',\n      expires_at: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString() // 2 weeks\n    });\n  });\n  \n  return recommendations;\n}\n\nfunction generateEngagementActivities() {\n  const currentMonth = new Date().getMonth();\n  const seasonalActivities = getSeasonalActivities(currentMonth);\n  \n  return [\n    {\n      id: `engagement_seasonal_${Date.now()}`,\n      type: 'engagement_activity',\n      category: 'motivation_boost',\n      title: 'Seasonal Agricultural Activities',\n      description: `Try these engaging ${getCurrentSeason()} activities to boost your involvement in agricultural education.`,\n      priority: 'medium',\n      estimated_time: 'Ongoing',\n      action_items: seasonalActivities,\n      success_criteria: ['Complete 3 seasonal activities', 'Document observations', 'Share experiences with peers'],\n      resources: ['Seasonal Agriculture Guide', 'FFA Chapter Activity Calendar'],\n      difficulty_level: 'moderate',\n      learning_style_match: 'experiential',\n      expires_at: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString() // 3 months\n    },\n    {\n      id: `engagement_goals_${Date.now()}`,\n      type: 'goal_setting',\n      category: 'motivation_boost',\n      title: 'Set Personal Learning Goals',\n      description: 'Create specific, achievable goals for your agricultural education journey this semester.',\n      priority: 'medium',\n      estimated_time: '1 week',\n      action_items: [\n        'Identify 3 specific competencies to improve',\n        'Set timeline for each goal',\n        'Create accountability system with peers or instructors',\n        'Track progress weekly'\n      ],\n      success_criteria: ['3 SMART goals established', 'Weekly progress reviews scheduled'],\n      resources: ['Goal Setting Worksheet', 'FFA SMART Goals Guide'],\n      difficulty_level: 'easy',\n      learning_style_match: 'reflective',\n      expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString() // 1 week\n    }\n  ];\n}\n\nfunction generatePeerMentoringRecommendations() {\n  return [\n    {\n      id: `peer_mentor_${Date.now()}`,\n      type: 'peer_mentoring',\n      category: 'leadership_development',\n      title: 'Become a Peer Mentor',\n      description: 'Your strong performance makes you an excellent candidate to help fellow students. Consider mentoring in your areas of strength.',\n      priority: 'medium',\n      estimated_time: 'Ongoing',\n      action_items: [\n        'Identify students who could benefit from your expertise',\n        'Volunteer for peer tutoring sessions',\n        'Lead study groups in your strong competencies',\n        'Share successful learning strategies'\n      ],\n      success_criteria: ['Mentor at least 1 peer', 'Positive feedback from mentees', 'Leadership skills development'],\n      resources: ['Peer Mentoring Guide', 'Leadership Development Resources'],\n      difficulty_level: 'moderate',\n      learning_style_match: 'social',\n      leadership_opportunity: true,\n      expires_at: new Date(Date.now() + 60 * 24 * 60 * 60 * 1000).toISOString() // 2 months\n    }\n  ];\n}\n\nfunction generateSeasonalProjectRecommendations() {\n  const currentMonth = new Date().getMonth();\n  const seasonalProjects = getSeasonalProjects(currentMonth);\n  \n  return seasonalProjects.map(project => ({\n    id: `seasonal_${project.type}_${Date.now()}`,\n    type: 'seasonal_project',\n    category: 'practical_application',\n    title: project.title,\n    description: project.description,\n    priority: 'medium',\n    estimated_time: project.duration,\n    action_items: project.action_items,\n    success_criteria: project.success_criteria,\n    resources: project.resources,\n    competency_focus: project.competencies,\n    difficulty_level: project.difficulty,\n    seasonal_relevance: true,\n    expires_at: new Date(Date.now() + project.duration_days * 24 * 60 * 60 * 1000).toISOString()\n  }));\n}\n\nfunction generateAdvancedChallenges() {\n  return [\n    {\n      id: `advanced_challenge_${Date.now()}`,\n      type: 'advanced_challenge',\n      category: 'mastery_demonstration',\n      title: 'Agricultural Innovation Project',\n      description: 'Design and implement an innovative solution to an agricultural challenge in your community.',\n      priority: 'low',\n      estimated_time: '8-12 weeks',\n      action_items: [\n        'Identify a local agricultural challenge',\n        'Research existing solutions',\n        'Design your innovative approach',\n        'Create implementation plan',\n        'Execute pilot project',\n        'Document results and lessons learned'\n      ],\n      success_criteria: [\n        'Complete project documentation',\n        'Demonstrate measurable impact',\n        'Present findings to agricultural community',\n        'Receive feedback from industry professionals'\n      ],\n      resources: ['Innovation Project Guide', 'Agricultural Extension Office Contacts', 'Research Databases'],\n      difficulty_level: 'expert',\n      learning_style_match: 'project_based',\n      innovation_focus: true,\n      expires_at: new Date(Date.now() + 84 * 24 * 60 * 60 * 1000).toISOString() // 12 weeks\n    }\n  ];\n}\n\nfunction generateCollaborativeLearningRecommendations() {\n  return [\n    {\n      id: `collaborative_${Date.now()}`,\n      type: 'collaborative_learning',\n      category: 'peer_interaction',\n      title: 'Join Agricultural Study Groups',\n      description: 'Connect with peers to form study groups focused on agricultural competencies and share learning experiences.',\n      priority: 'medium',\n      estimated_time: 'Ongoing',\n      action_items: [\n        'Find study group partners with complementary strengths',\n        'Schedule regular group meetings',\n        'Create shared learning materials',\n        'Practice competencies together',\n        'Peer review each other\\'s work'\n      ],\n      success_criteria: [\n        'Active participation in study group',\n        'Improved understanding through peer teaching',\n        'Collaborative project completion'\n      ],\n      resources: ['Study Group Formation Guide', 'Collaborative Learning Best Practices'],\n      difficulty_level: 'moderate',\n      learning_style_match: 'collaborative',\n      social_learning: true,\n      expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString() // 1 month\n    }\n  ];\n}\n\nfunction generateAssessmentPrepRecommendations() {\n  return [\n    {\n      id: `assessment_prep_${Date.now()}`,\n      type: 'assessment_preparation',\n      category: 'evaluation_readiness',\n      title: 'Competency Assessment Preparation',\n      description: 'Prepare for upcoming competency assessments with focused review and practice sessions.',\n      priority: 'high',\n      estimated_time: '2 weeks',\n      action_items: [\n        'Review all competency standards (AS.07.01-AS.07.04)',\n        'Practice hands-on procedures',\n        'Complete mock assessments',\n        'Study with flashcards and guides',\n        'Schedule practice sessions with instructor'\n      ],\n      success_criteria: [\n        'Score 80%+ on practice assessments',\n        'Demonstrate competencies independently',\n        'Complete all review materials'\n      ],\n      resources: [\n        'FFA Competency Assessment Guides',\n        'Practice Test Materials',\n        'Video Demonstration Library'\n      ],\n      difficulty_level: 'moderate',\n      learning_style_match: 'structured',\n      assessment_focused: true,\n      expires_at: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString() // 2 weeks\n    }\n  ];\n}\n\n// Helper functions\nfunction parseAnalyticsData(data) {\n  if (!data) return [];\n  return typeof data === 'string' ? JSON.parse(data) : data;\n}\n\nfunction getCompetencyName(competency) {\n  const names = {\n    'AS.07.01': 'Animal Health Management',\n    'AS.07.02': 'Disease Prevention',\n    'AS.07.03': 'Treatment Protocols',\n    'AS.07.04': 'Health Procedures'\n  };\n  return names[competency] || competency;\n}\n\nfunction generateActionItems(competency) {\n  const actionItems = {\n    'AS.07.01': [\n      'Perform daily health checks on 3 different animals',\n      'Practice body condition scoring techniques',\n      'Create comprehensive health monitoring protocols',\n      'Shadow experienced veterinarian during farm visits'\n    ],\n    'AS.07.02': [\n      'Design facility biosecurity protocols',\n      'Create vaccination schedule for livestock operation',\n      'Study disease transmission pathways',\n      'Implement quarantine procedures for new animals'\n    ],\n    'AS.07.03': [\n      'Practice medication administration under supervision',\n      'Develop treatment decision flowcharts',\n      'Study common livestock diseases and treatments',\n      'Practice diagnostic examination techniques'\n    ],\n    'AS.07.04': [\n      'Master animal restraint techniques for different species',\n      'Practice using veterinary instruments properly',\n      'Document all health procedures thoroughly',\n      'Practice injection techniques on training models'\n    ]\n  };\n  return actionItems[competency] || ['Consult with instructor for specific activities'];\n}\n\nfunction generateSuccessCriteria(competency) {\n  return [\n    'Demonstrate competency independently 3 times',\n    'Achieve 85% accuracy on practical assessments',\n    'Receive positive feedback from instructor or veterinarian',\n    'Apply knowledge in real-world scenarios'\n  ];\n}\n\nfunction getEducationalResources(competency) {\n  return [\n    'FFA Agricultural Education Curriculum',\n    'Veterinary Extension Resources',\n    'Online Agricultural Education Modules',\n    'Industry Professional Networks'\n  ];\n}\n\nfunction matchLearningStyle(competency) {\n  // Match based on student profile if available\n  const learningStyle = studentProfile.learning_style || 'hands_on';\n  const competencyStyles = {\n    'AS.07.01': 'observational',\n    'AS.07.02': 'analytical',\n    'AS.07.03': 'problem_solving',\n    'AS.07.04': 'hands_on'\n  };\n  return competencyStyles[competency] || learningStyle;\n}\n\nfunction getStrongCompetencies() {\n  return competencyData\n    .filter(comp => comp.level === 'advanced' || comp.level === 'proficient')\n    .map(comp => comp.competency);\n}\n\nfunction getStrugglingAreas() {\n  return competencyData\n    .filter(comp => comp.level === 'novice' || (comp.demonstrations || 0) < 2)\n    .map(comp => ({ competency: comp.competency, level: comp.level }));\n}\n\nfunction getCurrentSeason() {\n  const month = new Date().getMonth();\n  if (month >= 2 && month <= 4) return 'Spring';\n  if (month >= 5 && month <= 7) return 'Summer';\n  if (month >= 8 && month <= 10) return 'Fall';\n  return 'Winter';\n}\n\nfunction getSeasonalActivities(month) {\n  const activities = {\n    0: ['Winter feeding protocols', 'Equipment maintenance', 'Planning breeding schedules'],\n    1: ['Pregnancy checking', 'Facility preparation', 'Feed quality assessment'],\n    2: ['Calving season preparation', 'Pasture planning', 'Vaccination scheduling'],\n    3: ['Spring health checks', 'Pasture rotation planning', 'Breeding program review'],\n    4: ['Grazing management', 'Fly control implementation', 'Growth rate monitoring'],\n    5: ['Heat stress prevention', 'Water system maintenance', 'Parasite monitoring'],\n    6: ['Pasture quality assessment', 'Shade structure evaluation', 'Feed supplementation'],\n    7: ['Harvest planning', 'Fall breeding preparation', 'Health protocol updates'],\n    8: ['Weaning procedures', 'Feed inventory', 'Winter preparation planning'],\n    9: ['Fall vaccination programs', 'Facility winterization', 'Feed storage preparation'],\n    10: ['Winter feeding setup', 'Breeding season management', 'Health monitoring protocols'],\n    11: ['Year-end health assessments', 'Equipment winterization', 'Next year planning']\n  };\n  return activities[month] || activities[0];\n}\n\nfunction getSeasonalProjects(month) {\n  // Return season-appropriate projects\n  const spring_projects = [\n    {\n      type: 'calving_management',\n      title: 'Spring Calving Management Project',\n      description: 'Manage the calving process from preparation through newborn care.',\n      duration: '6-8 weeks',\n      duration_days: 56,\n      difficulty: 'intermediate',\n      competencies: ['AS.07.01', 'AS.07.04'],\n      action_items: [\n        'Monitor pregnant cows for calving signs',\n        'Assist with difficult births when needed',\n        'Implement newborn calf care protocols',\n        'Document birth weights and health status'\n      ],\n      success_criteria: [\n        'Successfully assist with calf deliveries',\n        'Maintain detailed calving records',\n        'Ensure 95%+ calf survival rate'\n      ],\n      resources: ['Calving Management Guide', 'Veterinary Emergency Contacts']\n    }\n  ];\n  \n  // Return appropriate projects based on month\n  if (month >= 2 && month <= 4) return spring_projects;\n  return []; // Add more seasonal projects as needed\n}\n\nfunction removeDuplicates(recommendations) {\n  const seen = new Set();\n  return recommendations.filter(rec => {\n    const key = `${rec.type}_${rec.competency_focus || rec.category}`;\n    if (seen.has(key)) {\n      return false;\n    }\n    seen.add(key);\n    return true;\n  });\n}\n\nfunction prioritizeRecommendations(recommendations) {\n  return recommendations.sort((a, b) => {\n    const priorityOrder = { 'high': 3, 'medium': 2, 'low': 1 };\n    if (priorityOrder[a.priority] !== priorityOrder[b.priority]) {\n      return priorityOrder[b.priority] - priorityOrder[a.priority];\n    }\n    // Secondary sort by category importance\n    const categoryOrder = {\n      'urgent_improvement': 5,\n      'foundational_support': 4,\n      'excellence_pursuit': 3,\n      'motivation_boost': 2,\n      'leadership_development': 1\n    };\n    return (categoryOrder[b.category] || 0) - (categoryOrder[a.category] || 0);\n  });\n}\n\n// Generate additional utility functions for advanced features\nfunction generateAdvancedActionItems(competency) {\n  const advanced = {\n    'AS.07.01': [\n      'Develop herd health management software',\n      'Research genetic markers for disease resistance',\n      'Design automated health monitoring systems',\n      'Create predictive health analytics models'\n    ]\n  };\n  return advanced[competency] || generateActionItems(competency);\n}\n\nfunction generateAdvancedSuccessCriteria(competency) {\n  return [\n    'Innovate new approaches to traditional practices',\n    'Mentor other students in competency area',\n    'Present findings at agricultural conferences',\n    'Collaborate with industry professionals on projects'\n  ];\n}\n\nfunction generateRemedialActionItems(competency) {\n  const remedial = {\n    'AS.07.01': [\n      'Watch video demonstrations of health check procedures',\n      'Practice on simulation models before live animals',\n      'Work one-on-one with instructor or mentor',\n      'Start with simple observation exercises'\n    ]\n  };\n  return remedial[competency] || generateActionItems(competency);\n}\n\nfunction generateBasicSuccessCriteria(competency) {\n  return [\n    'Complete basic procedures with supervision',\n    'Identify key concepts correctly',\n    'Follow safety protocols consistently',\n    'Ask relevant questions during learning'\n  ];\n}\n\nfunction getAdvancedResources(competency) {\n  return [\n    'Graduate-level agricultural research papers',\n    'Industry innovation reports',\n    'Professional conference proceedings',\n    'Advanced veterinary textbooks'\n  ];\n}\n\nfunction getFoundationalResources(competency) {\n  return [\n    'Beginner agricultural education videos',\n    'Interactive learning modules',\n    'Peer tutoring sessions',\n    'Instructor office hours'\n  ];\n}\n\nreturn recommendationEngine;"
+      },
+      "id": "generate-recommendations",
+      "name": "Generate AI Recommendations",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        900,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "batchSize": 1,
+        "options": {}
+      },
+      "id": "split-recommendations-batch",
+      "name": "Split Recommendations",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        1120,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "create",
+        "tableId": "student_recommendations",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "student_id",
+              "fieldValue": "={{ $('Generate AI Recommendations').first().json.student_id }}"
+            },
+            {
+              "fieldId": "recommendation_type",
+              "fieldValue": "={{ $json.type }}"
+            },
+            {
+              "fieldId": "title",
+              "fieldValue": "={{ $json.title }}"
+            },
+            {
+              "fieldId": "description",
+              "fieldValue": "={{ $json.description }}"
+            },
+            {
+              "fieldId": "priority",
+              "fieldValue": "={{ $json.priority }}"
+            },
+            {
+              "fieldId": "metadata",
+              "fieldValue": "={{ JSON.stringify($json) }}"
+            },
+            {
+              "fieldId": "status",
+              "fieldValue": "active"
+            },
+            {
+              "fieldId": "expires_at",
+              "fieldValue": "={{ $json.expires_at }}"
+            }
+          ]
+        }
+      },
+      "id": "store-recommendations",
+      "name": "Store Recommendations",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        1340,
+        300
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "id": "{{ $env.SUPABASE_CREDENTIAL_ID }}",
+          "name": "Supabase Agricultural Education"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "high-priority-recommendation",
+              "leftValue": "={{ $json.priority }}",
+              "rightValue": "high",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "check-high-priority",
+      "name": "High Priority?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        1560,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "create",
+        "tableId": "notifications",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "user_id",
+              "fieldValue": "={{ $('Generate AI Recommendations').first().json.student_id }}"
+            },
+            {
+              "fieldId": "type",
+              "fieldValue": "high_priority_recommendation"
+            },
+            {
+              "fieldId": "title",
+              "fieldValue": "{{ $json.title }}"
+            },
+            {
+              "fieldId": "message",
+              "fieldValue": "{{ $json.description }}"
+            },
+            {
+              "fieldId": "data",
+              "fieldValue": "={{ JSON.stringify($json) }}"
+            },
+            {
+              "fieldId": "priority",
+              "fieldValue": "high"
+            }
+          ]
+        }
+      },
+      "id": "create-priority-notification",
+      "name": "Create Priority Notification",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        1780,
+        200
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "id": "{{ $env.SUPABASE_CREDENTIAL_ID }}",
+          "name": "Supabase Agricultural Education"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "requestMethod": "POST",
+        "url": "={{ $env.ZEP_API_URL }}/api/v1/sessions/{{ $('Generate AI Recommendations').first().json.student_id }}_recommendations/memory",
+        "authentication": "headerAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer {{ $env.ZEP_API_KEY }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyContentType": "json",
+        "jsonParameters": true,
+        "options": {},
+        "bodyParametersJson": "={{ JSON.stringify({ messages: [{ role: 'assistant', content: `Generated ${$('Generate AI Recommendations').first().json.recommendations.length} personalized recommendations for agricultural education`, metadata: { recommendation_count: $('Generate AI Recommendations').first().json.recommendations.length, generation_timestamp: $('Generate AI Recommendations').first().json.generation_timestamp, trigger_type: $('Generate AI Recommendations').first().json.trigger_context.trigger_type } }] }) }}"
+      },
+      "id": "update-zep-context",
+      "name": "Update Zep Context",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        1560,
+        480
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ success: true, message: 'Recommendations generated successfully', data: { student_id: $('Generate AI Recommendations').first().json.student_id, recommendations_count: $('Generate AI Recommendations').first().json.recommendations.length, generation_timestamp: $('Generate AI Recommendations').first().json.generation_timestamp, high_priority_count: $('Generate AI Recommendations').first().json.recommendations.filter(r => r.priority === 'high').length } }) }}"
+      },
+      "id": "success-response",
+      "name": "Success Response",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        1780,
+        380
+      ]
+    }
+  ],
+  "connections": {
+    "Recommendation Trigger": {
+      "main": [
+        [
+          {
+            "node": "Process Recommendation Trigger",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Process Recommendation Trigger": {
+      "main": [
+        [
+          {
+            "node": "Get Latest Analytics",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Get Competency Status",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Get Student Profile",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Get Learning Context from Zep",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Latest Analytics": {
+      "main": [
+        [
+          {
+            "node": "Generate AI Recommendations",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Competency Status": {
+      "main": [
+        [
+          {
+            "node": "Generate AI Recommendations",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Student Profile": {
+      "main": [
+        [
+          {
+            "node": "Generate AI Recommendations",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Learning Context from Zep": {
+      "main": [
+        [
+          {
+            "node": "Generate AI Recommendations",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate AI Recommendations": {
+      "main": [
+        [
+          {
+            "node": "Split Recommendations",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Recommendations": {
+      "main": [
+        [
+          {
+            "node": "Store Recommendations",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Store Recommendations": {
+      "main": [
+        [
+          {
+            "node": "High Priority?",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Update Zep Context",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "High Priority?": {
+      "main": [
+        [
+          {
+            "node": "Create Priority Notification",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "Create Priority Notification": {
+      "main": [
+        [
+          {
+            "node": "Success Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Zep Context": {
+      "main": [
+        [
+          {
+            "node": "Success Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "createdAt": "2024-01-15T11:00:00.000Z",
+  "updatedAt": "2024-01-15T11:00:00.000Z",
+  "settings": {
+    "timezone": "America/Chicago",
+    "saveExecutionProgress": true,
+    "saveManualExecutions": true
+  },
+  "staticData": {},
+  "tags": [
+    "agricultural-education",
+    "recommendations",
+    "ai-powered",
+    "personalization"
+  ],
+  "triggerCount": 1,
+  "versionId": "1"
+}

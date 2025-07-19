@@ -1,0 +1,555 @@
+{
+  "name": "AG Education - Knowledge Graph Analyzer with Agricultural AI",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "knowledge-graph",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook-trigger",
+      "name": "Knowledge Graph Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [
+        240,
+        300
+      ],
+      "webhookId": "ag-knowledge-graph"
+    },
+    {
+      "parameters": {
+        "functionCode": "// Agricultural Knowledge Graph Analyzer\n// Processes learning events to build comprehensive knowledge relationships\n\nconst graphData = $input.first().json.body;\n\n// Validate input data\nif (!graphData.student_id || !graphData.analysis_type) {\n  throw new Error('Missing required fields: student_id, analysis_type');\n}\n\n// Supported analysis types\nconst validAnalysisTypes = [\n  'concept_relationship_mapping', 'temporal_learning_progression', \n  'competency_knowledge_graph', 'animal_specific_knowledge',\n  'skill_dependency_analysis', 'learning_pathway_optimization',\n  'peer_knowledge_comparison', 'expertise_gap_identification'\n];\n\nif (!validAnalysisTypes.includes(graphData.analysis_type)) {\n  throw new Error(`Invalid analysis type: ${graphData.analysis_type}`);\n}\n\n// Process knowledge graph context\nconst knowledgeContext = {\n  student_id: graphData.student_id,\n  analysis_type: graphData.analysis_type,\n  timestamp: new Date().toISOString(),\n  \n  // Analysis parameters\n  parameters: {\n    time_window_days: graphData.time_window_days || 30,\n    competency_focus: graphData.competency_focus || 'all',\n    animal_species_filter: graphData.animal_species_filter || 'all',\n    learning_depth_threshold: graphData.learning_depth_threshold || 'developing',\n    include_peer_comparisons: graphData.include_peer_comparisons || false,\n    generate_predictions: graphData.generate_predictions || true\n  },\n  \n  // Session context\n  session_id: graphData.session_id || `knowledge_analysis_${graphData.student_id}_${Date.now()}`,\n  \n  // Analysis scope\n  scope: {\n    concepts: graphData.include_concepts !== false,\n    competencies: graphData.include_competencies !== false,\n    temporal_patterns: graphData.include_temporal !== false,\n    knowledge_gaps: graphData.include_gaps !== false,\n    learning_pathways: graphData.include_pathways !== false\n  }\n};\n\nreturn knowledgeContext;"
+      },
+      "id": "process-analysis-request",
+      "name": "Process Analysis Request",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        460,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "requestMethod": "GET",
+        "url": "={{ $env.ZEP_API_URL }}/api/v1/sessions/{{ $json.session_id }}/memory",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "zepApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "retrieve-zep-memory",
+      "name": "Retrieve Zep Memory Context",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        680,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "requestMethod": "GET",
+        "url": "={{ $env.ZEP_API_URL }}/api/v1/graph/entities",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "zepApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "options": {},
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "student_id",
+              "value": "={{ $('Process Analysis Request').first().json.student_id }}"
+            },
+            {
+              "name": "limit",
+              "value": "100"
+            }
+          ]
+        }
+      },
+      "id": "retrieve-knowledge-entities",
+      "name": "Retrieve Knowledge Entities",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        680,
+        320
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "select",
+        "tableId": "educational_activities",
+        "filterType": "manual",
+        "matchAny": false,
+        "conditions": {
+          "conditions": [
+            {
+              "keyName": "student_id",
+              "condition": "equal",
+              "value": "={{ $('Process Analysis Request').first().json.student_id }}"
+            },
+            {
+              "keyName": "timestamp",
+              "condition": "dateAfter",
+              "value": "={{ new Date(Date.now() - $('Process Analysis Request').first().json.parameters.time_window_days * 24 * 60 * 60 * 1000).toISOString() }}"
+            }
+          ]
+        },
+        "options": {
+          "limit": 50,
+          "orderBy": "timestamp DESC",
+          "queryName": "recent_learning_activities"
+        }
+      },
+      "id": "get-learning-activities",
+      "name": "Get Learning Activities",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        680,
+        440
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "id": "{{ $env.SUPABASE_CREDENTIAL_ID }}",
+          "name": "Supabase Agricultural Education"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "assistant",
+        "operation": "message",
+        "assistantId": "{{ $env.OPENAI_ASSISTANT_ID }}",
+        "message": "Perform comprehensive knowledge graph analysis for this agricultural education student:\n\nANALYSIS REQUEST:\n- Student ID: {{ $('Process Analysis Request').first().json.student_id }}\n- Analysis Type: {{ $('Process Analysis Request').first().json.analysis_type }}\n- Time Window: {{ $('Process Analysis Request').first().json.parameters.time_window_days }} days\n- Competency Focus: {{ $('Process Analysis Request').first().json.parameters.competency_focus }}\n- Animal Species Filter: {{ $('Process Analysis Request').first().json.parameters.animal_species_filter }}\n- Include Predictions: {{ $('Process Analysis Request').first().json.parameters.generate_predictions }}\n\nSTUDENT MEMORY CONTEXT:\n{{ $('Retrieve Zep Memory Context').first().json.summary || 'No memory context available' }}\n\nKNOWLEDGE ENTITIES:\n{{ JSON.stringify($('Retrieve Knowledge Entities').first().json || []) }}\n\nLEARNING ACTIVITIES DATA:\n{{ JSON.stringify($('Get Learning Activities').first().json?.slice(0, 10) || []) }}\n\nPERFORM ANALYSIS:\n\n1. **CONCEPT RELATIONSHIP MAPPING**:\n   - Identify core agricultural concepts demonstrated\n   - Map semantic relationships (is-a, part-of, requires, enables)\n   - Analyze causal relationships (leads-to, prevents, causes)\n   - Assess concept complexity and prerequisite structures\n\n2. **TEMPORAL LEARNING PROGRESSION**:\n   - Track concept introduction and mastery over time\n   - Identify learning velocity patterns\n   - Analyze seasonal learning alignments\n   - Map skill building sequences\n\n3. **COMPETENCY KNOWLEDGE GRAPH**:\n   - Connect activities to FFA competency standards\n   - Map sub-competency relationships and dependencies\n   - Identify competency progression pathways\n   - Assess cross-competency knowledge transfer\n\n4. **KNOWLEDGE GAP ANALYSIS**:\n   - Identify missing prerequisite knowledge\n   - Detect conceptual understanding gaps\n   - Find practical experience deficiencies\n   - Recommend knowledge bridge activities\n\n5. **LEARNING PATHWAY OPTIMIZATION**:\n   - Suggest optimal concept introduction sequences\n   - Recommend reinforcement activities\n   - Identify acceleration opportunities\n   - Predict challenging concept areas\n\nRespond with structured JSON:\n\n```json\n{\n  \"knowledge_graph\": {\n    \"concept_nodes\": [\n      {\n        \"id\": \"concept_id\",\n        \"name\": \"concept_name\",\n        \"category\": \"health|nutrition|reproduction|management|safety\",\n        \"complexity_level\": \"basic|intermediate|advanced\", \n        \"mastery_level\": \"novice|developing|proficient|expert\",\n        \"first_encountered\": \"timestamp\",\n        \"last_practiced\": \"timestamp\",\n        \"demonstration_count\": \"number\",\n        \"animal_species_associations\": [\"species_list\"]\n      }\n    ],\n    \"relationships\": [\n      {\n        \"source_concept\": \"concept_id\",\n        \"target_concept\": \"concept_id\", \n        \"relationship_type\": \"prerequisite|enables|reinforces|conflicts\",\n        \"strength\": \"0.0-1.0\",\n        \"evidence_count\": \"number\",\n        \"temporal_pattern\": \"sequential|parallel|seasonal\"\n      }\n    ]\n  },\n  \"competency_mapping\": {\n    \"AS.07.01\": {\n      \"progress_percentage\": \"0-100\",\n      \"sub_competencies_addressed\": [\"list\"],\n      \"knowledge_connections\": [\"concept_ids\"],\n      \"gap_areas\": [\"missing_areas\"]\n    }\n  },\n  \"temporal_analysis\": {\n    \"learning_velocity\": \"concepts_per_week\",\n    \"retention_patterns\": [\"strong|moderate|weak retention areas\"],\n    \"seasonal_alignments\": [\"activities aligned with agricultural seasons\"],\n    \"progression_milestones\": [\"significant learning events\"]\n  },\n  \"knowledge_gaps\": {\n    \"prerequisite_gaps\": [\"missing foundational knowledge\"],\n    \"conceptual_gaps\": [\"understanding deficiencies\"],\n    \"practical_gaps\": [\"hands-on experience needs\"],\n    \"safety_knowledge_gaps\": [\"critical safety concepts needed\"]\n  },\n  \"predictive_insights\": {\n    \"next_concept_recommendations\": [\"optimal next learning targets\"],\n    \"challenge_predictions\": [\"areas likely to be difficult\"],\n    \"acceleration_opportunities\": [\"areas for advanced learning\"],\n    \"reinforcement_needs\": [\"concepts requiring more practice\"]\n  },\n  \"learning_pathway\": {\n    \"current_focus_area\": \"primary learning domain\",\n    \"suggested_sequence\": [\"ordered list of next concepts\"],\n    \"timeline_estimate\": \"estimated progression timeframe\",\n    \"support_requirements\": [\"supervision, resources, peer collaboration needs\"]\n  }\n}\n```",
+        "options": {
+          "returnOnlyText": false
+        }
+      },
+      "id": "ai-knowledge-graph-analysis",
+      "name": "AI Knowledge Graph Analysis",
+      "type": "n8n-nodes-base.openAi",
+      "typeVersion": 1,
+      "position": [
+        900,
+        300
+      ],
+      "credentials": {
+        "openAiApi": {
+          "id": "{{ $env.OPENAI_CREDENTIAL_ID }}",
+          "name": "OpenAI Agricultural Education"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "functionCode": "// Process Knowledge Graph Analysis and Create Enhanced Data Structures\n\nconst analysisRequest = $('Process Analysis Request').first().json;\nconst aiResponse = $input.first().json;\n\n// Parse AI Assistant response\nlet knowledgeGraph;\ntry {\n  // OpenAI Assistant returns response in 'text' field\n  const responseContent = aiResponse.text || aiResponse.message?.content || aiResponse;\n  \n  // Extract JSON from response\n  const jsonMatch = responseContent.match(/```json\\n([\\s\\S]*?)\\n```/) || \n                   responseContent.match(/\\{[\\s\\S]*\\}/);\n  \n  if (jsonMatch) {\n    knowledgeGraph = JSON.parse(jsonMatch[1] || jsonMatch[0]);\n  } else {\n    throw new Error('No JSON found in AI response');\n  }\n} catch (error) {\n  console.log('Failed to parse knowledge graph analysis:', error.message);\n  // Fallback structure\n  knowledgeGraph = {\n    knowledge_graph: {\n      concept_nodes: [],\n      relationships: []\n    },\n    competency_mapping: {},\n    temporal_analysis: {\n      learning_velocity: '2-3 concepts per week',\n      retention_patterns: ['Moderate retention in core areas'],\n      progression_milestones: ['Continued skill development']\n    },\n    knowledge_gaps: {\n      prerequisite_gaps: ['Assessment needed'],\n      conceptual_gaps: ['Further analysis required'],\n      practical_gaps: ['Hands-on experience evaluation needed']\n    },\n    predictive_insights: {\n      next_concept_recommendations: ['Continue current learning path'],\n      challenge_predictions: ['Individual assessment required'],\n      acceleration_opportunities: ['Skill-based advancement']\n    }\n  };\n}\n\n// Enhanced knowledge graph data structure\nconst enhancedKnowledgeGraph = {\n  student_id: analysisRequest.student_id,\n  analysis_id: `kg_analysis_${analysisRequest.student_id}_${Date.now()}`,\n  analysis_type: analysisRequest.analysis_type,\n  generated_timestamp: new Date().toISOString(),\n  \n  // Core knowledge graph structure\n  knowledge_graph: {\n    concept_nodes: (knowledgeGraph.knowledge_graph?.concept_nodes || []).map(node => ({\n      ...node,\n      analysis_confidence: calculateConfidence(node),\n      agricultural_relevance: assessAgriculturalRelevance(node),\n      practical_application_level: assessPracticalLevel(node)\n    })),\n    relationships: (knowledgeGraph.knowledge_graph?.relationships || []).map(rel => ({\n      ...rel,\n      relationship_confidence: parseFloat(rel.strength) || 0.7,\n      agricultural_context: getAgriculturalContext(rel),\n      learning_impact: assessLearningImpact(rel)\n    }))\n  },\n  \n  // Enhanced competency analysis\n  competency_analysis: enhanceCompetencyMapping(knowledgeGraph.competency_mapping || {}),\n  \n  // Temporal learning insights\n  temporal_insights: {\n    ...knowledgeGraph.temporal_analysis,\n    analysis_period: `${analysisRequest.parameters.time_window_days} days`,\n    learning_consistency: assessLearningConsistency(knowledgeGraph.temporal_analysis),\n    seasonal_optimization: getSeasonalOptimization(knowledgeGraph.temporal_analysis)\n  },\n  \n  // Knowledge gap prioritization\n  prioritized_gaps: prioritizeKnowledgeGaps(knowledgeGraph.knowledge_gaps || {}),\n  \n  // Actionable predictions\n  actionable_insights: {\n    immediate_actions: (knowledgeGraph.predictive_insights?.next_concept_recommendations || []).slice(0, 3),\n    challenge_mitigation: (knowledgeGraph.predictive_insights?.challenge_predictions || []).map(challenge => ({\n      challenge: challenge,\n      mitigation_strategy: suggestMitigationStrategy(challenge),\n      support_level: 'moderate'\n    })),\n    acceleration_path: knowledgeGraph.predictive_insights?.acceleration_opportunities || [],\n    reinforcement_schedule: createReinforcementSchedule(knowledgeGraph.predictive_insights?.reinforcement_needs || [])\n  },\n  \n  // Learning pathway with agricultural context\n  optimized_pathway: {\n    ...knowledgeGraph.learning_pathway,\n    agricultural_season_alignment: alignWithAgriculturalSeason(),\n    ffa_competency_progression: mapToFFAProgression(knowledgeGraph.competency_mapping),\n    peer_collaboration_opportunities: identifyCollaborationOpportunities(),\n    safety_priority_concepts: identifySafetyPriorities(knowledgeGraph.knowledge_gaps)\n  },\n  \n  // Analysis metadata\n  analysis_metadata: {\n    ai_model: 'gpt-4',\n    analysis_quality_score: calculateAnalysisQuality(knowledgeGraph),\n    data_completeness: assessDataCompleteness(analysisRequest),\n    recommendation_confidence: calculateRecommendationConfidence(knowledgeGraph)\n  }\n};\n\n// Helper functions\nfunction calculateConfidence(node) {\n  const baseConfidence = 0.7;\n  const demonstrationBonus = Math.min((node.demonstration_count || 0) * 0.05, 0.2);\n  const masteryBonus = getMasteryBonus(node.mastery_level);\n  return Math.min(baseConfidence + demonstrationBonus + masteryBonus, 1.0);\n}\n\nfunction getMasteryBonus(level) {\n  const bonuses = { 'expert': 0.2, 'proficient': 0.15, 'developing': 0.1, 'novice': 0.0 };\n  return bonuses[level] || 0.0;\n}\n\nfunction assessAgriculturalRelevance(node) {\n  const agriculturalCategories = ['health', 'nutrition', 'reproduction', 'management', 'safety'];\n  return agriculturalCategories.includes(node.category) ? 'high' : 'medium';\n}\n\nfunction assessPracticalLevel(node) {\n  if (node.category === 'safety' || node.name?.toLowerCase().includes('procedure')) return 'high';\n  if (node.category === 'management' || node.name?.toLowerCase().includes('observation')) return 'medium';\n  return 'theoretical';\n}\n\nfunction getAgriculturalContext(relationship) {\n  const contextMap = {\n    'prerequisite': 'foundational_knowledge',\n    'enables': 'skill_advancement',\n    'reinforces': 'knowledge_consolidation',\n    'conflicts': 'concept_clarification_needed'\n  };\n  return contextMap[relationship.relationship_type] || 'general';\n}\n\nfunction assessLearningImpact(relationship) {\n  const strengthValue = parseFloat(relationship.strength) || 0.5;\n  if (strengthValue > 0.8) return 'high';\n  if (strengthValue > 0.6) return 'medium';\n  return 'low';\n}\n\nfunction enhanceCompetencyMapping(competencyMapping) {\n  const enhanced = {};\n  Object.keys(competencyMapping).forEach(competency => {\n    enhanced[competency] = {\n      ...competencyMapping[competency],\n      priority_level: getPriorityLevel(competencyMapping[competency].progress_percentage),\n      next_milestone: calculateNextMilestone(competencyMapping[competency]),\n      support_recommendations: generateSupportRecommendations(competencyMapping[competency])\n    };\n  });\n  return enhanced;\n}\n\nfunction getPriorityLevel(progress) {\n  if (progress < 30) return 'high';\n  if (progress < 70) return 'medium';\n  return 'maintenance';\n}\n\nfunction calculateNextMilestone(competency) {\n  const progress = competency.progress_percentage || 0;\n  const milestones = [25, 50, 75, 90];\n  const nextMilestone = milestones.find(m => m > progress);\n  return nextMilestone ? `${nextMilestone}% competency achievement` : 'Mastery level';\n}\n\nfunction generateSupportRecommendations(competency) {\n  const recommendations = [];\n  if (competency.gap_areas?.length > 0) {\n    recommendations.push('Focus on gap areas through targeted practice');\n  }\n  if (competency.progress_percentage < 50) {\n    recommendations.push('Increase supervised practice frequency');\n  }\n  return recommendations;\n}\n\nfunction assessLearningConsistency(temporal) {\n  // Simple assessment based on velocity\n  const velocity = parseFloat(temporal?.learning_velocity) || 2;\n  if (velocity > 3) return 'high';\n  if (velocity > 1.5) return 'moderate';\n  return 'needs_improvement';\n}\n\nfunction getSeasonalOptimization(temporal) {\n  const currentMonth = new Date().getMonth() + 1;\n  if (currentMonth >= 3 && currentMonth <= 5) return 'Spring: Focus on breeding and birthing management';\n  if (currentMonth >= 6 && currentMonth <= 8) return 'Summer: Emphasize growth monitoring and heat stress';\n  if (currentMonth >= 9 && currentMonth <= 11) return 'Fall: Concentrate on weaning and winter preparation';\n  return 'Winter: Focus on facility management and record keeping';\n}\n\nfunction prioritizeKnowledgeGaps(gaps) {\n  const prioritized = {\n    critical: gaps.safety_knowledge_gaps || [],\n    high_priority: gaps.prerequisite_gaps || [],\n    medium_priority: gaps.practical_gaps || [],\n    low_priority: gaps.conceptual_gaps || []\n  };\n  return prioritized;\n}\n\nfunction suggestMitigationStrategy(challenge) {\n  if (challenge.toLowerCase().includes('safety')) return 'Additional supervision and safety protocol review';\n  if (challenge.toLowerCase().includes('complex')) return 'Break into smaller, manageable learning steps';\n  return 'Provide additional practice opportunities and peer collaboration';\n}\n\nfunction createReinforcementSchedule(reinforcementNeeds) {\n  return reinforcementNeeds.map((need, index) => ({\n    concept: need,\n    frequency: 'weekly',\n    duration: '2-3 practice sessions',\n    priority: index < 2 ? 'high' : 'medium'\n  }));\n}\n\nfunction alignWithAgriculturalSeason() {\n  const currentMonth = new Date().getMonth() + 1;\n  const seasonalFocus = {\n    spring: 'Breeding management and birthing assistance',\n    summer: 'Growth monitoring and pasture management', \n    fall: 'Weaning protocols and winter preparation',\n    winter: 'Facility maintenance and planning'\n  };\n  \n  if (currentMonth >= 3 && currentMonth <= 5) return seasonalFocus.spring;\n  if (currentMonth >= 6 && currentMonth <= 8) return seasonalFocus.summer;\n  if (currentMonth >= 9 && currentMonth <= 11) return seasonalFocus.fall;\n  return seasonalFocus.winter;\n}\n\nfunction mapToFFAProgression(competencyMapping) {\n  const progression = [];\n  Object.keys(competencyMapping).forEach(comp => {\n    const progress = competencyMapping[comp]?.progress_percentage || 0;\n    if (progress < 50) progression.push(`${comp}: Foundation building needed`);\n    else if (progress < 80) progression.push(`${comp}: Advancing toward proficiency`);\n    else progression.push(`${comp}: Ready for advanced challenges`);\n  });\n  return progression;\n}\n\nfunction identifyCollaborationOpportunities() {\n  return [\n    'Peer mentoring for advanced students',\n    'Group projects for complex procedures',\n    'Collaborative problem-solving sessions',\n    'Cross-species knowledge sharing'\n  ];\n}\n\nfunction identifySafetyPriorities(gaps) {\n  const safetyGaps = gaps.safety_knowledge_gaps || [];\n  return safetyGaps.map(gap => ({\n    concept: gap,\n    urgency: 'immediate',\n    training_required: true\n  }));\n}\n\nfunction calculateAnalysisQuality(graph) {\n  let score = 70; // Base score\n  if (graph.knowledge_graph?.concept_nodes?.length > 5) score += 10;\n  if (graph.knowledge_graph?.relationships?.length > 3) score += 10;\n  if (graph.competency_mapping && Object.keys(graph.competency_mapping).length > 0) score += 10;\n  return Math.min(score, 100);\n}\n\nfunction assessDataCompleteness(request) {\n  let completeness = 60; // Base completeness\n  if (request.parameters.time_window_days >= 30) completeness += 15;\n  if (request.parameters.competency_focus !== 'all') completeness += 10;\n  if (request.scope.concepts && request.scope.competencies) completeness += 15;\n  return Math.min(completeness, 100);\n}\n\nfunction calculateRecommendationConfidence(graph) {\n  const hasRecommendations = graph.predictive_insights?.next_concept_recommendations?.length > 0;\n  const hasPathway = graph.learning_pathway?.suggested_sequence?.length > 0;\n  const hasGapAnalysis = Object.keys(graph.knowledge_gaps || {}).length > 0;\n  \n  let confidence = 60;\n  if (hasRecommendations) confidence += 15;\n  if (hasPathway) confidence += 15;\n  if (hasGapAnalysis) confidence += 10;\n  \n  return Math.min(confidence, 100);\n}\n\nreturn enhancedKnowledgeGraph;"
+      },
+      "id": "process-knowledge-graph",
+      "name": "Process Knowledge Graph Analysis",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        1120,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "create",
+        "tableId": "knowledge_entities",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "id",
+              "fieldValue": "={{ $json.node.id }}"
+            },
+            {
+              "fieldId": "student_id",
+              "fieldValue": "={{ $json.student_id }}"
+            },
+            {
+              "fieldId": "entity_name",
+              "fieldValue": "={{ $json.node.name }}"
+            },
+            {
+              "fieldId": "entity_type",
+              "fieldValue": "agricultural_concept"
+            },
+            {
+              "fieldId": "category",
+              "fieldValue": "={{ $json.node.category }}"
+            },
+            {
+              "fieldId": "properties",
+              "fieldValue": "={{ JSON.stringify({ complexity_level: $json.node.complexity_level, mastery_level: $json.node.mastery_level, demonstration_count: $json.node.demonstration_count, analysis_confidence: $json.node.analysis_confidence, agricultural_relevance: $json.node.agricultural_relevance, practical_application_level: $json.node.practical_application_level, animal_species_associations: $json.node.animal_species_associations }) }}"
+            },
+            {
+              "fieldId": "first_encountered",
+              "fieldValue": "={{ $json.node.first_encountered }}"
+            },
+            {
+              "fieldId": "last_updated",
+              "fieldValue": "={{ new Date().toISOString() }}"
+            },
+            {
+              "fieldId": "session_id",
+              "fieldValue": "={{ $json.analysis_id }}"
+            }
+          ]
+        }
+      },
+      "id": "store-concept-nodes",
+      "name": "Store Concept Nodes",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        1340,
+        200
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "id": "{{ $env.SUPABASE_CREDENTIAL_ID }}",
+          "name": "Supabase Agricultural Education"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "create",
+        "tableId": "knowledge_relationships",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "id",
+              "fieldValue": "={{ `rel_${$json.relationship.source_concept}_${$json.relationship.target_concept}_${Date.now()}` }}"
+            },
+            {
+              "fieldId": "student_id",
+              "fieldValue": "={{ $json.student_id }}"
+            },
+            {
+              "fieldId": "source_entity",
+              "fieldValue": "={{ $json.relationship.source_concept }}"
+            },
+            {
+              "fieldId": "target_entity",
+              "fieldValue": "={{ $json.relationship.target_concept }}"
+            },
+            {
+              "fieldId": "relationship_type",
+              "fieldValue": "={{ $json.relationship.relationship_type }}"
+            },
+            {
+              "fieldId": "strength",
+              "fieldValue": "={{ parseFloat($json.relationship.strength) || 0.7 }}"
+            },
+            {
+              "fieldId": "properties",
+              "fieldValue": "={{ JSON.stringify({ evidence_count: $json.relationship.evidence_count, temporal_pattern: $json.relationship.temporal_pattern, agricultural_context: $json.relationship.agricultural_context, learning_impact: $json.relationship.learning_impact, relationship_confidence: $json.relationship.relationship_confidence }) }}"
+            },
+            {
+              "fieldId": "created_at",
+              "fieldValue": "={{ new Date().toISOString() }}"
+            },
+            {
+              "fieldId": "session_id",
+              "fieldValue": "={{ $json.analysis_id }}"
+            }
+          ]
+        }
+      },
+      "id": "store-relationships",
+      "name": "Store Knowledge Relationships",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        1340,
+        320
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "id": "{{ $env.SUPABASE_CREDENTIAL_ID }}",
+          "name": "Supabase Agricultural Education"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "create",
+        "tableId": "knowledge_graph_sessions",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "id",
+              "fieldValue": "={{ $json.analysis_id }}"
+            },
+            {
+              "fieldId": "student_id",
+              "fieldValue": "={{ $json.student_id }}"
+            },
+            {
+              "fieldId": "analysis_type",
+              "fieldValue": "={{ $json.analysis_type }}"
+            },
+            {
+              "fieldId": "session_data",
+              "fieldValue": "={{ JSON.stringify({ competency_analysis: $json.competency_analysis, temporal_insights: $json.temporal_insights, prioritized_gaps: $json.prioritized_gaps, actionable_insights: $json.actionable_insights, optimized_pathway: $json.optimized_pathway, analysis_metadata: $json.analysis_metadata }) }}"
+            },
+            {
+              "fieldId": "created_at",
+              "fieldValue": "={{ $json.generated_timestamp }}"
+            },
+            {
+              "fieldId": "expires_at",
+              "fieldValue": "={{ new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString() }}"
+            }
+          ]
+        }
+      },
+      "id": "store-analysis-session",
+      "name": "Store Analysis Session",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        1340,
+        440
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "id": "{{ $env.SUPABASE_CREDENTIAL_ID }}",
+          "name": "Supabase Agricultural Education"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "requestMethod": "POST",
+        "url": "={{ $env.ZEP_API_URL }}/api/v1/sessions/{{ $('Process Analysis Request').first().json.session_id }}/memory",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "zepApi",
+        "sendBody": true,
+        "bodyContentType": "json",
+        "jsonParameters": true,
+        "options": {},
+        "bodyParametersJson": "={{ JSON.stringify({ messages: [{ role: 'assistant', content: `Knowledge graph analysis completed: Identified ${$json.knowledge_graph.concept_nodes.length} concepts and ${$json.knowledge_graph.relationships.length} relationships. Analysis type: ${$json.analysis_type}. Key insights: ${$json.actionable_insights.immediate_actions.slice(0, 2).join(', ')}. Quality score: ${$json.analysis_metadata.analysis_quality_score}%`, metadata: { analysis_type: 'knowledge_graph', concept_count: $json.knowledge_graph.concept_nodes.length, relationship_count: $json.knowledge_graph.relationships.length, analysis_quality: $json.analysis_metadata.analysis_quality_score, timestamp: $json.generated_timestamp } }] }) }}"
+      },
+      "id": "update-zep-graph",
+      "name": "Update Zep Knowledge Graph",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        1560,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ success: true, message: 'Knowledge graph analysis completed successfully', data: { student_id: $json.student_id, analysis_id: $json.analysis_id, analysis_type: $json.analysis_type, concepts_identified: $json.knowledge_graph.concept_nodes.length, relationships_mapped: $json.knowledge_graph.relationships.length, competencies_analyzed: Object.keys($json.competency_analysis).length, immediate_recommendations: $json.actionable_insights.immediate_actions, next_pathway_focus: $json.optimized_pathway.current_focus_area, quality_score: $json.analysis_metadata.analysis_quality_score, recommendation_confidence: $json.analysis_metadata.recommendation_confidence, generated_timestamp: $json.generated_timestamp } }) }}"
+      },
+      "id": "success-response",
+      "name": "Success Response",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        1780,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ success: false, error: $json.error?.message || 'Failed to perform knowledge graph analysis', timestamp: new Date().toISOString() }) }}",
+        "responseCode": 400
+      },
+      "id": "error-response",
+      "name": "Error Response",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        460,
+        480
+      ]
+    }
+  ],
+  "connections": {
+    "Knowledge Graph Trigger": {
+      "main": [
+        [
+          {
+            "node": "Process Analysis Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Process Analysis Request": {
+      "main": [
+        [
+          {
+            "node": "Retrieve Zep Memory Context",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Retrieve Knowledge Entities",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Get Learning Activities",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Retrieve Zep Memory Context": {
+      "main": [
+        [
+          {
+            "node": "AI Knowledge Graph Analysis",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Retrieve Knowledge Entities": {
+      "main": [
+        [
+          {
+            "node": "AI Knowledge Graph Analysis",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Learning Activities": {
+      "main": [
+        [
+          {
+            "node": "AI Knowledge Graph Analysis",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Knowledge Graph Analysis": {
+      "main": [
+        [
+          {
+            "node": "Process Knowledge Graph Analysis",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Process Knowledge Graph Analysis": {
+      "main": [
+        [
+          {
+            "node": "Store Concept Nodes",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Store Knowledge Relationships",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Store Analysis Session",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Store Concept Nodes": {
+      "main": [
+        [
+          {
+            "node": "Update Zep Knowledge Graph",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Store Knowledge Relationships": {
+      "main": [
+        [
+          {
+            "node": "Update Zep Knowledge Graph",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Store Analysis Session": {
+      "main": [
+        [
+          {
+            "node": "Update Zep Knowledge Graph",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Zep Knowledge Graph": {
+      "main": [
+        [
+          {
+            "node": "Success Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "createdAt": "2024-01-15T10:00:00.000Z",
+  "updatedAt": "2024-01-15T10:00:00.000Z",
+  "settings": {
+    "timezone": "America/Chicago"
+  },
+  "staticData": {},
+  "tags": [
+    "agricultural-education",
+    "knowledge-graph",
+    "ai-analysis",
+    "educational-analytics",
+    "concept-mapping"
+  ],
+  "triggerCount": 1,
+  "versionId": "2"
+}

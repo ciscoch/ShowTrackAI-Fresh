@@ -1,0 +1,475 @@
+{
+  "name": "AG Education - Learning Event Processor",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "learning-event",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook-trigger",
+      "name": "Learning Event Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [
+        240,
+        300
+      ],
+      "webhookId": "ag-learning-event"
+    },
+    {
+      "parameters": {
+        "functionCode": "// Agricultural Education Learning Event Processor\n// Validates and enriches learning events for Zep memory integration\n\nconst eventData = $input.first().json.body;\n\n// Validate required fields\nif (!eventData.student_id || !eventData.event_type || !eventData.content) {\n  throw new Error('Missing required fields: student_id, event_type, content');\n}\n\n// Agricultural education event types\nconst validEventTypes = [\n  'health_check', 'journal_entry', 'competency_assessment', \n  'consultation', 'sae_activity', 'animal_observation',\n  'feeding_record', 'treatment_administration', 'vaccination'\n];\n\nif (!validEventTypes.includes(eventData.event_type)) {\n  throw new Error(`Invalid event type: ${eventData.event_type}`);\n}\n\n// Process and enrich the learning event\nconst processedEvent = {\n  student_id: eventData.student_id,\n  event_type: eventData.event_type,\n  content: eventData.content,\n  metadata: {\n    timestamp: new Date().toISOString(),\n    animal_id: eventData.animal_id || null,\n    competency: eventData.competency || null,\n    location: eventData.location || null,\n    supervisor: eventData.supervisor || null,\n    session_id: eventData.session_id || `student_${eventData.student_id}_${Date.now()}`,\n    grade_level: eventData.grade_level || null,\n    sae_project_id: eventData.sae_project_id || null\n  },\n  zep_payload: {\n    sessionId: eventData.session_id || `student_${eventData.student_id}_${Date.now()}`,\n    message: {\n      role: 'user',\n      content: eventData.content,\n      metadata: {\n        event_type: eventData.event_type,\n        timestamp: new Date().toISOString(),\n        competency: eventData.competency,\n        animal_id: eventData.animal_id,\n        educational_context: 'agricultural_education'\n      }\n    }\n  }\n};\n\n// Extract agricultural concepts from content\nprocessedEvent.concepts = extractAgriculturalConcepts(eventData.content);\n\n// Assess learning quality\nprocessedEvent.learning_assessment = assessLearningQuality(eventData);\n\n// Map to FFA competency standards\nif (eventData.competency) {\n  processedEvent.competency_mapping = mapToFFAStandards(eventData.competency);\n}\n\nfunction extractAgriculturalConcepts(content) {\n  const concepts = [];\n  const lowerContent = content.toLowerCase();\n  \n  // Animal health concepts\n  const healthConcepts = [\n    'vaccination', 'deworming', 'nutrition', 'body_condition', \n    'respiratory', 'digestive', 'reproduction', 'genetics', \n    'behavior', 'housing', 'sanitation', 'biosecurity',\n    'mastitis', 'pneumonia', 'scours', 'bloat', 'lameness'\n  ];\n  \n  // Animal science concepts\n  const animalConcepts = [\n    'breeding', 'calving', 'weaning', 'feed_conversion',\n    'average_daily_gain', 'body_weight', 'estrus_cycle',\n    'artificial_insemination', 'pregnancy_check'\n  ];\n  \n  // Management concepts\n  const managementConcepts = [\n    'record_keeping', 'financial_planning', 'marketing',\n    'quality_assurance', 'animal_welfare', 'sustainability'\n  ];\n  \n  const allConcepts = [...healthConcepts, ...animalConcepts, ...managementConcepts];\n  \n  allConcepts.forEach(concept => {\n    if (lowerContent.includes(concept.replace('_', ' ')) || lowerContent.includes(concept)) {\n      concepts.push(concept);\n    }\n  });\n  \n  return concepts;\n}\n\nfunction assessLearningQuality(eventData) {\n  let qualityScore = 0;\n  let qualityFactors = [];\n  \n  // Content depth assessment\n  if (eventData.content.length > 200) {\n    qualityScore += 20;\n    qualityFactors.push('detailed_description');\n  }\n  \n  // Observation quality indicators\n  const observationTerms = ['observed', 'noticed', 'measured', 'recorded', 'documented'];\n  if (observationTerms.some(term => eventData.content.toLowerCase().includes(term))) {\n    qualityScore += 25;\n    qualityFactors.push('systematic_observation');\n  }\n  \n  // Reflection indicators\n  const reflectionTerms = ['because', 'therefore', 'learned', 'understand', 'realize'];\n  if (reflectionTerms.some(term => eventData.content.toLowerCase().includes(term))) {\n    qualityScore += 25;\n    qualityFactors.push('reflective_thinking');\n  }\n  \n  // Technical terminology\n  const technicalTerms = ['diagnosis', 'treatment', 'protocol', 'procedure', 'analysis'];\n  if (technicalTerms.some(term => eventData.content.toLowerCase().includes(term))) {\n    qualityScore += 20;\n    qualityFactors.push('technical_vocabulary');\n  }\n  \n  // Supervision level\n  if (eventData.supervisor) {\n    qualityScore += 10;\n    qualityFactors.push('supervised_activity');\n  } else {\n    qualityScore += 15;\n    qualityFactors.push('independent_work');\n  }\n  \n  return {\n    score: Math.min(qualityScore, 100),\n    level: qualityScore >= 80 ? 'advanced' : qualityScore >= 60 ? 'proficient' : qualityScore >= 40 ? 'developing' : 'novice',\n    factors: qualityFactors\n  };\n}\n\nfunction mapToFFAStandards(competency) {\n  const ffaMapping = {\n    'AS.07.01': {\n      name: 'Develop and implement animal health management practices',\n      category: 'health_management',\n      sub_competencies: [\n        'identify_health_signs',\n        'develop_health_protocols', \n        'implement_preventive_care',\n        'maintain_health_records'\n      ]\n    },\n    'AS.07.02': {\n      name: 'Develop and implement disease prevention practices',\n      category: 'disease_prevention',\n      sub_competencies: [\n        'understand_transmission',\n        'implement_biosecurity',\n        'design_vaccination_schedules',\n        'evaluate_prevention_effectiveness'\n      ]\n    },\n    'AS.07.03': {\n      name: 'Develop and implement animal treatment protocols',\n      category: 'treatment_protocols',\n      sub_competencies: [\n        'diagnose_health_issues',\n        'develop_treatment_plans',\n        'administer_medications',\n        'monitor_treatment_effectiveness'\n      ]\n    },\n    'AS.07.04': {\n      name: 'Implement health procedures and techniques',\n      category: 'health_procedures',\n      sub_competencies: [\n        'perform_health_procedures',\n        'use_veterinary_instruments',\n        'practice_animal_restraint',\n        'document_procedures'\n      ]\n    }\n  };\n  \n  return ffaMapping[competency] || { name: 'Unknown competency', category: 'other' };\n}\n\nreturn processedEvent;"
+      },
+      "id": "process-event",
+      "name": "Process & Enrich Event",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        460,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "requestMethod": "POST",
+        "url": "={{ $env.ZEP_API_URL }}/api/v1/sessions/{{ $json.zep_payload.sessionId }}/memory",
+        "authentication": "headerAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer {{ $env.ZEP_API_KEY }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyContentType": "json",
+        "jsonParameters": true,
+        "options": {},
+        "bodyParametersJson": "={{ JSON.stringify({ messages: [$json.zep_payload.message], summary: `Agricultural learning: ${$json.event_type} - ${$json.content.substring(0, 150)}...` }) }}"
+      },
+      "id": "add-to-zep",
+      "name": "Add to Zep Memory",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        680,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "requestMethod": "POST",
+        "url": "={{ $env.ZEP_API_URL }}/api/v1/graph/entities",
+        "authentication": "headerAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer {{ $env.ZEP_API_KEY }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyContentType": "json",
+        "jsonParameters": true,
+        "options": {},
+        "bodyParametersJson": "={{ JSON.stringify({ relationships: [{ source: `student_${$json.student_id}`, target: `learning_event_${Date.now()}`, type: 'PARTICIPATED_IN', properties: { event_type: $json.event_type, timestamp: $json.metadata.timestamp, concepts: $json.concepts, quality_score: $json.learning_assessment.score, competency: $json.metadata.competency, animal_id: $json.metadata.animal_id } }] }) }}"
+      },
+      "id": "update-knowledge-graph",
+      "name": "Update Knowledge Graph",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        680,
+        320
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "create",
+        "tableId": "educational_activities",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "id",
+              "fieldValue": "={{ $json.metadata.session_id }}_{{ Date.now() }}"
+            },
+            {
+              "fieldId": "student_id",
+              "fieldValue": "={{ $json.student_id }}"
+            },
+            {
+              "fieldId": "activity_type",
+              "fieldValue": "={{ $json.event_type }}"
+            },
+            {
+              "fieldId": "content",
+              "fieldValue": "={{ $json.content }}"
+            },
+            {
+              "fieldId": "competency_addressed",
+              "fieldValue": "={{ $json.metadata.competency }}"
+            },
+            {
+              "fieldId": "concepts_covered",
+              "fieldValue": "={{ JSON.stringify($json.concepts) }}"
+            },
+            {
+              "fieldId": "learning_assessment",
+              "fieldValue": "={{ JSON.stringify($json.learning_assessment) }}"
+            },
+            {
+              "fieldId": "timestamp",
+              "fieldValue": "={{ $json.metadata.timestamp }}"
+            },
+            {
+              "fieldId": "animal_id",
+              "fieldValue": "={{ $json.metadata.animal_id }}"
+            },
+            {
+              "fieldId": "session_id",
+              "fieldValue": "={{ $json.zep_payload.sessionId }}"
+            },
+            {
+              "fieldId": "location",
+              "fieldValue": "={{ $json.metadata.location }}"
+            },
+            {
+              "fieldId": "supervisor",
+              "fieldValue": "={{ $json.metadata.supervisor }}"
+            }
+          ]
+        }
+      },
+      "id": "log-to-database",
+      "name": "Log to Supabase",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        680,
+        440
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "id": "{{ $env.SUPABASE_CREDENTIAL_ID }}",
+          "name": "Supabase Agricultural Education"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "has-competency",
+              "leftValue": "={{ $json.metadata.competency }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "check-competency",
+      "name": "Has Competency?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        900,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "upsert",
+        "tableId": "student_competencies",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "student_id",
+              "fieldValue": "={{ $json.student_id }}"
+            },
+            {
+              "fieldId": "competency",
+              "fieldValue": "={{ $json.metadata.competency }}"
+            },
+            {
+              "fieldId": "demonstrations",
+              "fieldValue": "={{ $json.demonstrations + 1 || 1 }}"
+            },
+            {
+              "fieldId": "last_demonstration",
+              "fieldValue": "={{ $json.metadata.timestamp }}"
+            },
+            {
+              "fieldId": "quality_scores",
+              "fieldValue": "={{ JSON.stringify(($json.quality_scores || []).concat([$json.learning_assessment.score])) }}"
+            },
+            {
+              "fieldId": "level",
+              "fieldValue": "={{ $json.learning_assessment.level }}"
+            },
+            {
+              "fieldId": "progression_data",
+              "fieldValue": "={{ JSON.stringify({ competency_mapping: $json.competency_mapping, recent_concepts: $json.concepts, supervision_level: $json.metadata.supervisor ? 'supervised' : 'independent' }) }}"
+            }
+          ]
+        }
+      },
+      "id": "update-competency",
+      "name": "Update Competency Progress",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        1120,
+        180
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "id": "{{ $env.SUPABASE_CREDENTIAL_ID }}",
+          "name": "Supabase Agricultural Education"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "high-quality",
+              "leftValue": "={{ $json.learning_assessment.score }}",
+              "rightValue": "80",
+              "operator": {
+                "type": "number",
+                "operation": "gte"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "check-quality",
+      "name": "High Quality Learning?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        1120,
+        320
+      ]
+    },
+    {
+      "parameters": {
+        "requestMethod": "POST",
+        "url": "{{ $env.N8N_WEBHOOK_BASE }}/recommendation-generator",
+        "sendBody": true,
+        "bodyContentType": "json",
+        "jsonParameters": true,
+        "options": {},
+        "bodyParametersJson": "={{ JSON.stringify({ trigger: 'high_quality_learning', student_id: $json.student_id, event_data: $json, timestamp: new Date().toISOString() }) }}"
+      },
+      "id": "trigger-recommendations",
+      "name": "Trigger Recommendation Update",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        1340,
+        240
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ success: true, message: 'Learning event processed successfully', data: { session_id: $('Process & Enrich Event').first().json.zep_payload.sessionId, concepts_extracted: $('Process & Enrich Event').first().json.concepts.length, quality_score: $('Process & Enrich Event').first().json.learning_assessment.score, competency_updated: !!$('Process & Enrich Event').first().json.metadata.competency, knowledge_graph_updated: true, timestamp: new Date().toISOString() } }) }}"
+      },
+      "id": "success-response",
+      "name": "Success Response",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        1560,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ success: false, error: $json.error.message || 'Unknown error occurred', timestamp: new Date().toISOString() }) }}",
+        "responseCode": 400
+      },
+      "id": "error-response",
+      "name": "Error Response",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        460,
+        480
+      ]
+    }
+  ],
+  "connections": {
+    "Learning Event Webhook": {
+      "main": [
+        [
+          {
+            "node": "Process & Enrich Event",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Process & Enrich Event": {
+      "main": [
+        [
+          {
+            "node": "Add to Zep Memory",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Update Knowledge Graph",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Log to Supabase",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Add to Zep Memory": {
+      "main": [
+        [
+          {
+            "node": "Has Competency?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Knowledge Graph": {
+      "main": [
+        [
+          {
+            "node": "Has Competency?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log to Supabase": {
+      "main": [
+        [
+          {
+            "node": "Has Competency?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has Competency?": {
+      "main": [
+        [
+          {
+            "node": "Update Competency Progress",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "High Quality Learning?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Competency Progress": {
+      "main": [
+        [
+          {
+            "node": "High Quality Learning?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "High Quality Learning?": {
+      "main": [
+        [
+          {
+            "node": "Trigger Recommendation Update",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Success Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Trigger Recommendation Update": {
+      "main": [
+        [
+          {
+            "node": "Success Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "createdAt": "2024-01-15T10:00:00.000Z",
+  "updatedAt": "2024-01-15T10:00:00.000Z",
+  "settings": {
+    "timezone": "America/Chicago"
+  },
+  "staticData": {},
+  "tags": [
+    "agricultural-education",
+    "zep-memory",
+    "learning-analytics"
+  ],
+  "triggerCount": 1,
+  "versionId": "1"
+}

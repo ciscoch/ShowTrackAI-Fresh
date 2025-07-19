@@ -1,12 +1,12 @@
 /**
  * N8N Workflow Service for ShowTrackAI Agricultural Education Platform
  * 
- * Integrates with N8N automation platform to provide:
- * - Daily progress tracking workflows
- * - Feed efficiency monitoring
- * - Health alert systems
- * - SAE project automation
- * - Student reminder systems
+ * Integrates with N8N Cloud workflows to provide:
+ * - Learning event processing and Zep memory integration
+ * - Knowledge graph analysis and skill gap detection
+ * - AI-powered recommendation generation
+ * - Agricultural education competency tracking
+ * - Real-time student analytics and notifications
  */
 
 export interface N8nWorkflowConfig {
@@ -14,6 +14,9 @@ export interface N8nWorkflowConfig {
   apiKey?: string;
   enableWebhooks: boolean;
   enableScheduledTasks: boolean;
+  learningEventWebhook?: string;
+  knowledgeGraphWebhook?: string;
+  recommendationWebhook?: string;
 }
 
 export interface WorkflowTriggerData {
@@ -571,6 +574,391 @@ export class N8nWorkflowService {
       console.error('Cancel execution failed:', error);
       return false;
     }
+  }
+
+  // ===== AGRICULTURAL EDUCATION WORKFLOWS =====
+  // Integration with N8N Cloud workflows for agricultural education platform
+
+  /**
+   * Process Learning Event - Sends to N8N Learning Event Processor
+   * Integrates with Zep memory and Supabase for comprehensive learning tracking
+   * Workflow: ag_learning_event_processor.json
+   */
+  async processLearningEvent(eventData: {
+    student_id: string;
+    event_type: 'health_check' | 'journal_entry' | 'competency_assessment' | 'consultation' | 'sae_activity' | 'animal_observation' | 'feeding_record' | 'treatment_administration' | 'vaccination';
+    content: string;
+    animal_id?: string;
+    competency?: string;
+    location?: string;
+    supervisor?: string;
+    session_id?: string;
+    grade_level?: number;
+    sae_project_id?: string;
+  }): Promise<any> {
+    const webhookUrl = this.config.learningEventWebhook || process.env.EXPO_PUBLIC_N8N_LEARNING_EVENT_WEBHOOK;
+    
+    if (!webhookUrl) {
+      console.warn('N8N Learning event webhook not configured - skipping cloud workflow');
+      return { success: false, message: 'Webhook not configured' };
+    }
+
+    try {
+      const payload = {
+        ...eventData,
+        timestamp: new Date().toISOString(),
+        source: 'showtrack_ai_agricultural_education'
+      };
+
+      console.log('🔄 Sending learning event to N8N:', payload.event_type);
+
+      const response = await fetch(webhookUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(payload)
+      });
+
+      if (!response.ok) {
+        throw new Error(`Learning event processing failed: ${response.status} ${response.statusText}`);
+      }
+
+      const result = await response.json();
+      console.log('✅ Learning event processed successfully by N8N Cloud:', {
+        event_type: eventData.event_type,
+        session_id: result.data?.session_id,
+        concepts_extracted: result.data?.concepts_extracted,
+        quality_score: result.data?.quality_score,
+        competency_updated: result.data?.competency_updated
+      });
+      
+      return result;
+    } catch (error) {
+      console.error('❌ N8N Learning event processing failed:', error);
+      
+      // Don't throw error - allow app to continue functioning without N8N
+      return { 
+        success: false, 
+        error: error.message,
+        fallback: true 
+      };
+    }
+  }
+
+  /**
+   * Trigger Knowledge Graph Analysis - Manually trigger knowledge graph analysis for a student
+   * Workflow: ag_knowledge_graph_analyzer.json (normally runs every 6 hours automatically)
+   */
+  async triggerKnowledgeGraphAnalysis(studentId: string, options?: {
+    force_analysis?: boolean;
+    include_recommendations?: boolean;
+  }): Promise<any> {
+    const webhookUrl = this.config.knowledgeGraphWebhook || process.env.EXPO_PUBLIC_N8N_KNOWLEDGE_GRAPH_WEBHOOK;
+    
+    if (!webhookUrl) {
+      console.warn('N8N Knowledge graph webhook not configured - skipping analysis');
+      return { success: false, message: 'Knowledge graph webhook not configured' };
+    }
+
+    try {
+      const payload = {
+        student_id: studentId,
+        trigger_type: 'manual',
+        options: options || {
+          force_analysis: true,
+          include_recommendations: true
+        },
+        timestamp: new Date().toISOString()
+      };
+
+      console.log('🧠 Triggering knowledge graph analysis for student:', studentId);
+
+      const response = await fetch(webhookUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(payload)
+      });
+
+      if (!response.ok) {
+        throw new Error(`Knowledge graph analysis failed: ${response.status} ${response.statusText}`);
+      }
+
+      const result = await response.json();
+      console.log('✅ Knowledge graph analysis triggered successfully:', {
+        student_id: studentId,
+        analysis_scheduled: true,
+        workflow: 'ag_knowledge_graph_analyzer'
+      });
+      
+      return result;
+    } catch (error) {
+      console.error('❌ Knowledge graph analysis failed:', error);
+      
+      // Don't throw error - return fallback response
+      return { 
+        success: false, 
+        error: error.message,
+        fallback: true 
+      };
+    }
+  }
+
+  /**
+   * Generate Recommendations - Trigger AI-powered recommendation generation
+   * Workflow: ag_recommendation_generator.json
+   */
+  async generateRecommendations(data: {
+    student_id: string;
+    trigger: 'high_quality_learning' | 'skill_gap_detected' | 'completion_milestone' | 'manual_request' | 'scheduled_analysis';
+    context?: {
+      competency?: string;
+      animal_id?: string;
+      sae_project_id?: string;
+      recent_activities?: string[];
+      learning_goals?: string[];
+    };
+  }): Promise<any> {
+    const webhookUrl = this.config.recommendationWebhook || process.env.EXPO_PUBLIC_N8N_RECOMMENDATION_WEBHOOK;
+    
+    if (!webhookUrl) {
+      console.warn('N8N Recommendation webhook not configured - generating local recommendations');
+      return this.generateLocalRecommendations(data);
+    }
+
+    try {
+      const payload = {
+        ...data,
+        timestamp: new Date().toISOString(),
+        source: 'showtrack_ai_agricultural_education'
+      };
+
+      console.log('🎯 Generating recommendations via N8N for student:', data.student_id, 'trigger:', data.trigger);
+
+      const response = await fetch(webhookUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(payload)
+      });
+
+      if (!response.ok) {
+        throw new Error(`Recommendation generation failed: ${response.status} ${response.statusText}`);
+      }
+
+      const result = await response.json();
+      console.log('✅ AI recommendations generated successfully:', {
+        student_id: data.student_id,
+        trigger: data.trigger,
+        recommendations_created: result.recommendations_count || 'unknown',
+        workflow: 'ag_recommendation_generator'
+      });
+      
+      return result;
+    } catch (error) {
+      console.error('❌ N8N Recommendation generation failed:', error);
+      
+      // Fallback to local recommendations
+      console.log('🔄 Falling back to local recommendation generation');
+      return this.generateLocalRecommendations(data);
+    }
+  }
+
+  /**
+   * Generate local recommendations when N8N is not available
+   */
+  private generateLocalRecommendations(data: {
+    student_id: string;
+    trigger: string;
+    context?: any;
+  }): any {
+    const recommendations = [];
+    
+    // Generate basic recommendations based on trigger
+    switch (data.trigger) {
+      case 'high_quality_learning':
+        recommendations.push({
+          type: 'skill_development',
+          title: 'Continue Excellent Work!',
+          description: 'Your recent learning activity shows great progress. Consider exploring advanced topics in this area.',
+          priority: 'medium'
+        });
+        break;
+        
+      case 'skill_gap_detected':
+        recommendations.push({
+          type: 'skill_development',
+          title: 'Skill Development Opportunity',
+          description: 'Focus on practicing health assessment skills with your animals.',
+          priority: 'high'
+        });
+        break;
+        
+      case 'manual_request':
+        recommendations.push({
+          type: 'general',
+          title: 'Next Steps for Your SAE Project',
+          description: 'Consider documenting your recent animal health observations in detail.',
+          priority: 'medium'
+        });
+        break;
+        
+      default:
+        recommendations.push({
+          type: 'general',
+          title: 'Keep Up the Great Work',
+          description: 'Continue tracking your animals daily and documenting your observations.',
+          priority: 'low'
+        });
+    }
+    
+    return {
+      success: true,
+      recommendations,
+      fallback: true,
+      message: 'Local recommendations generated'
+    };
+  }
+
+  /**
+   * Quick helper methods for common agricultural education workflows
+   */
+
+  // ===== CONVENIENCE METHODS FOR AGRICULTURAL EDUCATION =====
+  
+  /**
+   * Process health check learning event with automatic competency mapping
+   */
+  async processHealthCheckEvent(studentId: string, content: string, metadata: {
+    animal_id: string;
+    competency?: string;
+    supervisor?: string;
+  }): Promise<any> {
+    // Auto-map to FFA competency if not provided
+    const competency = metadata.competency || 'AS.07.01'; // Health management practices
+    
+    return this.processLearningEvent({
+      student_id: studentId,
+      event_type: 'health_check',
+      content,
+      competency,
+      ...metadata
+    });
+  }
+
+  /**
+   * Process journal entry learning event with content analysis
+   */
+  async processJournalEntry(studentId: string, content: string, metadata: {
+    animal_id?: string;
+    competency?: string;
+    sae_project_id?: string;
+  }): Promise<any> {
+    // Determine competency from content if not provided
+    let competency = metadata.competency;
+    if (!competency) {
+      const lowerContent = content.toLowerCase();
+      if (lowerContent.includes('health') || lowerContent.includes('sick') || lowerContent.includes('treatment')) {
+        competency = 'AS.07.01';
+      } else if (lowerContent.includes('feed') || lowerContent.includes('nutrition')) {
+        competency = 'AS.06.01';
+      } else if (lowerContent.includes('breeding') || lowerContent.includes('reproduction')) {
+        competency = 'AS.05.01';
+      }
+    }
+    
+    return this.processLearningEvent({
+      student_id: studentId,
+      event_type: 'journal_entry',
+      content,
+      competency,
+      ...metadata
+    });
+  }
+
+  /**
+   * Process SAE activity learning event with project tracking
+   */
+  async processSAEActivity(studentId: string, content: string, metadata: {
+    sae_project_id: string;
+    competency?: string;
+    supervisor?: string;
+  }): Promise<any> {
+    return this.processLearningEvent({
+      student_id: studentId,
+      event_type: 'sae_activity',
+      content,
+      ...metadata
+    });
+  }
+
+  /**
+   * Trigger recommendations after high-quality learning with enhanced context
+   */
+  async triggerHighQualityLearningRecommendations(studentId: string, context: {
+    competency: string;
+    animal_id?: string;
+    learning_quality_score: number;
+  }): Promise<any> {
+    console.log('🌟 Triggering high-quality learning recommendations:', {
+      student_id: studentId,
+      competency: context.competency,
+      quality_score: context.learning_quality_score
+    });
+    
+    return this.generateRecommendations({
+      student_id: studentId,
+      trigger: 'high_quality_learning',
+      context: {
+        ...context,
+        timestamp: new Date().toISOString(),
+        source_workflow: 'high_quality_learning_detection'
+      }
+    });
+  }
+
+  /**
+   * Batch process multiple learning events efficiently
+   */
+  async processBatchLearningEvents(events: Array<{
+    student_id: string;
+    event_type: string;
+    content: string;
+    metadata?: any;
+  }>): Promise<any[]> {
+    console.log(`📚 Processing ${events.length} learning events in batch`);
+    
+    const results = [];
+    
+    for (const event of events) {
+      try {
+        const result = await this.processLearningEvent({
+          student_id: event.student_id,
+          event_type: event.event_type as any,
+          content: event.content,
+          ...event.metadata
+        });
+        
+        results.push({ ...result, event_id: `${event.student_id}_${Date.now()}` });
+        
+        // Small delay to prevent overwhelming the N8N webhook
+        await new Promise(resolve => setTimeout(resolve, 100));
+        
+      } catch (error) {
+        console.error('Batch event processing failed:', error);
+        results.push({ 
+          success: false, 
+          error: error.message, 
+          event_id: `${event.student_id}_${Date.now()}` 
+        });
+      }
+    }
+    
+    console.log(`✅ Batch processing complete: ${results.filter(r => r.success !== false).length}/${events.length} successful`);
+    return results;
   }
 }
 

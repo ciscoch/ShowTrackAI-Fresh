@@ -1,0 +1,413 @@
+{
+  "name": "AG Education - AI-Powered Recommendation Generator",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "recommendation-generator",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook-trigger",
+      "name": "Recommendation Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [
+        240,
+        300
+      ],
+      "webhookId": "ag-recommendation-generator"
+    },
+    {
+      "parameters": {
+        "functionCode": "// Agricultural Education Recommendation Generator\n// Processes triggers and prepares context for AI recommendation generation\n\nconst triggerData = $input.first().json.body;\n\n// Validate trigger data\nif (!triggerData.student_id || !triggerData.trigger) {\n  throw new Error('Missing required fields: student_id, trigger');\n}\n\n// Supported trigger types\nconst validTriggers = [\n  'high_quality_learning', 'skill_gap_detected', 'competency_milestone',\n  'learning_plateau', 'new_concept_introduced', 'assessment_completed',\n  'seasonal_activity_due', 'peer_comparison_insight'\n];\n\nif (!validTriggers.includes(triggerData.trigger)) {\n  throw new Error(`Invalid trigger type: ${triggerData.trigger}`);\n}\n\n// Process trigger context\nconst recommendationContext = {\n  student_id: triggerData.student_id,\n  trigger_type: triggerData.trigger,\n  timestamp: new Date().toISOString(),\n  event_data: triggerData.event_data || {},\n  ai_recommendations: triggerData.ai_recommendations || [],\n  \n  // Context for AI recommendation generation\n  context: {\n    recent_learning: triggerData.event_data || {},\n    competency_focus: triggerData.event_data?.metadata?.competency || null,\n    animal_species: triggerData.event_data?.metadata?.animal_species || null,\n    learning_quality: triggerData.event_data?.learning_assessment?.score || 0,\n    current_level: triggerData.event_data?.learning_assessment?.level || 'novice',\n    concepts_demonstrated: triggerData.event_data?.processed_concepts || [],\n    supervision_level: triggerData.event_data?.metadata?.supervisor ? 'supervised' : 'independent'\n  },\n  \n  // Session ID for memory retrieval\n  session_id: triggerData.event_data?.zep_payload?.sessionId || `student_${triggerData.student_id}_session`,\n  \n  // Trigger-specific parameters\n  trigger_parameters: getTriggerParameters(triggerData.trigger, triggerData)\n};\n\nfunction getTriggerParameters(trigger, data) {\n  switch(trigger) {\n    case 'high_quality_learning':\n      return {\n        quality_threshold: 75,\n        focus: 'advancement_opportunities',\n        recommendation_types: ['skill_development', 'knowledge_integration', 'leadership_opportunities']\n      };\n    \n    case 'skill_gap_detected':\n      return {\n        gap_area: data.gap_area || 'general',\n        urgency: 'high',\n        recommendation_types: ['foundational_skills', 'remediation', 'practice_opportunities']\n      };\n    \n    case 'competency_milestone':\n      return {\n        milestone_reached: data.milestone || 'unknown',\n        celebration: true,\n        recommendation_types: ['next_level_challenges', 'peer_mentoring', 'competition_opportunities']\n      };\n    \n    case 'learning_plateau':\n      return {\n        plateau_duration: data.plateau_days || 14,\n        intervention_needed: true,\n        recommendation_types: ['variety_injection', 'different_learning_styles', 'collaborative_projects']\n      };\n    \n    default:\n      return {\n        general_focus: true,\n        recommendation_types: ['general_advancement', 'skill_building']\n      };\n  }\n}\n\nreturn recommendationContext;"
+      },
+      "id": "process-trigger",
+      "name": "Process Trigger Context",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        460,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "requestMethod": "GET",
+        "url": "={{ $env.ZEP_API_URL }}/api/v1/sessions/{{ $json.session_id }}/memory",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "zepApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "retrieve-student-history",
+      "name": "Retrieve Student Learning History",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        680,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "select",
+        "tableId": "student_competencies", 
+        "filterType": "manual",
+        "matchAny": false,
+        "conditions": {
+          "conditions": [
+            {
+              "keyName": "student_id",
+              "condition": "equal",
+              "value": "={{ $json.student_id }}"
+            }
+          ]
+        },
+        "options": {
+          "queryName": "student_competency_progress"
+        }
+      },
+      "id": "get-competency-progress",
+      "name": "Get Student Competency Progress",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        680,
+        320
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "id": "{{ $env.SUPABASE_CREDENTIAL_ID }}",
+          "name": "Supabase Agricultural Education"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "select",
+        "tableId": "educational_activities",
+        "filterType": "manual", 
+        "matchAny": false,
+        "conditions": {
+          "conditions": [
+            {
+              "keyName": "student_id",
+              "condition": "equal",
+              "value": "={{ $json.student_id }}"
+            }
+          ]
+        },
+        "options": {
+          "limit": 10,
+          "orderBy": "timestamp DESC",
+          "queryName": "recent_activities"
+        }
+      },
+      "id": "get-recent-activities",
+      "name": "Get Recent Educational Activities",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        680,
+        440
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "id": "{{ $env.SUPABASE_CREDENTIAL_ID }}",
+          "name": "Supabase Agricultural Education"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "assistant",
+        "operation": "message",
+        "assistantId": "{{ $env.OPENAI_ASSISTANT_ID }}",
+        "message": "Generate personalized agricultural education recommendations for this student:\n\nTRIGGER CONTEXT:\n- Trigger Type: {{ $('Process Trigger Context').first().json.trigger_type }}\n- Student ID: {{ $('Process Trigger Context').first().json.student_id }}\n- Current Learning Level: {{ $('Process Trigger Context').first().json.context.current_level }}\n- Recent Quality Score: {{ $('Process Trigger Context').first().json.context.learning_quality }}\n- Competency Focus: {{ $('Process Trigger Context').first().json.context.competency_focus }}\n- Animal Species: {{ $('Process Trigger Context').first().json.context.animal_species }}\n- Supervision Level: {{ $('Process Trigger Context').first().json.context.supervision_level }}\n\nSTUDENT LEARNING HISTORY:\n{{ $('Retrieve Student Learning History').first().json.summary || 'No historical context available' }}\n\nCURRENT COMPETENCY PROGRESS:\n{{ JSON.stringify($('Get Student Competency Progress').first().json || []) }}\n\nRECENT ACTIVITIES (Last 10):\n{{ JSON.stringify($('Get Recent Educational Activities').first().json?.slice(0, 5) || []) }}\n\nRECOMMENDATION REQUIREMENTS:\n- Focus Areas: {{ JSON.stringify($('Process Trigger Context').first().json.trigger_parameters.recommendation_types) }}\n- Urgency Level: {{ $('Process Trigger Context').first().json.trigger_parameters.urgency || 'medium' }}\n- Special Context: {{ $('Process Trigger Context').first().json.trigger_parameters.focus || 'general_advancement' }}\n\nGenerate 3-5 specific recommendations in JSON format:\n\n```json\n{\n  \"recommendations\": [\n    {\n      \"id\": \"unique_recommendation_id\",\n      \"type\": \"skill_development|knowledge_integration|practical_application|assessment_opportunity|leadership_development\",\n      \"priority\": \"high|medium|low\", \n      \"title\": \"Clear, actionable title\",\n      \"description\": \"Detailed explanation of the recommended activity\",\n      \"competency_alignment\": \"AS.07.01|AS.07.02|AS.07.03|AS.07.04|General\",\n      \"animal_species\": \"Cattle|Sheep|Swine|Goats|Poultry|Multi-species\",\n      \"time_estimate\": \"Estimated time to complete\",\n      \"difficulty_level\": \"beginner|intermediate|advanced\", \n      \"resources_needed\": [\"List of required resources\"],\n      \"learning_outcomes\": [\"Expected learning outcomes\"],\n      \"assessment_method\": \"How to measure success\",\n      \"seasonal_relevance\": \"Current season applicability\",\n      \"collaboration_opportunities\": \"Peer/mentor/supervisor involvement\",\n      \"career_readiness_connection\": \"How this connects to career preparation\"\n    }\n  ],\n  \"overall_pathway\": {\n    \"current_focus\": \"Primary area for development\",\n    \"next_milestone\": \"Next major achievement target\", \n    \"estimated_timeline\": \"Expected progression timeframe\",\n    \"support_needed\": \"Recommended mentorship or supervision\"\n  },\n  \"motivation_factors\": {\n    \"strengths_to_leverage\": [\"Student's demonstrated strengths\"],\n    \"growth_opportunities\": [\"Areas for improvement\"],\n    \"celebration_points\": [\"Recent achievements to acknowledge\"]\n  }\n}\n```",
+        "options": {
+          "returnOnlyText": false
+        }
+      },
+      "id": "ai-recommendation-generator", 
+      "name": "AI Recommendation Generator",
+      "type": "n8n-nodes-base.openAi",
+      "typeVersion": 1,
+      "position": [
+        900,
+        300
+      ],
+      "credentials": {
+        "openAiApi": {
+          "id": "{{ $env.OPENAI_CREDENTIAL_ID }}",
+          "name": "OpenAI Agricultural Education"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "functionCode": "// Process AI Recommendations and Create Database Records\n\nconst triggerContext = $('Process Trigger Context').first().json;\nconst aiResponse = $input.first().json;\n\n// Parse AI Assistant response\nlet recommendations;\ntry {\n  // OpenAI Assistant returns response in 'text' field\n  const responseContent = aiResponse.text || aiResponse.message?.content || aiResponse;\n  \n  // Extract JSON from response\n  const jsonMatch = responseContent.match(/```json\\n([\\s\\S]*?)\\n```/) || \n                   responseContent.match(/\\{[\\s\\S]*\\}/);\n  \n  if (jsonMatch) {\n    recommendations = JSON.parse(jsonMatch[1] || jsonMatch[0]);\n  } else {\n    throw new Error('No JSON found in AI response');\n  }\n} catch (error) {\n  console.log('Failed to parse AI recommendations:', error.message);\n  // Fallback structure\n  recommendations = {\n    recommendations: [{\n      id: `fallback_${Date.now()}`,\n      type: 'general_advancement',\n      priority: 'medium',\n      title: 'Continue Current Learning Path',\n      description: 'Based on your recent progress, continue practicing the skills you\\'ve been developing.',\n      competency_alignment: triggerContext.context.competency_focus || 'General',\n      time_estimate: '1-2 weeks',\n      difficulty_level: triggerContext.context.current_level || 'intermediate'\n    }],\n    overall_pathway: {\n      current_focus: 'Skill development',\n      next_milestone: 'Competency advancement',\n      estimated_timeline: '4-6 weeks'\n    }\n  };\n}\n\n// Process and enhance recommendations\nconst processedRecommendations = recommendations.recommendations.map((rec, index) => ({\n  id: rec.id || `rec_${triggerContext.student_id}_${Date.now()}_${index}`,\n  student_id: triggerContext.student_id,\n  recommendation_type: rec.type || 'general_advancement',\n  priority: rec.priority || 'medium',\n  title: rec.title || 'Agricultural Learning Activity',\n  description: rec.description || 'Engage in agricultural learning activities to advance your skills.',\n  competency_alignment: rec.competency_alignment || triggerContext.context.competency_focus || 'General',\n  animal_species: rec.animal_species || triggerContext.context.animal_species || 'Multi-species',\n  time_estimate: rec.time_estimate || '1-2 weeks',\n  difficulty_level: rec.difficulty_level || triggerContext.context.current_level || 'intermediate',\n  resources_needed: JSON.stringify(rec.resources_needed || ['Basic farm equipment', 'Supervision available']),\n  learning_outcomes: JSON.stringify(rec.learning_outcomes || ['Skill improvement', 'Practical experience']),\n  assessment_method: rec.assessment_method || 'Supervisor evaluation and self-reflection',\n  seasonal_relevance: rec.seasonal_relevance || getCurrentSeasonalContext(),\n  collaboration_opportunities: rec.collaboration_opportunities || 'Work with classmates and instructor',\n  career_readiness_connection: rec.career_readiness_connection || 'Builds foundation for agricultural career',\n  \n  // Metadata\n  generated_by: 'ai_recommendation_engine',\n  trigger_type: triggerContext.trigger_type,\n  generation_timestamp: new Date().toISOString(),\n  expiration_date: getExpirationDate(rec.time_estimate),\n  status: 'active'\n}));\n\nfunction getCurrentSeasonalContext() {\n  const month = new Date().getMonth() + 1;\n  if (month >= 3 && month <= 5) return 'Spring activities: breeding, birthing, pasture management';\n  if (month >= 6 && month <= 8) return 'Summer activities: growth monitoring, heat stress management';\n  if (month >= 9 && month <= 11) return 'Fall activities: weaning, vaccination, winter preparation';\n  return 'Winter activities: facility maintenance, record keeping, planning';\n}\n\nfunction getExpirationDate(timeEstimate) {\n  const now = new Date();\n  const daysToAdd = timeEstimate?.includes('week') ? \n    (parseInt(timeEstimate) || 2) * 7 : \n    (parseInt(timeEstimate) || 14);\n  \n  now.setDate(now.getDate() + daysToAdd);\n  return now.toISOString();\n}\n\n// Return structured data for database insertion\nreturn {\n  recommendations: processedRecommendations,\n  summary: {\n    student_id: triggerContext.student_id,\n    total_recommendations: processedRecommendations.length,\n    trigger_type: triggerContext.trigger_type,\n    generation_timestamp: new Date().toISOString(),\n    overall_pathway: recommendations.overall_pathway || {},\n    motivation_factors: recommendations.motivation_factors || {}\n  }\n};"
+      },
+      "id": "process-recommendations",
+      "name": "Process AI Recommendations", 
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        1120,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "create",
+        "tableId": "student_recommendations",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "id", 
+              "fieldValue": "={{ $json.id }}"
+            },
+            {
+              "fieldId": "student_id",
+              "fieldValue": "={{ $json.student_id }}"
+            },
+            {
+              "fieldId": "recommendation_type",
+              "fieldValue": "={{ $json.recommendation_type }}"
+            },
+            {
+              "fieldId": "priority",
+              "fieldValue": "={{ $json.priority }}"
+            },
+            {
+              "fieldId": "title",
+              "fieldValue": "={{ $json.title }}"
+            },
+            {
+              "fieldId": "description", 
+              "fieldValue": "={{ $json.description }}"
+            },
+            {
+              "fieldId": "competency_alignment",
+              "fieldValue": "={{ $json.competency_alignment }}"
+            },
+            {
+              "fieldId": "metadata",
+              "fieldValue": "={{ JSON.stringify({ animal_species: $json.animal_species, time_estimate: $json.time_estimate, difficulty_level: $json.difficulty_level, resources_needed: JSON.parse($json.resources_needed), learning_outcomes: JSON.parse($json.learning_outcomes), assessment_method: $json.assessment_method, seasonal_relevance: $json.seasonal_relevance, collaboration_opportunities: $json.collaboration_opportunities, career_readiness_connection: $json.career_readiness_connection, generated_by: $json.generated_by, trigger_type: $json.trigger_type }) }}"
+            },
+            {
+              "fieldId": "created_at",
+              "fieldValue": "={{ $json.generation_timestamp }}"
+            },
+            {
+              "fieldId": "expires_at",
+              "fieldValue": "={{ $json.expiration_date }}"
+            },
+            {
+              "fieldId": "status",
+              "fieldValue": "={{ $json.status }}"
+            }
+          ]
+        }
+      },
+      "id": "store-recommendations",
+      "name": "Store Recommendations in Database",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        1340,
+        300
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "id": "{{ $env.SUPABASE_CREDENTIAL_ID }}",
+          "name": "Supabase Agricultural Education"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "requestMethod": "POST",
+        "url": "={{ $env.ZEP_API_URL }}/api/v1/sessions/{{ $('Process Trigger Context').first().json.session_id }}/memory",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "zepApi",
+        "sendBody": true,
+        "bodyContentType": "json",
+        "jsonParameters": true,
+        "options": {},
+        "bodyParametersJson": "={{ JSON.stringify({ messages: [{ role: 'assistant', content: `Generated ${$('Process AI Recommendations').first().json.summary.total_recommendations} personalized recommendations based on ${$('Process Trigger Context').first().json.trigger_type} trigger. Focus areas: ${$('Process AI Recommendations').first().json.recommendations.map(r => r.recommendation_type).join(', ')}. Next milestone: ${$('Process AI Recommendations').first().json.summary.overall_pathway.next_milestone || 'continued skill development'}.`, metadata: { type: 'recommendation_generation', trigger: $('Process Trigger Context').first().json.trigger_type, recommendation_count: $('Process AI Recommendations').first().json.summary.total_recommendations, timestamp: $('Process AI Recommendations').first().json.summary.generation_timestamp } }] }) }}"
+      },
+      "id": "update-memory",
+      "name": "Update Student Memory",
+      "type": "n8n-nodes-base.httpRequest", 
+      "typeVersion": 4,
+      "position": [
+        1560,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ success: true, message: 'AI-powered recommendations generated successfully', data: { student_id: $('Process AI Recommendations').first().json.summary.student_id, total_recommendations: $('Process AI Recommendations').first().json.summary.total_recommendations, trigger_type: $('Process AI Recommendations').first().json.summary.trigger_type, recommendations: $('Process AI Recommendations').first().json.recommendations.map(r => ({ id: r.id, title: r.title, type: r.recommendation_type, priority: r.priority, competency: r.competency_alignment })), generation_timestamp: $('Process AI Recommendations').first().json.summary.generation_timestamp, pathway_focus: $('Process AI Recommendations').first().json.summary.overall_pathway.current_focus, next_milestone: $('Process AI Recommendations').first().json.summary.overall_pathway.next_milestone } }) }}"
+      },
+      "id": "success-response",
+      "name": "Success Response",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        1780,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ success: false, error: $json.error?.message || 'Failed to generate recommendations', timestamp: new Date().toISOString() }) }}",
+        "responseCode": 400
+      },
+      "id": "error-response", 
+      "name": "Error Response",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        460,
+        480
+      ]
+    }
+  ],
+  "connections": {
+    "Recommendation Trigger": {
+      "main": [
+        [
+          {
+            "node": "Process Trigger Context",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Process Trigger Context": {
+      "main": [
+        [
+          {
+            "node": "Retrieve Student Learning History", 
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Get Student Competency Progress",
+            "type": "main", 
+            "index": 0
+          },
+          {
+            "node": "Get Recent Educational Activities",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Retrieve Student Learning History": {
+      "main": [
+        [
+          {
+            "node": "AI Recommendation Generator",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Student Competency Progress": {
+      "main": [
+        [
+          {
+            "node": "AI Recommendation Generator",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Recent Educational Activities": {
+      "main": [
+        [
+          {
+            "node": "AI Recommendation Generator", 
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Recommendation Generator": {
+      "main": [
+        [
+          {
+            "node": "Process AI Recommendations",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Process AI Recommendations": {
+      "main": [
+        [
+          {
+            "node": "Store Recommendations in Database",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Store Recommendations in Database": {
+      "main": [
+        [
+          {
+            "node": "Update Student Memory",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Student Memory": {
+      "main": [
+        [
+          {
+            "node": "Success Response",
+            "type": "main", 
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "createdAt": "2024-01-15T10:00:00.000Z",
+  "updatedAt": "2024-01-15T10:00:00.000Z", 
+  "settings": {
+    "timezone": "America/Chicago"
+  },
+  "staticData": {},
+  "tags": [
+    "agricultural-education",
+    "ai-recommendations", 
+    "personalized-learning",
+    "ffa-competencies",
+    "gpt4-analysis"
+  ],
+  "triggerCount": 1,
+  "versionId": "2"
+}
